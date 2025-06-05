@@ -21,4 +21,17 @@ export default class ShowtimeService {
     async deleteShowtime(id: string): Promise<IShowtime | null> {
         return Showtime.findByIdAndDelete(id);
     }
+
+    async getShowtimesByTheaterAndDate(theaterId: string, showDate: string): Promise<IShowtime[]> {
+        // showDate dạng "YYYY-MM-DD"
+        const startOfDay = new Date(showDate + "T00:00:00.000Z");
+        const endOfDay = new Date(showDate + "T23:59:59.999Z");
+        return Showtime.find({
+            theaterId,
+            showDate: {
+                $gte: startOfDay,
+                $lte: endOfDay
+            }
+        });
+    }
 }

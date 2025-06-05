@@ -62,4 +62,21 @@ export default class ShowtimeController {
             res.status(500).json({ message: "Error deleting showtime", error });
         }
     }
+
+    async getShowtimesByTheaterAndDate(req: Request, res: Response): Promise<void> {
+        const { theaterId, showDate } = req.query;
+        if (!theaterId || !showDate) {
+            res.status(400).json({ message: "Missing theaterId or showDate" });
+            return;
+        }
+        try {
+            const showtimes = await showtimeService.getShowtimesByTheaterAndDate(
+                theaterId as string,
+                showDate as string
+            );
+            res.status(200).json(showtimes);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching showtimes", error });
+        }
+    }
 }

@@ -1,10 +1,13 @@
 import express, { Application, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import connectDB from './configs/dbconnect';
+import moviesRouter from './routes/MoviesRouter';
 dotenv.config();
 
 const app: Application = express();
 const PORT = process.env.PORT;
+
+
 
 // Connect to MongoDB
 connectDB();
@@ -12,11 +15,9 @@ connectDB();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+//impoer routes
+app.use('/movies', moviesRouter);
 
-// Example route
-app.get('/', (req: Request, res: Response) => {
-    res.send('Welcome to ViviCinema!');
-});
 
 
 // Start the server

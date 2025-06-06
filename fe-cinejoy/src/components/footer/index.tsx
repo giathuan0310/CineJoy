@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { FaFacebookF, FaInstagram, FaTwitter } from 'react-icons/fa';
+import { Link } from "react-router-dom";
+import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa";
 
 const Footer = () => {
     return (
@@ -10,11 +10,14 @@ const Footer = () => {
                     <div className="md:col-span-1">
                         <div className="mb-6">
                             <Link to="/">
-                                <img
-                                    src="/logo-vti.png"
-                                    alt="VTI Logo"
+                                <img 
+                                    src="/logo-vti.png" 
+                                    alt="VTI Logo" 
                                     className="w-16 h-auto"
-
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "https://placeholder.com/100x40?text=VTI";
+                                    }}
                                 />
                             </Link>
                         </div>
@@ -28,74 +31,199 @@ const Footer = () => {
                         </ul>
                     </div>
 
-                    {/* Theater System - 3 columns */}
-                    <div className="md:col-span-3">
-                        <h3 className="text-lg font-semibold mb-6 text-center">Hệ thống rạp</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Northern Region */}
-                            <div>
-                                <h4 className="font-semibold mb-4 text-center">Miền Bắc</h4>
-                                <ul className="space-y-2">
-                                    <li><Link to="/cinema/hanoi" className="text-gray-700 hover:text-red-600">VTI Hà Nội Cinema</Link></li>
-                                    <li><Link to="/cinema/thanglong" className="text-gray-700 hover:text-red-600">VTI Thăng Long Movie</Link></li>
-                                    <li><Link to="/cinema/royal" className="text-gray-700 hover:text-red-600">VTI Royal Hanoi Theater</Link></li>
-                                    <li><Link to="/cinema/westlake" className="text-gray-700 hover:text-red-600">VTI West Lake Cinema</Link></li>
-                                    <li><Link to="/cinema/redriver" className="text-gray-700 hover:text-red-600">VTI Red River Film House</Link></li>
-                                </ul>
-                            </div>
+          {/* Theater System - 3 columns */}
+          <div className="md:col-span-3">
+            <h3 className="text-[20px] font-semibold mb-6 text-center">
+              Hệ thống rạp
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Northern Region */}
+              <div>
+                <h4 className="font-semibold mb-4">Miền Bắc</h4>
+                <ul className="space-y-3">
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Hà Nội Cinema
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Thăng Long Movie
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Royal Hanoi Theater
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy West Lake Cinema
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Red River Film House
+                    </Link>
+                  </li>
+                </ul>
+              </div>
 
-                            {/* Central Region */}
-                            <div>
-                                <h4 className="font-semibold mb-4 text-center">Miền Trung</h4>
-                                <ul className="space-y-2">
-                                    <li><Link to="/cinema/danang" className="text-gray-700 hover:text-red-600">VTI Đà Nẵng Star Cinema</Link></li>
-                                    <li><Link to="/cinema/hue" className="text-gray-700 hover:text-red-600">VTI Huế Heritage Cinema</Link></li>
-                                    <li><Link to="/cinema/hoian" className="text-gray-700 hover:text-red-600">VTI Đồng Hới Film Center</Link></li>
-                                    <li><Link to="/cinema/nhatrang" className="text-gray-700 hover:text-red-600">VTI Nha Trang Sun Theater</Link></li>
-                                    <li><Link to="/cinema/pleiku" className="text-gray-700 hover:text-red-600">VTI Pleiku Movies</Link></li>
-                                </ul>
-                            </div>
+              {/* Central Region */}
+              <div>
+                <h4 className="font-semibold mb-4">Miền Trung</h4>
+                <ul className="space-y-3">
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Đà Nẵng Star Cinema
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Huế Heritage Cinema
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Đồng Hới Film Center
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Nha Trang Sun Theater
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Pleiku Movies
+                    </Link>
+                  </li>
+                </ul>
+              </div>
 
-                            {/* Southern Region */}
-                            <div>
-                                <h4 className="font-semibold mb-4 text-center">Miền Nam</h4>
-                                <ul className="space-y-2">
-                                    <li><Link to="/cinema/saigon" className="text-gray-700 hover:text-red-600">VTI Sài Gòn Film House</Link></li>
-                                    <li><Link to="/cinema/mekong" className="text-gray-700 hover:text-red-600">VTI Mekong Movie Center</Link></li>
-                                    <li><Link to="/cinema/vungtau" className="text-gray-700 hover:text-red-600">VTI Vũng Tàu Ocean Cinema</Link></li>
-                                    <li><Link to="/cinema/cantho" className="text-gray-700 hover:text-red-600">VTI Cần Thơ Riverside Theater</Link></li>
-                                    <li><Link to="/cinema/bienhoa" className="text-gray-700 hover:text-red-600">VTI Biên Hòa Galaxy</Link></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
+              {/* Southern Region */}
+              <div>
+                <h4 className="font-semibold mb-4">Miền Nam</h4>
+                <ul className="space-y-3">
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Sài Gòn Film House
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Mekong Movie Center
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Vũng Tàu Ocean Cinema
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Cần Thơ Riverside Theater
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="#"
+                      className="text-gray-700 hover:text-red-600"
+                    >
+                      CineJoy Biên Hòa Galaxy
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
 
-                    {/* Connect & Contact */}
-                    <div className="md:col-span-1">
-                        <div className="mb-8">
-                            <h3 className="text-lg font-semibold mb-4">Kết nối</h3>
-                            <div className="flex gap-4">
-                                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-blue-600">
-                                    <FaFacebookF className="text-lg" /> Facebook
-                                </a>
-                            </div>
-                            <div className="flex gap-4 my-3">
-                                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-pink-600">
-                                    <FaInstagram className="text-lg" /> Instagram
-                                </a>
-                            </div>
-                            <div className="flex gap-4">
-                                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-blue-400">
-                                    <FaTwitter className="text-lg" /> Twitter
-                                </a>
-                            </div>
+          {/* Connect & Contact */}
+          <div className="md:col-span-1">
+            <div className="mb-8">
+              <h3 className="text-[20px] font-semibold mb-4">Kết nối</h3>
+              <div className="flex gap-4">
+                <a
+                  href="https://facebook.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-gray-700 hover:text-blue-600"
+                >
+                  <FaFacebookF className="text-lg" /> Facebook
+                </a>
+              </div>
+              <div className="flex gap-4 my-6">
+                <a
+                  href="https://instagram.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-gray-700 hover:text-pink-600"
+                >
+                  <FaInstagram className="text-lg" /> Instagram
+                </a>
+              </div>
+              <div className="flex gap-4">
+                <a
+                  href="https://twitter.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-gray-700 hover:text-blue-400"
+                >
+                  <FaTwitter className="text-lg" /> Twitter
+                </a>
+              </div>
 
                             <div className="mt-4">
-                                <img
-                                    src="/bo-cong-thuong.png"
-                                    alt="Bộ Công Thương"
+                                <img 
+                                    src="/bo-cong-thuong.png" 
+                                    alt="Bộ Công Thương" 
                                     className="w-32 h-auto"
-
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "https://placeholder.com/120x40?text=BCT";
+                                    }}
                                 />
                             </div>
                         </div>
@@ -109,7 +237,7 @@ const Footer = () => {
                         </div>
                     </div>
                 </div>
-
+                
                 {/* Copyright */}
                 <div className="mt-10 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
                     © Copyright 2024 - 2025

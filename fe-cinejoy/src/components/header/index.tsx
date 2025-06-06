@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const Header = () => {
     return (
-        <header className="bg-[#eee] shadow-sm">
+        <header className="bg-[#eee] shadow-sm border-b border-[#ccc]">
             <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
                 {/* Logo */}
                 <div className='flex items-center gap-6'>

@@ -3,9 +3,9 @@ import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa";
 
 const Footer = () => {
   return (
-    <footer className="bg-gray-100 pt-4 pb-2">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+    <footer className="bg-[#eee] pt-4">
+      <div className="container mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-8 px-4">
           {/* Left sidebar - Links */}
           <div className="md:col-span-1">
             <div className="mb-6">
@@ -257,7 +257,7 @@ const Footer = () => {
           <div className="md:col-span-1">
             <div>
               <h3 className="text-[20px] font-semibold mb-4">Liên hệ</h3>
-              <p className="mb-3">CÔNG TY CỔ PHẦN CineJoy MEDIA</p>
+              <p className="mb-3">CÔNG TY CỔ PHẦN CINEJOY MEDIA</p>
               <p className="mb-3">LIÊN HỆ HỢP TÁC</p>
               <p className="mb-3">HOTLINE: 1900 1999</p>
               <p className="mb-3">EMAIL: cinejoy@gmail.com</p>
@@ -266,7 +266,7 @@ const Footer = () => {
         </div>
 
         {/* Copyright */}
-        <div className="mt-10 pt-2 border-t border-gray-200 text-center text-gray-600 text-sm">
+        <div className="mt-10 py-2 bg-[#d2d8de] border-t border-gray-200 text-center text-gray-600 text-sm">
           © Copyright 2024 - 2025
         </div>
       </div>

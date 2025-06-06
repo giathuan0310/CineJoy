@@ -19,23 +19,23 @@ const Footer = () => {
             </div>
             <ul className="space-y-3">
               <li>
-                <Link to="/faq" className="text-gray-700 hover:text-red-600">
+                <Link to="#" className="text-gray-700 hover:text-red-600">
                   FAQ
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="text-gray-700 hover:text-red-600">
+                <Link to="#" className="text-gray-700 hover:text-red-600">
                   Giới thiệu
                 </Link>
               </li>
               <li>
-                <Link to="/terms" className="text-gray-700 hover:text-red-600">
+                <Link to="#" className="text-gray-700 hover:text-red-600">
                   Điều khoản sử dụng
                 </Link>
               </li>
               <li>
                 <Link
-                  to="/privacy"
+                  to="#"
                   className="text-gray-700 hover:text-red-600"
                 >
                   Chính Sách Quyền Riêng Tư
@@ -43,7 +43,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/account-request"
+                  to="#"
                   className="text-gray-700 hover:text-red-600"
                 >
                   Yêu cầu riêng về tài khoản
@@ -51,7 +51,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  to="/booking-guide"
+                  to="#"
                   className="text-gray-700 hover:text-red-600"
                 >
                   Hướng dẫn đặt vé online
@@ -72,7 +72,7 @@ const Footer = () => {
                 <ul className="space-y-3">
                   <li>
                     <Link
-                      to="/cinema/hanoi"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Hà Nội Cinema
@@ -80,7 +80,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/thanglong"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Thăng Long Movie
@@ -88,7 +88,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/royal"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Royal Hanoi Theater
@@ -96,7 +96,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/westlake"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy West Lake Cinema
@@ -104,7 +104,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/redriver"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Red River Film House
@@ -119,7 +119,7 @@ const Footer = () => {
                 <ul className="space-y-3">
                   <li>
                     <Link
-                      to="/cinema/danang"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Đà Nẵng Star Cinema
@@ -127,7 +127,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/hue"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Huế Heritage Cinema
@@ -135,7 +135,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/hoian"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Đồng Hới Film Center
@@ -143,7 +143,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/nhatrang"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Nha Trang Sun Theater
@@ -151,7 +151,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/pleiku"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Pleiku Movies
@@ -166,7 +166,7 @@ const Footer = () => {
                 <ul className="space-y-3">
                   <li>
                     <Link
-                      to="/cinema/saigon"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Sài Gòn Film House
@@ -174,7 +174,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/mekong"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Mekong Movie Center
@@ -182,7 +182,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/vungtau"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Vũng Tàu Ocean Cinema
@@ -190,7 +190,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/cantho"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Cần Thơ Riverside Theater
@@ -198,7 +198,7 @@ const Footer = () => {
                   </li>
                   <li>
                     <Link
-                      to="/cinema/bienhoa"
+                      to="#"
                       className="text-gray-700 hover:text-red-600"
                     >
                       CineJoy Biên Hòa Galaxy

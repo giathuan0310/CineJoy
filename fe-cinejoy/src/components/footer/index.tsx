@@ -2,34 +2,34 @@ import { Link } from "react-router-dom";
 import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa";
 
 const Footer = () => {
-    return (
-        <footer className="bg-gray-100 pt-10 pb-4">
-            <div className="container mx-auto px-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                    {/* Left sidebar - Links */}
-                    <div className="md:col-span-1">
-                        <div className="mb-6">
-                            <Link to="/">
-                                <img 
-                                    src="/logo-vti.png" 
-                                    alt="VTI Logo" 
-                                    className="w-16 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/100x40?text=VTI";
-                                    }}
-                                />
-                            </Link>
-                        </div>
-                        <ul className="space-y-3">
-                            <li><Link to="/faq" className="text-gray-700 hover:text-red-600">FAQ</Link></li>
-                            <li><Link to="/about" className="text-gray-700 hover:text-red-600">Giới thiệu</Link></li>
-                            <li><Link to="/terms" className="text-gray-700 hover:text-red-600">Điều khoản sử dụng</Link></li>
-                            <li><Link to="/privacy" className="text-gray-700 hover:text-red-600">Chính Sách Quyền Riêng Tư</Link></li>
-                            <li><Link to="/account-request" className="text-gray-700 hover:text-red-600">Yêu cầu riêng về tài khoản</Link></li>
-                            <li><Link to="/booking-guide" className="text-gray-700 hover:text-red-600">Hướng dẫn đặt vé online</Link></li>
-                        </ul>
-                    </div>
+  return (
+    <footer className="bg-gray-100 pt-10 pb-4">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+          {/* Left sidebar - Links */}
+          <div className="md:col-span-1">
+            <div className="mb-6">
+              <Link to="/">
+                <img
+                  src="/logo-vti.png"
+                  alt="VTI Logo"
+                  className="w-16 h-auto"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "https://placeholder.com/100x40?text=VTI";
+                  }}
+                />
+              </Link>
+            </div>
+            <ul className="space-y-3">
+              <li><Link to="/faq" className="text-gray-700 hover:text-red-600">FAQ</Link></li>
+              <li><Link to="/about" className="text-gray-700 hover:text-red-600">Giới thiệu</Link></li>
+              <li><Link to="/terms" className="text-gray-700 hover:text-red-600">Điều khoản sử dụng</Link></li>
+              <li><Link to="/privacy" className="text-gray-700 hover:text-red-600">Chính Sách Quyền Riêng Tư</Link></li>
+              <li><Link to="/account-request" className="text-gray-700 hover:text-red-600">Yêu cầu riêng về tài khoản</Link></li>
+              <li><Link to="/booking-guide" className="text-gray-700 hover:text-red-600">Hướng dẫn đặt vé online</Link></li>
+            </ul>
+          </div>
 
           {/* Theater System - 3 columns */}
           <div className="md:col-span-3">
@@ -215,36 +215,36 @@ const Footer = () => {
                 </a>
               </div>
 
-                            <div className="mt-4">
-                                <img 
-                                    src="/bo-cong-thuong.png" 
-                                    alt="Bộ Công Thương" 
-                                    className="w-32 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/120x40?text=BCT";
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-lg font-semibold mb-4">Liên hệ</h3>
-                            <p className="mb-2 font-semibold">CÔNG TY CỔ PHẦN VTI MEDIA</p>
-                            <p className="mb-2">LIÊN HỆ HỢP TÁC</p>
-                            <p className="mb-2">HOTLINE: 1900 1999</p>
-                            <p className="mb-2">EMAIL: vticinema@gmail.com</p>
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Copyright */}
-                <div className="mt-10 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
-                    © Copyright 2024 - 2025
-                </div>
+              <div className="mt-4">
+                <img
+                  src="/bo-cong-thuong.png"
+                  alt="Bộ Công Thương"
+                  className="w-32 h-auto"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "https://placeholder.com/120x40?text=BCT";
+                  }}
+                />
+              </div>
             </div>
-        </footer>
-    );
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Liên hệ</h3>
+              <p className="mb-2 font-semibold">CÔNG TY CỔ PHẦN VTI MEDIA</p>
+              <p className="mb-2">LIÊN HỆ HỢP TÁC</p>
+              <p className="mb-2">HOTLINE: 1900 1999</p>
+              <p className="mb-2">EMAIL: vticinema@gmail.com</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <div className="mt-10 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
+          © Copyright 2024 - 2025
+        </div>
+      </div>
+    </footer>
+  );
 };
 
 export default Footer;

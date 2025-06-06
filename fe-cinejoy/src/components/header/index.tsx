@@ -10,7 +10,7 @@ const Header = () => {
                     <Link to="/" className="flex items-center">
                         <img className='w-[60px] object-cover inline-block' src="https://vticinema.web.app/assets/logo-Bum-QgbD.png" alt="Logo" />
                     </Link>
-    
+
                     <div className="flex flex-col items-center text-sm select-none">
                         <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">Đặt vé</p>
                         <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">xem phim</p>
@@ -43,8 +43,8 @@ const Header = () => {
                             <FaSearch size={16} />
                         </button>
                     </div>
-                    <Link 
-                        to="/login" 
+                    <Link
+                        to="/login"
                         className="bg-[#061b4b] text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium"
                     >
                         Đăng nhập

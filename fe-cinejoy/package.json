@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.8",
     "@types/axios": "^0.9.36",
+    "antd": "^5.25.4",
     "async-mutex": "0.5.0",
     "axios": "^1.9.0",
     "dns": "^0.2.2",

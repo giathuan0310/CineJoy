@@ -10,14 +10,11 @@ const Footer = () => {
                     <div className="md:col-span-1">
                         <div className="mb-6">
                             <Link to="/">
-                                <img 
-                                    src="/logo-vti.png" 
-                                    alt="VTI Logo" 
+                                <img
+                                    src="/logo-vti.png"
+                                    alt="VTI Logo"
                                     className="w-16 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/100x40?text=VTI";
-                                    }}
+
                                 />
                             </Link>
                         </div>
@@ -94,14 +91,11 @@ const Footer = () => {
                             </div>
 
                             <div className="mt-4">
-                                <img 
-                                    src="/bo-cong-thuong.png" 
-                                    alt="Bộ Công Thương" 
+                                <img
+                                    src="/bo-cong-thuong.png"
+                                    alt="Bộ Công Thương"
                                     className="w-32 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/120x40?text=BCT";
-                                    }}
+
                                 />
                             </div>
                         </div>
@@ -115,7 +109,7 @@ const Footer = () => {
                         </div>
                     </div>
                 </div>
-                
+
                 {/* Copyright */}
                 <div className="mt-10 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
                     © Copyright 2024 - 2025

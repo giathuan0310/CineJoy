@@ -3,7 +3,7 @@ import { FaFacebookF, FaInstagram, FaTwitter } from 'react-icons/fa';
 
 const Footer = () => {
     return (
-        <footer className="bg-gray-100 pt-10 pb-4">
+        <footer className="bg-gray-100 pt-10 pb-2">
             <div className="container mx-auto px-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
                     {/* Left sidebar - Links */}
@@ -14,10 +14,6 @@ const Footer = () => {
                                     src="/logo-vti.png" 
                                     alt="VTI Logo" 
                                     className="w-16 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/100x40?text=VTI";
-                                    }}
                                 />
                             </Link>
                         </div>
@@ -98,10 +94,6 @@ const Footer = () => {
                                     src="/bo-cong-thuong.png" 
                                     alt="Bộ Công Thương" 
                                     className="w-32 h-auto"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/120x40?text=BCT";
-                                    }}
                                 />
                             </div>
                         </div>
@@ -117,7 +109,7 @@ const Footer = () => {
                 </div>
                 
                 {/* Copyright */}
-                <div className="mt-10 pt-6 border-t border-gray-200 text-center text-gray-600 text-sm">
+                <div className="mt-10 pt-2 border-t border-gray-200 text-center text-gray-600 text-sm">
                     © Copyright 2024 - 2025
                 </div>
             </div>

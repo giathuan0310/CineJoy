@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Layout from './components/layout';
 import HomePage from './pages/client/Home';
+import Movies from './pages/client/Movies';
+import MoviesDetail from './pages/client/MoviesDetail';
 
 const router = createBrowserRouter([
   {
@@ -13,6 +15,14 @@ const router = createBrowserRouter([
         index: true,
         element: <HomePage />
       },
+      {
+        path: "/movies",
+        element: <Movies />
+      }
+      , {
+        path: "/movies/:id",
+        element: <MoviesDetail />
+      }
     ]
   }
 ]);

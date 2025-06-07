@@ -21,6 +21,7 @@ export interface IMovie extends Document {
   posterImage: string;
   ageRating: string;
   reviews: IReview[];
+  averageRating: number;
 }
 
 const MovieSchema = new Schema<IMovie>({
@@ -44,6 +45,12 @@ const MovieSchema = new Schema<IMovie>({
       rating: { type: Number, required: true },
     },
   ],
+  averageRating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5,
+  }
 });
 
 export const Movie = model<IMovie>("Movie", MovieSchema);

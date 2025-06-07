@@ -11,52 +11,19 @@ const Footer = () => {
             <div className="mb-6">
               <Link to="/">
                 <img
-                  src="https://vticinema.web.app/assets/logo-Bum-QgbD.png"
-                  alt="CineJoy Logo"
-                  className="w-15 h-auto"
+                  src="/logo-vti.png"
+                  alt="VTI Logo"
+                  className="w-16 h-auto"
                 />
               </Link>
             </div>
             <ul className="space-y-3">
-              <li>
-                <Link to="#" className="text-gray-700 hover:text-red-600">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link to="#" className="text-gray-700 hover:text-red-600">
-                  Giới thiệu
-                </Link>
-              </li>
-              <li>
-                <Link to="#" className="text-gray-700 hover:text-red-600">
-                  Điều khoản sử dụng
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="#"
-                  className="text-gray-700 hover:text-red-600"
-                >
-                  Chính Sách Quyền Riêng Tư
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="#"
-                  className="text-gray-700 hover:text-red-600"
-                >
-                  Yêu cầu riêng về tài khoản
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="#"
-                  className="text-gray-700 hover:text-red-600"
-                >
-                  Hướng dẫn đặt vé online
-                </Link>
-              </li>
+              <li><Link to="/faq" className="text-gray-700 hover:text-red-600">FAQ</Link></li>
+              <li><Link to="/about" className="text-gray-700 hover:text-red-600">Giới thiệu</Link></li>
+              <li><Link to="/terms" className="text-gray-700 hover:text-red-600">Điều khoản sử dụng</Link></li>
+              <li><Link to="/privacy" className="text-gray-700 hover:text-red-600">Chính Sách Quyền Riêng Tư</Link></li>
+              <li><Link to="/account-request" className="text-gray-700 hover:text-red-600">Yêu cầu riêng về tài khoản</Link></li>
+              <li><Link to="/booking-guide" className="text-gray-700 hover:text-red-600">Hướng dẫn đặt vé online</Link></li>
             </ul>
           </div>
 
@@ -246,15 +213,13 @@ const Footer = () => {
 
               <div className="mt-4">
                 <img
-                  src="https://vticinema.web.app/assets/logo_da_thong_bao_bct-C4rMiu-E.webp"
+                  src="/bo-cong-thuong.png"
                   alt="Bộ Công Thương"
-                  className="w-36 h-auto"
+                  className="w-32 h-auto"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="md:col-span-1">
             <div>
               <h3 className="text-[20px] font-semibold mb-4">Liên hệ</h3>
               <p className="mb-3">CÔNG TY CỔ PHẦN CINEJOY MEDIA</p>

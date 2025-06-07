@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+.react-multiple-carousel__arrow--left {
+  top: 38% !important;
+  left: 25px !important;
+}
+
+.react-multiple-carousel__arrow--right {
+  top: 38% !important;
+  right: 25px !important;
+}
+
 @media (min-width: 767px) {
   ::-webkit-scrollbar {
     width: 8px;

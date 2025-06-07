@@ -1,9 +1,9 @@
 import { FaSearch } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 
 const Header = () => {
     return (
-        <header className="bg-[#eee] shadow-sm">
+        <header className="sticky top-0 z-9999 bg-[#eee] shadow-sm border-b border-[#ccc]">
             <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
                 {/* Logo */}
                 <div className='flex items-center gap-6'>
@@ -19,21 +19,21 @@ const Header = () => {
 
                 {/* Navigation */}
                 <nav className="hidden md:flex items-center gap-10 mx-4">
-                    <Link to="/" className="text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]">
+                    <NavLink to="/" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
                         Trang chủ
-                    </Link>
-                    <Link to="/movies" className="text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]">
+                    </NavLink>
+                    <NavLink to="/movies" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
                         Phim
-                    </Link>
-                    <Link to="/news" className="text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]">
+                    </NavLink>
+                    <NavLink to="/news" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
                         Tin tức
-                    </Link>
-                    <Link to="/members" className="text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]">
+                    </NavLink>
+                    <NavLink to="/members" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
                         Thành viên
-                    </Link>
-                    <Link to="/contact" className="text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]">
+                    </NavLink>
+                    <NavLink to="/contact" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
                         Liên hệ
-                    </Link>
+                    </NavLink>
                 </nav>
 
                 {/* Right section */}

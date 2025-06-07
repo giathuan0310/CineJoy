@@ -1,5 +1,6 @@
 import { FaSearch } from 'react-icons/fa';
 import { Link, NavLink } from 'react-router-dom';
+import Logo from 'assets/CineJoyLogo.png';
 
 const Header = () => {
     return (
@@ -8,7 +9,7 @@ const Header = () => {
                 {/* Logo */}
                 <div className='flex items-center gap-6'>
                     <Link to="/" className="flex items-center">
-                        <img className='w-[60px] object-cover inline-block' src="https://vticinema.web.app/assets/logo-Bum-QgbD.png" alt="Logo" />
+                        <img className='w-[90px] object-cover inline-block' src={Logo} alt="Logo" />
                     </Link>
 
                     <div className="flex flex-col items-center text-sm select-none">

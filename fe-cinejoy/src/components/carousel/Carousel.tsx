@@ -1,4 +1,4 @@
-import { Carousel } from "antd";
+import { Carousel } from 'antd';
 import React, { useState } from "react";
 
 const images: string[] = [

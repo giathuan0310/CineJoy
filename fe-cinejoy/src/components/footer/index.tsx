@@ -14,10 +14,7 @@ const Footer = () => {
                   src="/logo-vti.png"
                   alt="VTI Logo"
                   className="w-16 h-auto"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "https://placeholder.com/100x40?text=VTI";
-                  }}
+
                 />
               </Link>
             </div>
@@ -220,10 +217,7 @@ const Footer = () => {
                   src="/bo-cong-thuong.png"
                   alt="Bộ Công Thương"
                   className="w-32 h-auto"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "https://placeholder.com/120x40?text=BCT";
-                  }}
+
                 />
               </div>
             </div>

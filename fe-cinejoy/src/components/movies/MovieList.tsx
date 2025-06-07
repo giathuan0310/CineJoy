@@ -34,6 +34,8 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
 
     return (
         <div className="w-full">
+
+            {/* Các nút Sắp chiếu */}
             <div className="flex justify-center gap-4 mb-8 pt-3 pb-3">
                 <button
                     className={`px-6 h-10 border rounded font-semibold transition ${activeTab === "upcoming"
@@ -73,6 +75,9 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
                     Tất cả các phim
                 </button>
             </div>
+
+
+            {/* Hiển Thị Tất Cả Phim */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5  px-4">
                 {(showMore ? filteredMovies : filteredMovies.slice(0, 7)).map((movie) => (
                     <div

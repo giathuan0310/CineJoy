@@ -1,5 +1,5 @@
 import Slider from '@/components/carousel/Carousel';
-import MovieList from '@/components/moviesList/MovieList';
+import MovieList from '@/components/movies/MovieList';
 
 const movies = [
     {
@@ -45,10 +45,8 @@ const movies = [
 const Movies = () => {
     return (
         <>
-
             <Slider />
             <MovieList movies={movies} />
-
 
         </>
 

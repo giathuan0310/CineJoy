@@ -5,7 +5,7 @@ import Layout from './components/layout';
 import HomePage from './pages/client/Home';
 import Movies from './pages/client/Movies';
 import MoviesDetail from './pages/client/MoviesDetail';
-
+import Select from './pages/client/SelectSeat';
 const router = createBrowserRouter([
   {
     path: '/',
@@ -23,6 +23,10 @@ const router = createBrowserRouter([
       , {
         path: "/movies/:id",
         element: <MoviesDetail />
+      },
+      {
+        path: "/selectSeat",
+        element: <Select />
       }
     ]
   }

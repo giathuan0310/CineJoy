@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FaCheckCircle } from 'react-icons/fa';
+import MoviesListCarousel from '@/components/moviesListCarousel';
+import ScheduleList from '@/components/scheduleList';
 
 const HomePage = () => {
     return (
@@ -62,10 +64,6 @@ const HomePage = () => {
                                     src="https://res.cloudinary.com/ddia5yfia/image/upload/v1733633928/contact_5_otvgni.png" 
                                     alt="Cinema illustration" 
                                     className="w-full max-w-md"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "https://placeholder.com/800x500?text=Cinema+Illustration";
-                                    }}
                                 />
                             </div>
                         </div>
@@ -73,7 +71,9 @@ const HomePage = () => {
                 </div>
             </div>
 
-            {/* Thêm các section khác của trang chủ ở đây */}
+            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating />
+            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" />
+            <ScheduleList />
         </>
     );
 };

@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import connectDB from './configs/dbconnect';
 import moviesRouter from './routes/MoviesRouter';
 import theaterRouter from './routes/TheaterRouter';
@@ -14,7 +15,7 @@ const app: Application = express();
 const PORT = process.env.PORT;
 
 
-
+app.use(cors({ origin: "http://localhost:3000" })); // Cấu hình CORS để cho phép truy cập từ localhost:3000
 // Connect to MongoDB
 connectDB();
 
@@ -29,6 +30,8 @@ app.use("/food-combos", FoodComboRouter);
 app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
+
+
 
 // Start the server
 app.listen(PORT, () => {

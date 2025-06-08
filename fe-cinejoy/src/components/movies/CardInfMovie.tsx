@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { getMovieById } from "@/apiservice/apiMovies";
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 const cinemas = [
     {
@@ -87,62 +89,25 @@ const showtimesData: Record<number, Record<string, string[]>> = {
     },
 };
 
-const movies = [
-    {
-        id: 1,
-        title: "Vây Hãm Tại Đài Bắc",
-        poster:
-            "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969147/50.Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_lr0jp4_wbdemr.jpg",
-        age: "16+",
-        subtitle: "2D Phụ đề",
-        showtimes: ["03:00 PM ~ 04:52 PM", "05:15 PM ~ 07:07 PM"],
-    },
-    {
-        id: 2,
-        title: "Vùng Đất Bị Nguyền Rủa",
-        poster:
-            "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969149/56._A%CC%81c_Quy%CC%89_Truy_Ho%CC%82%CC%80n_xdqdbj_jziajq.webp",
-        age: "12+",
-        subtitle: "2D Phụ đề",
-        showtimes: ["03:00 PM ~ 04:59 PM", "05:15 PM ~ 07:14 PM"],
-    },
-    {
-        id: 3,
-        title: "Robot Hoang Dã",
-        poster:
-            "https://res.cloudinary.com/ddia5yfia/image/upload/v1742694499/57_Nobita_va%CC%80_Cuo%CC%A3%CC%82c_Phie%CC%82u_Lu%CC%9Bu_Va%CC%80o_The%CC%82%CC%81_Gio%CC%9B%CC%81i_Trong_Tranh_nyf1uc.webp",
-        age: "15+",
-        subtitle: "2D Phụ đề",
-        showtimes: ["03:00 PM ~ 05:04 PM", "05:15 PM ~ 07:19 PM"],
-    },
-    {
-        id: 4,
-        title: "Tiên Tri Tử Thần",
-        poster:
-            "https://res.cloudinary.com/ddia5yfia/image/upload/v1742732596/58_Quy%CC%89_Nha%CC%A3%CC%82p_Tra%CC%80ng_xsxfca.jpg",
-        age: "15+",
-        subtitle: "2D Phụ đề",
-        showtimes: ["03:00 PM ~ 05:26 PM", "05:15 PM ~ 07:41 PM"],
-    },
-];
 
-const movie = {
-    movie_id: 1,
-    movie_name: "Nhà Gia Tiên",
-    image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1740883582/21_Nha_gia_tien_rp2jfd.jpg",
-    background: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325247/21_Nha%CC%80_Gia_Tie%CC%82n_n5wndv.jpg",
-    trailer: "https://www.youtube.com/watch?v=S-uf1N5FjTA",
-    rating: 4,
-    release_date: "01-12-2025",
-    duration: 120,
-    genre: "Hài, Gia đình",
-    director: "Huỳnh Lập",
-    actor: "Huỳnh Lập, Phương Mỹ Chi",
-    language: "Vietnamese",
-    description:
-        "Nhà Gia Tiên xoay quanh câu chuyện đa góc nhìn về các thế hệ khác nhau trong một gia đình, có hai nhân vật chính là Gia Minh (Huỳnh Lập) và Mỹ Tiên (Phương Mỹ Chi). Trở về căn nhà gia tiên để quay các Hhiiiiiiiiiiiiiiiiiiiiiiiiiii",
-    status: "active",
-};
+
+// const movie = {
+//     movie_id: 1,
+//     movie_name: "Nhà Gia Tiên",
+//     image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1740883582/21_Nha_gia_tien_rp2jfd.jpg",
+//     background: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325247/21_Nha%CC%80_Gia_Tie%CC%82n_n5wndv.jpg",
+//     trailer: "https://www.youtube.com/watch?v=S-uf1N5FjTA",
+//     rating: 4,
+//     release_date: "01-12-2025",
+//     duration: 120,
+//     genre: "Hài, Gia đình",
+//     director: "Huỳnh Lập",
+//     actor: "Huỳnh Lập, Phương Mỹ Chi",
+//     language: "Vietnamese",
+//     description:
+//         "Nhà Gia Tiên xoay quanh câu chuyện đa góc nhìn về các thế hệ khác nhau trong một gia đình, có hai nhân vật chính là Gia Minh (Huỳnh Lập) và Mỹ Tiên (Phương Mỹ Chi). Trở về căn nhà gia tiên để quay các Hhiiiiiiiiiiiiiiiiiiiiiiiiiii",
+//     status: "active",
+// };
 
 const cities = ["Hà Nội", "Hồ Chí Minh"];
 
@@ -153,6 +118,28 @@ const CardInfMovie = () => {
     const [selectedCity, setSelectedCity] = useState("Hà Nội");
     const [selectedCinemaId, setSelectedCinemaId] = useState<number>(1);
     const [selectedDate, setSelectedDate] = useState(dates[0].value);
+
+    const { _id } = useParams<{ _id: string }>();
+    const [movie, setMovie] = useState<IMovie | null>(null);
+
+
+    useEffect(() => {
+        const fetchMovie = async () => {
+            try {
+                if (_id) {
+                    const response = await getMovieById(_id);
+                    setMovie(response); // response là IMovie
+                }
+            } catch (error) {
+                console.error("Lỗi khi lấy thông tin phim:", error);
+            }
+        };
+        fetchMovie();
+    }, [_id]);
+    if (!movie) return <div>Đang tải...</div>;
+
+
+
 
     // Lọc rạp theo thành phố
     const filteredCinemas = cinemas.filter((c) => c.city === selectedCity);

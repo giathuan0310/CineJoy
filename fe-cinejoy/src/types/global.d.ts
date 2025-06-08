@@ -1,4 +1,4 @@
-export {};
+export { };
 
 declare global {
     interface IBackendResponse<T> {
@@ -42,5 +42,32 @@ declare global {
 
     interface IFetchAccount {
         user: IUser;
+    }
+
+    interface IMovie {
+        _id: string;
+        title: string;
+        releaseDate: string; // dạng ISO string, ví dụ "2025-06-07"
+        duration: number;
+        genre: string[];
+        director: string;
+        actors: string[];
+        language: string[];
+        description: string;
+        trailer: string;
+        status: string;
+        image: string;
+        posterImage: string;
+        ageRating: string;
+        reviews: IReview[];
+        averageRating: number;
+    }
+
+    // Nếu có review:
+    interface IReview {
+        user: string;
+        comment: string;
+        rating: number;
+        // Thêm các trường khác nếu có
     }
 }

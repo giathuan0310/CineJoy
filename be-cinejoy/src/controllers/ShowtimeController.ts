@@ -63,15 +63,18 @@ export default class ShowtimeController {
         }
     }
 
-    async getShowtimesByTheaterAndDate(req: Request, res: Response): Promise<void> {
-        const { theaterId, showDate } = req.query;
-        if (!theaterId || !showDate) {
-            res.status(400).json({ message: "Missing theaterId or showDate" });
+   
+
+    async getShowtimesByTheaterMovieAndDate(req: Request, res: Response): Promise<void> {
+        const { theaterId, movieId, showDate } = req.query;
+        if (!theaterId || !movieId || !showDate) {
+            res.status(400).json({ message: "Missing theaterId, movieId, or showDate" });
             return;
         }
         try {
-            const showtimes = await showtimeService.getShowtimesByTheaterAndDate(
+            const showtimes = await showtimeService.getShowtimesByTheaterMovieAndDate(
                 theaterId as string,
+                movieId as string,
                 showDate as string
             );
             res.status(200).json(showtimes);

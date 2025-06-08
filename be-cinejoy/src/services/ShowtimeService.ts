@@ -22,16 +22,15 @@ export default class ShowtimeService {
         return Showtime.findByIdAndDelete(id);
     }
 
-    async getShowtimesByTheaterAndDate(theaterId: string, showDate: string): Promise<IShowtime[]> {
-        // showDate dạng "YYYY-MM-DD"
-        const startOfDay = new Date(showDate + "T00:00:00.000Z");
-        const endOfDay = new Date(showDate + "T23:59:59.999Z");
+
+    async getShowtimesByTheaterMovieAndDate(theaterId: string, movieId: string, showDate: string) {
+        const selectedDate = new Date(showDate);
+        // Lấy các suất chiếu mà selectedDate nằm trong khoảng showDate.start và showDate.end
         return Showtime.find({
             theaterId,
-            showDate: {
-                $gte: startOfDay,
-                $lte: endOfDay
-            }
+            movieId,
+            "showDate.start": { $lte: selectedDate },
+            "showDate.end": { $gte: selectedDate }
         });
     }
 }

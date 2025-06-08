@@ -10,7 +10,10 @@ export interface ISeat {
 export interface IShowtime extends Document {
     movieId: Schema.Types.ObjectId;
     theaterId: Schema.Types.ObjectId;
-    showDate: Date;
+    showDate: {
+        start: Date;
+        end: Date;
+    };
     showTime: {
         start: Date;
         end: Date;
@@ -22,7 +25,10 @@ export interface IShowtime extends Document {
 const ShowtimeSchema = new Schema<IShowtime>({
     movieId: { type: Schema.Types.ObjectId, required: true, ref: "Movie" },
     theaterId: { type: Schema.Types.ObjectId, required: true, ref: "Theater" },
-    showDate: { type: Date, required: true },
+    showDate: {
+        start: { type: Date, required: true },
+        end: { type: Date, required: true },
+    },
     showTime: {
         start: { type: Date, required: true },
         end: { type: Date, required: true },

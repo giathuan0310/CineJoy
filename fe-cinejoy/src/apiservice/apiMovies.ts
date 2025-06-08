@@ -15,7 +15,7 @@ export const getMovies = async () => {
 };
 export const getMovieById = async (id: string) => {
     try {
-        const response = await axiosClient.get<IBackendResponse<IMovie>>(`/movies/${id}`);
+        const response = await axiosClient.get<IMovie>(`/movies/${id}`);
         return response.data;
     } catch (error) {
         console.error("Error fetching movie by ID:", error);
@@ -24,7 +24,7 @@ export const getMovieById = async (id: string) => {
 };
 export const createMovie = async (movie: IMovie) => {
     try {
-        const response = await axiosClient.post<IBackendResponse<IMovie>>("/movies", movie);
+        const response = await axiosClient.post<IMovie>("/movies", movie);
         return response.data;
     } catch (error) {
         console.error("Error creating movie:", error);

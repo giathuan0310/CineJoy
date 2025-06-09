@@ -98,7 +98,7 @@ const ScheduleList: React.FC = () => {
       </h2>
       <div className="flex items-center gap-5">
         <label className="block text-gray-700 font-medium mb-2">Vị trí</label>
-        <select className="w-[250px] text-sm border rounded p-2">
+        <select className="w-[250px] text-sm border rounded p-2 cursor-pointer">
           <option>Hà Nội</option>
           <option>Hồ Chí Minh</option>
         </select>

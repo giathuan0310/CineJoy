@@ -5,7 +5,6 @@ const images: string[] = [
     "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325247/21_Nha%CC%80_Gia_Tie%CC%82n_n5wndv.jpg",
     "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969912/7ca50-civil_war_brr2j2.webp",
     "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969914/Te%CC%80o_Em_xoqbn9.webp",
-
 ];
 
 const Slider: React.FC = () => {

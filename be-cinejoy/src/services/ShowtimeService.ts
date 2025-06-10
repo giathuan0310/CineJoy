@@ -23,14 +23,13 @@ export default class ShowtimeService {
     }
 
 
-    async getShowtimesByTheaterMovieAndDate(theaterId: string, movieId: string, showDate: string) {
-        const selectedDate = new Date(showDate);
+    async getShowtimesByTheaterMovie(theaterId: string, movieId: string) {
+
         // Lấy các suất chiếu mà selectedDate nằm trong khoảng showDate.start và showDate.end
         return Showtime.find({
             theaterId,
-            movieId,
-            "showDate.start": { $lte: selectedDate },
-            "showDate.end": { $gte: selectedDate }
+            movieId
+
         });
     }
 }

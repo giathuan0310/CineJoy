@@ -14,12 +14,13 @@ export interface IShowtime extends Document {
         start: Date;
         end: Date;
     };
-    showTime: {
-        start: Date;
-        end: Date;
-    };
-    room: string;
-    seats: ISeat[];
+    showTimes: Array<{
+        date: Date; // ngày chiếu cụ thể (YYYY-MM-DD)
+        start: Date; // giờ bắt đầu
+        end: Date;   // giờ kết thúc
+        room: string;
+        seats: ISeat[];
+    }>;
 }
 
 const ShowtimeSchema = new Schema<IShowtime>({
@@ -29,17 +30,20 @@ const ShowtimeSchema = new Schema<IShowtime>({
         start: { type: Date, required: true },
         end: { type: Date, required: true },
     },
-    showTime: {
-        start: { type: Date, required: true },
-        end: { type: Date, required: true },
-    },
-    room: { type: String, required: true },
-    seats: [
+    showTimes: [
         {
-            seatId: { type: String, required: true },
-            status: { type: String, required: true },
-            type: { type: String, required: true },
-            price: { type: Number, required: true },
+            date: { type: Date, required: true },
+            start: { type: Date, required: true },
+            end: { type: Date, required: true },
+            room: { type: String, required: true },
+            seats: [
+                {
+                    seatId: { type: String, required: true },
+                    status: { type: String, required: true },
+                    type: { type: String, required: true },
+                    price: { type: Number, required: true },
+                },
+            ],
         },
     ],
 });

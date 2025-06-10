@@ -11,10 +11,10 @@ export const getShowTimes = async () => {
     }
 };
 
-export const getShowTimesByFilter = async (movieId: string, theaterId: string, showDate: string) => {
+export const getShowTimesByFilter = async (movieId: string, theaterId: string) => {
     try {
         const response = await axiosClient.get<IShowtime[]>(
-            `/showtimes/filter?movieId=${movieId}&theaterId=${theaterId}&showDate=${showDate}`
+            `/showtimes/filter?movieId=${movieId}&theaterId=${theaterId}`
         );
         return response.data;
     } catch (error) {

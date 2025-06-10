@@ -65,17 +65,17 @@ export default class ShowtimeController {
 
    
 
-    async getShowtimesByTheaterMovieAndDate(req: Request, res: Response): Promise<void> {
-        const { theaterId, movieId, showDate } = req.query;
-        if (!theaterId || !movieId || !showDate) {
+    async getShowtimesByTheaterMovie(req: Request, res: Response): Promise<void> {
+        const { theaterId, movieId } = req.query;
+        if (!theaterId || !movieId ) {
             res.status(400).json({ message: "Missing theaterId, movieId, or showDate" });
             return;
         }
         try {
-            const showtimes = await showtimeService.getShowtimesByTheaterMovieAndDate(
+            const showtimes = await showtimeService.getShowtimesByTheaterMovie(
                 theaterId as string,
                 movieId as string,
-                showDate as string
+               
             );
             res.status(200).json(showtimes);
         } catch (error) {

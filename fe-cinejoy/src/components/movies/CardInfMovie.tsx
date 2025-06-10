@@ -7,6 +7,8 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 const getVNDayLabel = (date: Date, idx: number) => {
@@ -16,14 +18,31 @@ const getVNDayLabel = (date: Date, idx: number) => {
     return `${days[date.getDay()]}\n${date.getDate()}`;
 };
 
-const dates = Array.from({ length: 7 }).map((_, idx) => {
-    const d = new Date();
-    d.setDate(d.getDate() + idx);
-    return {
-        label: getVNDayLabel(d, idx),
-        value: d.toISOString().slice(0, 10),
-    };
-});
+function getDateRange(start: string, end: string) {
+    const result = [];
+    let current = dayjs(start);
+    const last = dayjs(end);
+    let idx = 0;
+    while (current.isSameOrBefore(last, "day")) {
+        result.push({
+            label: getVNDayLabel(current.toDate(), idx),
+            value: current.format("YYYY-MM-DD"),
+        });
+        current = current.add(1, "day");
+        idx++;
+    }
+    return result;
+}
+
+
+// const dates = Array.from({ length: 7 }).map((_, idx) => {
+//     const d = new Date();
+//     d.setDate(d.getDate() + idx);
+//     return {
+//         label: getVNDayLabel(d, idx),
+//         value: d.toISOString().slice(0, 10),
+//     };
+// });
 
 
 
@@ -49,8 +68,15 @@ const CardInfMovie = () => {
     const [openModal, setOpenModal] = useState(false);
     const [selectedCity, setSelectedCity] = useState("Hà Nội");
     const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
-    const [selectedDate, setSelectedDate] = useState(dates[0].value);
+    const [selectedDate, setSelectedDate] = useState<string>("");
+    const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
+    const days = getDateRange(showtimes[0]?.showDate.start, showtimes[0]?.showDate.end);
+    // Giả sử showtimes là mảng các document, mỗi doc có showTimes là mảng các suất chiếu
+    const allShowTimes = showtimes.flatMap(st => st.showTimes || []);
+    const showTimesOfSelectedDate = allShowTimes.filter(
+        st => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
+    );
 
     const navigate = useNavigate(); // Thêm dòng này
 
@@ -112,13 +138,13 @@ const CardInfMovie = () => {
             : movies.filter((movie) => movie.status === activeTab);
 
     useEffect(() => {
-        if (movie?._id && selectedCinemaId && selectedDate) {
-            getShowTimesByFilter(movie._id, selectedCinemaId, selectedDate)
+        if (movie?._id && selectedCinemaId) {
+            getShowTimesByFilter(movie._id, selectedCinemaId)
                 .then((data) => setShowtimes(data || []));
         } else {
-            setShowtimes([]); // Nếu thiếu điều kiện thì reset suất chiếu
+            setShowtimes([]);
         }
-    }, [movie?._id, selectedCinemaId, selectedDate]);
+    }, [movie?._id, selectedCinemaId]);
 
 
     // Lọc rạp theo thành phố
@@ -132,22 +158,32 @@ const CardInfMovie = () => {
     }, [selectedCity]);
 
     // Khi đổi rạp, nếu rạp không có ngày đang chọn thì chọn ngày đầu tiên có suất chiếu
-    React.useEffect(() => {
-        if (selectedCinemaId && showtimes.length > 0) {
-            // Lấy danh sách ngày có suất chiếu từ mảng showtimes (dựa vào showTime.start)
-            const availableDates = Array.from(
-                new Set(
-                    showtimes
-                        .map(st => st.showTime?.start ? st.showTime.start.slice(0, 10) : null)
-                        .filter(Boolean)
-                )
+    useEffect(() => {
+        if (showtimes.length > 0) {
+            const minStart = showtimes.reduce(
+                (min, st) => st.showDate?.start && st.showDate.start < min ? st.showDate.start : min,
+                showtimes[0].showDate?.start
             );
-            if (!availableDates.includes(selectedDate) && typeof availableDates[0] === "string") {
-                setSelectedDate(availableDates[0]);
+            const maxEnd = showtimes.reduce(
+                (max, st) => st.showDate?.end && st.showDate.end > max ? st.showDate.end : max,
+                showtimes[0].showDate?.end
+            );
+            if (minStart && maxEnd) {
+                setDates(getDateRange(minStart, maxEnd));
+                // Nếu selectedDate chưa có hoặc không nằm trong khoảng thì set lại
+                if (
+                    !selectedDate ||
+                    selectedDate < minStart.slice(0, 10) ||
+                    selectedDate > maxEnd.slice(0, 10)
+                ) {
+                    setSelectedDate(minStart.slice(0, 10));
+                }
             }
+        } else {
+            setDates([]);
+            setSelectedDate(""); // reset ngày nếu không có suất chiếu
         }
-    }, [selectedCinemaId, showtimes, selectedDate]);
-
+    }, [showtimes]);
 
 
 
@@ -394,32 +430,15 @@ const CardInfMovie = () => {
 
                                             </div>
                                             <div className="flex gap-3 flex-wrap">
-                                                {showtimes
-                                                    .filter(showtime => {
-                                                        // Kiểm tra selectedDate có nằm trong khoảng showDate.start và showDate.end không
-                                                        const start = showtime.showDate?.start ? showtime.showDate.start.slice(0, 10) : null;
-                                                        const end = showtime.showDate?.end ? showtime.showDate.end.slice(0, 10) : null;
-                                                        return (
-                                                            start &&
-                                                            end &&
-                                                            selectedDate >= start &&
-                                                            selectedDate <= end
-                                                        );
-                                                    })
-                                                    .map((showtime, idx) => (
-                                                        <button
-                                                            key={showtime._id || idx}
-                                                            className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
-                                                            onClick={() => {
-                                                                navigate(`/selectSeat`);
-                                                            }}
-                                                        >
-                                                            {/* Luôn hiển thị giờ chiếu, không cần ngày phải trùng */}
-                                                            {showtime.showTime?.start && showtime.showTime?.end
-                                                                ? `${formatVNTime(showtime.showTime.start)} - ${formatVNTime(showtime.showTime.end)}`
-                                                                : ""}
-                                                        </button>
-                                                    ))}
+                                                {showTimesOfSelectedDate.map((showtime, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
+                                                        onClick={() => navigate(`/selectSeat/${showtime._id}`)}
+                                                    >
+                                                        {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </>
                                     ) : (

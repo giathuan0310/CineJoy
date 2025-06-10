@@ -4,7 +4,7 @@ import ShowtimeController from "../controllers/ShowtimeController";
 const router = Router();
 const showtimeController = new ShowtimeController();
 
-router.get("/filter", showtimeController.getShowtimesByTheaterMovieAndDate.bind(showtimeController));
+router.get("/filter", showtimeController.getShowtimesByTheaterMovie.bind(showtimeController));
 router.get("/", showtimeController.getShowtimes.bind(showtimeController));
 router.get("/:id", showtimeController.getShowtimeById.bind(showtimeController));
 router.post("/add", showtimeController.addShowtime.bind(showtimeController));

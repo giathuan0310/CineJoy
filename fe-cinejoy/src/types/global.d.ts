@@ -7,13 +7,12 @@ declare global {
         error: number | string;
         data?: T;
     }
-
+    
     interface IRegister {
         _id: string;
         email: string;
         fullName: string;
     }
-
     interface ILogin {
         accessToken: string;
         refreshToken: string;

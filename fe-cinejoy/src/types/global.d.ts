@@ -4,7 +4,7 @@ declare global {
     interface IBackendResponse<T> {
         status?: string | string[];
         message: string;
-        errorCode: number | string;
+        error: number | string;
         data?: T;
     }
 

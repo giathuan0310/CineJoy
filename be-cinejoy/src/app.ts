@@ -1,7 +1,9 @@
-import express, { Application, Request, Response } from 'express';
+import express, { Application } from 'express';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import connectDB from './configs/dbconnect';
+import authRouter from './routes/AuthRouter';
 import moviesRouter from './routes/MoviesRouter';
 import theaterRouter from './routes/TheaterRouter';
 import ShowtimeRouter from './routes/ShowtimeRouter';
@@ -14,15 +16,38 @@ dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT;
 
+app.use(
+    cors({
+        origin: process.env.FRONTEND_URL,
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Headers",
+        "Origin",
+        "Accept",
+        "X-Requested-With",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+        "Access-Control-Allow-Credentials",
+        "delay",
+        ],
+        exposedHeaders: ["Set-Cookie"],
+        optionsSuccessStatus: 204,
+    })
+);
 
-app.use(cors({ origin: "http://localhost:3000" })); // Cấu hình CORS để cho phép truy cập từ localhost:3000
 // Connect to MongoDB
 connectDB();
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-//impoer routes
+app.use(cookieParser(process.env.COOKIE_SECRET));
+
+//import routes
+app.use('/auth', authRouter);
 app.use('/movies', moviesRouter);
 app.use('/theaters', theaterRouter);
 app.use("/showtimes", ShowtimeRouter);

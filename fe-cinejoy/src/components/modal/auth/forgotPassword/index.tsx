@@ -53,7 +53,6 @@ const ModalForgotPassword = (props: IProps) => {
       width={450}
       className="rounded-xl"
       getContainer={false}
-      maskClosable={false}
     >
       {/* Header */}
       <div className="flex items-center w-[80px] gap-2 text-sm font-medium text-[#0f1b4c] mb-1 cursor-pointer" onClick={handleBtnBack}>

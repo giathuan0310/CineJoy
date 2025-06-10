@@ -37,7 +37,6 @@ app.use(
         optionsSuccessStatus: 204,
     })
 );
-
 // Connect to MongoDB
 connectDB();
 

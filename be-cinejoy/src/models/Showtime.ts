@@ -10,30 +10,40 @@ export interface ISeat {
 export interface IShowtime extends Document {
     movieId: Schema.Types.ObjectId;
     theaterId: Schema.Types.ObjectId;
-    showDate: Date;
-    showTime: {
+    showDate: {
         start: Date;
         end: Date;
     };
-    room: string;
-    seats: ISeat[];
+    showTimes: Array<{
+        date: Date; // ngày chiếu cụ thể (YYYY-MM-DD)
+        start: Date; // giờ bắt đầu
+        end: Date;   // giờ kết thúc
+        room: string;
+        seats: ISeat[];
+    }>;
 }
 
 const ShowtimeSchema = new Schema<IShowtime>({
     movieId: { type: Schema.Types.ObjectId, required: true, ref: "Movie" },
     theaterId: { type: Schema.Types.ObjectId, required: true, ref: "Theater" },
-    showDate: { type: Date, required: true },
-    showTime: {
+    showDate: {
         start: { type: Date, required: true },
         end: { type: Date, required: true },
     },
-    room: { type: String, required: true },
-    seats: [
+    showTimes: [
         {
-            seatId: { type: String, required: true },
-            status: { type: String, required: true },
-            type: { type: String, required: true },
-            price: { type: Number, required: true },
+            date: { type: Date, required: true },
+            start: { type: Date, required: true },
+            end: { type: Date, required: true },
+            room: { type: String, required: true },
+            seats: [
+                {
+                    seatId: { type: String, required: true },
+                    status: { type: String, required: true },
+                    type: { type: String, required: true },
+                    price: { type: Number, required: true },
+                },
+            ],
         },
     ],
 });

@@ -6,6 +6,7 @@ import HomePage from './pages/client/Home';
 import Movies from './pages/client/Movies';
 import MoviesDetail from './pages/client/MoviesDetail';
 import Select from './pages/client/SelectSeat';
+import Dashboard from './pages/admin/AdminDaskboard';
 const router = createBrowserRouter([
   {
     path: '/',
@@ -26,9 +27,16 @@ const router = createBrowserRouter([
       {
         path: "/selectSeat",
         element: <Select />
-      }
+      },
+
     ]
-  }
+
+  },
+  {
+    path: "/admin",
+    element: <Dashboard />
+  },
+
 ]);
 
 createRoot(document.getElementById('root')!).render(

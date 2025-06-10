@@ -2,14 +2,20 @@ import React from "react";
 import Seat from "./Seat";
 
 interface SeatLayoutProps {
+    selectedSeats: string[];
+    soldSeats: string[];
+    onSelect: (seat: string) => void;
     selectedSeatPrice: number;
+
 }
 
-const SeatLayout: React.FC<SeatLayoutProps> = ({ selectedSeatPrice }) => {
+const SeatLayout: React.FC<SeatLayoutProps> = ({ selectedSeats,
+    soldSeats,
+    onSelect, selectedSeatPrice }) => {
     return (
         <div className="flex-1 bg-[#e7ede7] rounded-xl p-4">
             {/* Màn hình chiếu */}
-            <div className="flex flex-col items-center mb-4">
+            <div className="flex flex-col items-center mb-4 ">
                 <img
                     src="https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809663/ic-screen_qsvlrn.png"
                     alt="Màn hình chiếu"
@@ -19,7 +25,9 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ selectedSeatPrice }) => {
             </div>
             {/* Sơ đồ ghế (render ghế ở đây) */}
             <div className="flex flex-col items-center">
-                <Seat />
+                <Seat selectedSeats={selectedSeats}
+                    soldSeats={soldSeats}
+                    onSelect={onSelect} />
             </div>
             {/* Trạng thái ghế */}
             <div className="flex flex-row justify-center gap-8 mt-6 mb-2">
@@ -48,7 +56,12 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({ selectedSeatPrice }) => {
                 </div>
                 <div>
                     <p className="text-base font-medium">Giá vé:</p>
-                    <div className="text-xl font-bold text-[#b55210]">{selectedSeatPrice.toLocaleString()} VNĐ</div>
+                    <div className="text-xl font-bold text-[#b55210]">
+                        {(selectedSeatPrice * selectedSeats.length).toLocaleString()} VNĐ
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                        ({selectedSeats.length} ghế x {selectedSeatPrice.toLocaleString()} VNĐ)
+                    </p>
                 </div>
             </div>
         </div>

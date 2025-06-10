@@ -96,12 +96,14 @@ declare global {
             end: string; // ISO string, ví dụ "2025-06-10T11:36:00Z"
         }
         ; // ISO string, ví dụ "2025-06-10"
-        showTime: {
-            start: string; // ISO string, ví dụ "2025-06-10T10:00:00Z"
-            end: string; // ISO string, ví dụ "2025-06-10T11:36:00Z"
-        };
-        room: string; // Ví dụ: "Phòng 1"
-        seats: ISeat[]; // Danh sách ghế
+        showTimes: Array<{
+            date: string;
+            start: string;
+            end: string;
+            room: string;
+            seats: ISeat[];
+            _id: string; // ID suất chiếu
+        }>;
     }
 
     interface ISeat {
@@ -112,4 +114,62 @@ declare global {
     }
 
 
+
+    // Voucher
+    interface IVoucher {
+        _id: string;
+        name: string;
+        validityPeriod: {
+            startDate: string;
+            endDate: string;
+        };
+        quantity: number;
+    }
+
+
+    // Blog
+    interface IBlog {
+        _id: string;
+        title: string;
+        postedDate: string;
+        content: string;
+        image: string;
+    }
+
+    // FoodCombo
+    interface IFoodCombo {
+        _id: string;
+        name: string;
+        price: number;
+    }
+
+    // Region
+    interface IRegion {
+        _id: string;
+        regionId: string;
+        name: string;
+    }
+
+
+
+
+
+    // Seat & Showtime
+    interface ISeat {
+        seatId: string;
+        status: string;
+        type: string;
+        price: number;
+    }
+
+
+
+    interface IOrder {
+        _id: string;
+        tenNguoiDung: string;
+        createdAt: string;
+        tongTien: number;
+        trangThaiDonHang: string;
+        trangThaiThanhToan: string;
+    }
 }

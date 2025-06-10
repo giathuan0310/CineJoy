@@ -35,14 +35,6 @@ function getDateRange(start: string, end: string) {
 }
 
 
-// const dates = Array.from({ length: 7 }).map((_, idx) => {
-//     const d = new Date();
-//     d.setDate(d.getDate() + idx);
-//     return {
-//         label: getVNDayLabel(d, idx),
-//         value: d.toISOString().slice(0, 10),
-//     };
-// });
 
 
 
@@ -71,7 +63,7 @@ const CardInfMovie = () => {
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-    const days = getDateRange(showtimes[0]?.showDate.start, showtimes[0]?.showDate.end);
+    // const days = getDateRange(showtimes[0]?.showDate.start, showtimes[0]?.showDate.end);
     // Giả sử showtimes là mảng các document, mỗi doc có showTimes là mảng các suất chiếu
     const allShowTimes = showtimes.flatMap(st => st.showTimes || []);
     const showTimesOfSelectedDate = allShowTimes.filter(
@@ -434,7 +426,30 @@ const CardInfMovie = () => {
                                                     <button
                                                         key={idx}
                                                         className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
-                                                        onClick={() => navigate(`/selectSeat/${showtime._id}`)}
+                                                        onClick={() => navigate(`/selectSeat`, {
+                                                            state: {
+                                                                movie: {
+                                                                    title: movie?.title,
+                                                                    poster: movie?.image,
+                                                                    format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
+                                                                    genre: movie?.genre?.join(", "),
+                                                                    duration: movie?.duration,
+                                                                },
+                                                                cinema: filteredCinemas.find(c => c._id === selectedCinemaId)?.name,
+                                                                date: selectedDate,
+                                                                time: formatVNTime(showtime.start),
+                                                                room: showtime.room,
+                                                                seats: [], // sẽ cập nhật khi chọn ghế
+
+
+
+
+                                                            }
+
+                                                        }
+
+                                                        )}
+
                                                     >
                                                         {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
                                                     </button>

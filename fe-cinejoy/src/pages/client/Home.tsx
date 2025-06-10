@@ -2,8 +2,165 @@ import { Link } from 'react-router-dom';
 import { FaCheckCircle } from 'react-icons/fa';
 import MoviesListCarousel from '@/components/moviesListCarousel';
 import ScheduleList from '@/components/scheduleList';
+import CommentCard from '@/components/card/commentCard';
+import NewsCard from '@/components/card/newCard';
+
+interface UserComment {
+    name: string;
+    avatar: string;
+    date: string;
+    comment: string;
+    nameColor?: string;
+}
+interface CommentCardProps {
+    image: string;
+    title: string;
+    rating: number;
+    comments: number;
+    users: UserComment[];
+}
+
+interface NewsCardProps {
+    image: string;
+    title: string;
+    description: string;
+}
 
 const HomePage = () => {
+    const cards: CommentCardProps[] = [
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325255/52_Robot_Hoang_Da%CC%83_acqnjy.jpg",
+            title: "Robot Hoang Dã",
+            rating: 9,
+            comments: 18,
+            users: [
+            {
+                name: "Đức Bùi",
+                avatar: "https://res.cloudinary.com/ddia5yfia/image/upload/v1744014469/VTI_Cinemas/Avatar/qijumserwhbmvm7ojfbe.jpg",
+                date: "07/04/2025",
+                comment: "ok",
+            },
+            {
+                name: "Tuổi Học Trò",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocJUnv4Vz7Q_8KrSGZlQWwTqqhHwQAsMNLkox_6NpWoji-M84V6s=s96-c",
+                date: "28/03/2025",
+                comment: "Xem cũng tạm được. Phù hợp với thiếu nhi",
+                nameColor: "text-red-500",
+            },
+            ],
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1742694536/57_Nobita_va%CC%80_Cuo%CC%A3%CC%82c_Phie%CC%82u_Lu%CC%9Bu_Va%CC%80o_The%CC%82%CC%81_Gio%CC%9B%CC%81i_Trong_Tranh_hwnm6v.webp",
+            title: "Nobita và Cuộc Phiêu Lưu Vào Thế Giới Trong Tranh",
+            rating: 10,
+            comments: 10,
+            users: [
+            {
+                name: "Nguyen Duy Linh",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocKYHo7paZydUjli72srSil4sXtaHC_cTZd6DE72uMptT7vSOnxdPg=s96-c",
+                date: "30/03/2025",
+                comment: "Phim cũng vui. Dẫn con đi xem, thấy con vui nên mình cũng vui theo!",
+            },
+            ],
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325254/50_Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_tzflmw.jpg",
+            title: "Vây Hãm Tại Đài Bắc",
+            rating: 8,
+            comments: 8,
+            users: [
+            {
+                name: "Nguyen Duy Linh",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocKYHo7paZydUjli72srSil4sXtaHC_cTZd6DE72uMptT7vSOnxdPg=s96-c",
+                date: "29/03/2025",
+                comment: "Cũng tạm được mọi người ạ!",
+            },
+            ],
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325255/52_Robot_Hoang_Da%CC%83_acqnjy.jpg",
+            title: "Robot Hoang Dã",
+            rating: 9,
+            comments: 18,
+            users: [
+            {
+                name: "Đức Bùi",
+                avatar: "https://res.cloudinary.com/ddia5yfia/image/upload/v1744014469/VTI_Cinemas/Avatar/qijumserwhbmvm7ojfbe.jpg",
+                date: "07/04/2025",
+                comment: "ok",
+            },
+            {
+                name: "Tuổi Học Trò",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocJUnv4Vz7Q_8KrSGZlQWwTqqhHwQAsMNLkox_6NpWoji-M84V6s=s96-c",
+                date: "28/03/2025",
+                comment: "Xem cũng tạm được. Phù hợp với thiếu nhi",
+                nameColor: "text-red-500",
+            },
+            ],
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1742694536/57_Nobita_va%CC%80_Cuo%CC%A3%CC%82c_Phie%CC%82u_Lu%CC%9Bu_Va%CC%80o_The%CC%82%CC%81_Gio%CC%9B%CC%81i_Trong_Tranh_hwnm6v.webp",
+            title: "Nobita và Cuộc Phiêu Lưu Vào Thế Giới Trong Tranh",
+            rating: 10,
+            comments: 10,
+            users: [
+            {
+                name: "Nguyen Duy Linh",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocKYHo7paZydUjli72srSil4sXtaHC_cTZd6DE72uMptT7vSOnxdPg=s96-c",
+                date: "30/03/2025",
+                comment: "Phim cũng vui. Dẫn con đi xem, thấy con vui nên mình cũng vui theo!",
+            },
+            ],
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325254/50_Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_tzflmw.jpg",
+            title: "Vây Hãm Tại Đài Bắc",
+            rating: 8,
+            comments: 8,
+            users: [
+            {
+                name: "Nguyen Duy Linh",
+                avatar: "https://lh3.googleusercontent.com/a/ACg8ocKYHo7paZydUjli72srSil4sXtaHC_cTZd6DE72uMptT7vSOnxdPg=s96-c",
+                date: "29/03/2025",
+                comment: "Cũng tạm được mọi người ạ!",
+            },
+            ],
+        },
+    ];
+
+    const newsList: NewsCardProps[] = [
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/xem-phim-hay--ngat-ngay-cung-banh-phong-de-rec-rec_m20xlz.jpg",
+            title: "Bánh Phồng Dễ REC REC - Thử Ngay!",
+            description: "Thưởng thức Bánh Phồng Dễ REC REC với giá chỉ từ 25K khi mua cùng Combo!",
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/ben-nhau-gan-ket---tet-trung-qua-to_qwluti.jpg",
+            title: "Bên Nhau Gắn Kết - Tết Trúng Quà To",
+            description: "Mua combo bắp nước có sản phẩm Pepsi và nhận cơ hội tham gia Vòng Quay May Mắn!",
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/ben-nhau-gan-ket---tet-vui-tron-vi_xkdwj4.jpg",
+            title: "Bên Nhau Gắn Kết - Tết Vui Trọn Vị",
+            description: "Tận hưởng combo đồ ăn đặc biệt trong mùa Tết tại VTI Cinema!",
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/happy-day---ve-chi-tu-45k_pqvewt.jpg",
+            title: "Thứ Ba Vui Vẻ - Vé Chỉ 50K",
+            description: "Mua vé vào thứ Ba với giá 50K, áp dụng cho mọi suất chiếu!",
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140984/ngay-tri-an-cua-galaxy-cinema---ngay-thu-hai-dau-tien-moi-thang_ul8h6x.jpg",
+            title: "Ngày Tri Ân VTI Cinema - Vé 2D chỉ từ 45K!",
+            description: "Mua vé 2D giá chỉ 45K vào Thứ Hai đầu tiên của mỗi tháng, kèm ưu đãi bắp nước!",
+        },
+        {
+            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739141351/tieu-chi-phan-loai-phim-theo-lua-tuoi-cap-nhat-moi-tu-cuc-dien-anh_vigjab.jpg",
+            title: "Phân Loại Phim Theo Độ Tuổi",
+            description: "Cập nhật quy định phân loại phim theo độ tuổi mới nhất từ VTI Cinema.",
+        },
+    ];
+
     return (
         <>
             {/* Hero Section */}
@@ -74,6 +231,40 @@ const HomePage = () => {
             <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating />
             <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" />
             <ScheduleList />
+
+            <div className="bg-[#cccccc2b] min-h-screen py-10 px-4">
+                <h1 className="text-3xl font-bold text-center text-[#0f1b4c] mb-10">
+                    Bình luận nổi bật
+                </h1>
+                <div className="grid md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+                    {cards.map((card, index) => (
+                        <CommentCard key={index} {...card} />
+                    ))}
+                </div>
+                <div className="text-center mt-10">
+                    <button className="bg-[#0f1b4c] text-white px-6 py-2 rounded-full hover:bg-blue-700 transition cursor-pointer">
+                        Xem tiếp nhé! ↓
+                    </button>
+                </div>
+            </div>
+
+            <div className="bg-[#134c0f1a] min-h-screen py-10 px-4">
+                <h1 className="text-2xl font-bold text-center text-blue-900 mb-10">
+                    TIN TỨC - KHUYẾN MÃI
+                </h1>
+
+                <div className="grid md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+                    {newsList.map((news, index) => (
+                        <NewsCard key={index} {...news} />
+                    ))}
+                </div>
+
+                <div className="text-center mt-10">
+                    <button className="bg-[#0f1b4c] text-white px-6 py-2 rounded-full hover:bg-blue-700 transition cursor-pointer">
+                        Xem thêm ↓
+                    </button>
+                </div>
+            </div>
         </>
     );
 };

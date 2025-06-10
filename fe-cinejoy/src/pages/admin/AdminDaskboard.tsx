@@ -4,9 +4,9 @@ import { getVouchers } from "@/apiservice/apiVoucher";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getTheaters } from "@/apiservice/apiTheater";
 import { getMovies } from "@/apiservice/apiMovies";
-import { getRegions } from "@/apiservice/apiRegion";
+import { getRegions, addRegion, deleteRegion } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
-
+import { motion } from "framer-motion";
 
 
 
@@ -21,8 +21,6 @@ const Dashboard: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 2;
-
-
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [regions, setRegions] = useState<IRegion[]>([]);
@@ -30,7 +28,7 @@ const Dashboard: React.FC = () => {
     const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
     const [blogs, setBlogs] = useState<IBlog[]>([]);
 
-
+    const [newRegionName, setNewRegionName] = useState("");
 
     useEffect(() => {
         getTheaters()
@@ -51,7 +49,10 @@ const Dashboard: React.FC = () => {
         getBlogs()
             .then((data) => setBlogs(data))
             .catch(() => setBlogs([]));
+
     }, []);
+
+
 
     // Lọc và phân trang cho từng tab
     const filterAndPaginate = <T,>(
@@ -139,6 +140,35 @@ const Dashboard: React.FC = () => {
     React.useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, searchTerm]);
+
+    const handleAddRegion = async (e: React.FormEvent) => {
+        e.preventDefault();
+        console.log("Adding region:", newRegionName);
+        try {
+            const newRegion: IRegion = await addRegion({ name: newRegionName });
+            setRegions([...regions, newRegion]);
+            setNewRegionName("");
+        } catch (error) {
+            console.error("Failed to add region:", error);
+        }
+    };
+
+    const handleDeleteRegion = async (regionId: string) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa khu vực này?')) {
+            try {
+                await deleteRegion(regionId); // Gọi API xóa
+                setRegions((prevRegions) =>
+                    prevRegions.filter((region) => region._id !== regionId) // Cập nhật state sau khi xóa thành công
+                );
+                alert('Xóa khu vực thành công!');
+                // Sau khi xóa, có thể cần reset trang về 1 hoặc kiểm tra lại tổng số trang
+                // Ví dụ: setCurrentPage(1); // hoặc kiểm tra lại logic phân trang của bạn
+            } catch (error) {
+                console.error('Lỗi khi xóa khu vực:', error);
+                alert('Xóa khu vực thất bại!');
+            }
+        }
+    };
 
 
 
@@ -413,13 +443,55 @@ const Dashboard: React.FC = () => {
                                 Quản lý Khu vực
                             </h2>
                             <div className="flex justify-between items-center mb-4">
-                                <input
-                                    type="text"
-                                    placeholder="Tìm kiếm khu vực..."
-                                    className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+
+                                <form onSubmit={handleAddRegion}>
+                                    <div className="flex flex-col md:flex-row gap-6 ">
+                                        <motion.input
+                                            type="text"
+
+                                            value={newRegionName} // Bind giá trị với state
+                                            onChange={(e) => setNewRegionName(e.target.value)} // Cập nhật giá trị khi người dùng nhập
+                                            placeholder="Nhập tên Khu vực"
+                                            className="w-full md:w-1/3 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-red-700"
+                                            whileFocus={{
+                                                scale: 1.02,
+                                                transition: { duration: 0.2 },
+                                            }}
+
+                                        />
+                                        <div className="flex gap-2">
+                                            <motion.button
+                                                type="submit"
+                                                className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                            >
+                                                Thêm
+                                            </motion.button>
+
+                                            <motion.button
+                                                type="button"
+
+                                                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                            >
+                                                Hủy
+                                            </motion.button>
+
+                                        </div>
+
+                                        <motion.input
+                                            type="text"
+                                            placeholder="Tìm kiếm khu vực..."
+                                            className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+
+                                </form>
+
                                 <div>
                                     <span>
                                         Trang {currentPage} / {totalRegionPages}
@@ -446,6 +518,7 @@ const Dashboard: React.FC = () => {
                                         <tr>
                                             <th className="p-3 text-left">STT</th>
                                             <th className="p-3 text-left">Tên Khu vực</th>
+                                            <th className="p-3 text-left">Hành Động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -453,6 +526,32 @@ const Dashboard: React.FC = () => {
                                             <tr key={region._id} className="border-b hover:bg-gray-100">
                                                 <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                                 <td className="p-3">{region.name}</td>
+                                                <td className="p-3">
+                                                    <motion.button
+                                                        className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+
+                                                    >
+                                                        Sửa
+                                                    </motion.button>
+                                                    <motion.button
+                                                        className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-red-600"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleDeleteRegion(region._id)}
+                                                    >
+                                                        Xóa
+                                                    </motion.button>
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+
+
+                                                    >
+
+                                                    </motion.button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

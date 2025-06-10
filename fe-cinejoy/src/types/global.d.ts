@@ -83,7 +83,7 @@ declare global {
     }
 
     interface IRegion {
-        _id: string;
+
         name: string; // Tên vùng
     }
 

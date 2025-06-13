@@ -24,6 +24,7 @@
     "react-icons": "^5.5.0",
     "react-multi-carousel": "^2.8.6",
     "react-router-dom": "6.27.0",
+    "react-toastify": "^11.0.5",
     "sass": "^1.89.1",
     "tailwindcss": "^4.1.8",
     "vite-tsconfig-paths": "^5.1.4"

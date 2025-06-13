@@ -7,6 +7,7 @@ import Movies from './pages/client/Movies';
 import MoviesDetail from './pages/client/MoviesDetail';
 import Select from './pages/client/SelectSeat';
 import Dashboard from './pages/admin/AdminDaskboard';
+import { ToastContainer } from 'react-toastify';
 const router = createBrowserRouter([
   {
     path: '/',
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="light" />
     <RouterProvider router={router} />
   </StrictMode>,
 );

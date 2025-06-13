@@ -44,7 +44,7 @@ export const updateMovie = async (id: string, movie: IMovie) => {
 
 export const deleteMovie = async (id: string) => {
     try {
-        const response = await axiosClient.delete<IBackendResponse<IMovie>>(`/movies/${id}`);
+        const response = await axiosClient.delete<IBackendResponse<IMovie>>(`/movies/delete/${id}`);
         return response.data;
     } catch (error) {
         console.error("Error deleting movie:", error);

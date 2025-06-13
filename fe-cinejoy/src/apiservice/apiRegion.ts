@@ -17,7 +17,7 @@ export const addRegion = async (region: { name: string }): Promise<IRegion> => {
 };
 
 export const updateRegion = async (id: string, region: IRegion): Promise<IRegion> => {
-    const res = await axiosClient.put<IRegion>(`/regions/${id}`, region);
+    const res = await axiosClient.put<IRegion>(`/regions/update/${id}`, region);
     return res.data;
 };
 

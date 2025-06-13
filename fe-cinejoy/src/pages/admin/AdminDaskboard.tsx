@@ -4,16 +4,17 @@ import { getVouchers } from "@/apiservice/apiVoucher";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getTheaters } from "@/apiservice/apiTheater";
 import { deleteMovie, getMovies, createMovie, updateMovie } from "@/apiservice/apiMovies";
-import { getRegions, addRegion, deleteRegion } from "@/apiservice/apiRegion";
+import { getRegions, addRegion, deleteRegion, getRegionById, updateRegion } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
 import { motion } from "framer-motion";
 import MovieForm from "@/pages/admin/Form/MovieForm";
+import { toast } from "react-toastify";
 
 const Dashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState("movies");
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 2;
+    const itemsPerPage = 10;
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [regions, setRegions] = useState<IRegion[]>([]);
@@ -24,6 +25,7 @@ const Dashboard: React.FC = () => {
     const [newRegionName, setNewRegionName] = useState("");
     const [showMovieForm, setShowMovieForm] = useState(false);
     const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(undefined);
+    const [editingRegion, setEditingRegion] = useState<IRegion | null>(null);
 
     useEffect(() => {
         getTheaters()
@@ -131,15 +133,29 @@ const Dashboard: React.FC = () => {
     }, [activeTab, searchTerm]);
 
     ////////////////////////Xử lý CRUD khu vực////////////////////////
-    const handleAddRegion = async (e: React.FormEvent) => {
+    const handleRegionSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Adding region:", newRegionName);
-        try {
-            const newRegion: IRegion = await addRegion({ name: newRegionName });
-            setRegions([...regions, newRegion]);
-            setNewRegionName("");
-        } catch (error) {
-            console.error("Failed to add region:", error);
+        if (editingRegion) {
+            // Cập nhật
+            try {
+                const updated = await updateRegion(editingRegion._id, { ...editingRegion, name: newRegionName });
+                setRegions(regions.map(r => r._id === updated._id ? updated : r));
+                setEditingRegion(null);
+                setNewRegionName('');
+                toast.success('Cập nhật khu vực thành công!');
+            } catch {
+                toast.success('Cập nhật thất bại!');
+            }
+        } else {
+            // Thêm mới
+            try {
+                const newRegion: IRegion = await addRegion({ name: newRegionName });
+                setRegions([...regions, newRegion]);
+                setNewRegionName('');
+                toast.success('Thêm khu vực thành công!');
+            } catch {
+                toast.success('Thêm khu vực thất bại!');
+            }
         }
     };
     const handleDeleteRegion = async (regionId: string) => {
@@ -149,13 +165,22 @@ const Dashboard: React.FC = () => {
                 setRegions((prevRegions) =>
                     prevRegions.filter((region) => region._id !== regionId) // Cập nhật state sau khi xóa thành công
                 );
-                alert('Xóa khu vực thành công!');
+                toast.success('Xóa khu vực thành công!');
                 // Sau khi xóa, có thể cần reset trang về 1 hoặc kiểm tra lại tổng số trang
                 // Ví dụ: setCurrentPage(1); // hoặc kiểm tra lại logic phân trang của bạn
             } catch (error) {
                 console.error('Lỗi khi xóa khu vực:', error);
-                alert('Xóa khu vực thất bại!');
+                toast.success('Xóa khu vực thất bại!');
             }
+        }
+    };
+    const handleEditRegion = async (regionId: string) => {
+        try {
+            const region = await getRegionById(regionId);
+            setEditingRegion(region);
+            setNewRegionName(region.name);
+        } catch (error) {
+            toast.error('Không lấy được thông tin khu vực!');
         }
     };
     /////////////////////////////////////////////////////////////////
@@ -168,12 +193,12 @@ const Dashboard: React.FC = () => {
                 setRegions((prevRegions) =>
                     prevRegions.filter((movie) => movie._id !== movieId) // Cập nhật state sau khi xóa thành công
                 );
-                alert('Xóa Movie thành công!');
+                toast.success('Xóa Movie thành công!');
                 // Sau khi xóa, có thể cần reset trang về 1 hoặc kiểm tra lại tổng số trang
                 // Ví dụ: setCurrentPage(1); // hoặc kiểm tra lại logic phân trang của bạn
             } catch (error) {
                 console.error('Lỗi khi xóa movie:', error);
-                alert('Xóa movie thất bại!');
+                toast.error('Xóa movie thất bại!');
             }
         }
     };
@@ -183,10 +208,10 @@ const Dashboard: React.FC = () => {
             const newMovie = await createMovie(movieData as IMovie);
             setMovies(prev => [...prev, newMovie]);
             setShowMovieForm(false);
-            alert('Thêm phim thành công!');
+            toast.success('Thêm phim thành công!');
         } catch (error) {
             console.error('Lỗi khi thêm phim:', error);
-            alert('Thêm phim thất bại!');
+            toast.error('Thêm phim thất bại!');
         }
     };
 
@@ -199,10 +224,10 @@ const Dashboard: React.FC = () => {
             ));
             setShowMovieForm(false);
             setSelectedMovie(undefined);
-            alert('Cập nhật phim thành công!');
+            toast.success('Cập nhật phim thành công!');
         } catch (error) {
             console.error('Lỗi khi cập nhật phim:', error);
-            alert('Cập nhật phim thất bại!');
+            toast.error('Cập nhật phim thất bại!');
         }
     };
 
@@ -517,41 +542,41 @@ const Dashboard: React.FC = () => {
                             </h2>
                             <div className="flex justify-between items-center mb-4">
 
-                                <form onSubmit={handleAddRegion}>
+                                <form onSubmit={handleRegionSubmit}>
                                     <div className="flex flex-col md:flex-row gap-6 ">
                                         <motion.input
                                             type="text"
-
-                                            value={newRegionName} // Bind giá trị với state
-                                            onChange={(e) => setNewRegionName(e.target.value)} // Cập nhật giá trị khi người dùng nhập
+                                            value={newRegionName}
+                                            onChange={(e) => setNewRegionName(e.target.value)}
                                             placeholder="Nhập tên Khu vực"
                                             className="w-full md:w-1/3 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-red-700"
                                             whileFocus={{
                                                 scale: 1.02,
                                                 transition: { duration: 0.2 },
                                             }}
-
                                         />
                                         <div className="flex gap-2">
                                             <motion.button
                                                 type="submit"
-                                                className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+                                                className={editingRegion ? "bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700" : "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"}
                                                 whileHover={{ scale: 1.05 }}
                                                 whileTap={{ scale: 0.95 }}
                                             >
-                                                Thêm
+                                                {editingRegion ? 'Sửa' : 'Thêm'}
                                             </motion.button>
 
                                             <motion.button
                                                 type="button"
-
                                                 className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
                                                 whileHover={{ scale: 1.05 }}
                                                 whileTap={{ scale: 0.95 }}
+                                                onClick={() => {
+                                                    setEditingRegion(null);
+                                                    setNewRegionName('');
+                                                }}
                                             >
                                                 Hủy
                                             </motion.button>
-
                                         </div>
 
                                         <motion.input
@@ -604,7 +629,7 @@ const Dashboard: React.FC = () => {
                                                         className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
                                                         whileHover={{ scale: 1.1 }}
                                                         whileTap={{ scale: 0.9 }}
-
+                                                        onClick={() => handleEditRegion(region._id)}
                                                     >
                                                         Sửa
                                                     </motion.button>

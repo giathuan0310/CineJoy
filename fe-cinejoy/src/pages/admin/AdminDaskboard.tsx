@@ -17,7 +17,7 @@ const Dashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState("movies");
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 2;
+    const itemsPerPage = 5;
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [regions, setRegions] = useState<IRegion[]>([]);

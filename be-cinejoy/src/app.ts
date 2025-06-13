@@ -28,7 +28,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/movies', moviesRouter);
 app.use('/theaters', theaterRouter);
 app.use("/showtimes", ShowtimeRouter);
-app.use("/food-combos", FoodComboRouter);
+app.use("/foodcombos", FoodComboRouter);
 app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);

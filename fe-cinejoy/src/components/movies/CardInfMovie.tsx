@@ -331,7 +331,11 @@ const CardInfMovie = () => {
                         </div>
                         <ul className="space-y-4">
                             {filteredMovies.map((item) => (
-                                <li key={item._id} className="flex items-center gap-3  rounded-lg p-2 border-b border-gray-300 mx-2">
+                                <li
+                                    key={item._id}
+                                    className="flex items-center gap-3 rounded-lg p-2 border-b border-gray-300 mx-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => navigate(`/movies/${item._id}`)}
+                                >
                                     <img src={item.image} alt={item.title} className="w-12 h-16 object-cover rounded" />
                                     <div>
                                         <div className="text-black font-semibold">{item.title}</div>
@@ -341,7 +345,6 @@ const CardInfMovie = () => {
                                         </div>
                                     </div>
                                 </li>
-
                             ))}
 
                         </ul>

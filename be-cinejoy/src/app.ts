@@ -9,6 +9,7 @@ import FoodComboRouter from './routes/FoodComboRouter';
 import BlogRouter from './routes/BlogRouter';
 import VoucherRouter from './routes/VoucherRouter';
 import RegionRouter from './routes/RegionRouter';
+import chatbotRouter from './routes/chatbotRoutes';
 dotenv.config();
 
 const app: Application = express();
@@ -31,6 +32,7 @@ app.use("/food-combos", FoodComboRouter);
 app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
+app.use("/chatbot", chatbotRouter);
 
 
 

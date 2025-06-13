@@ -10,22 +10,28 @@ import { motion } from "framer-motion";
 import MovieForm from "@/pages/admin/Form/MovieForm";
 import { toast } from "react-toastify";
 
+import { getShowTimes } from "@/apiservice/apiShowTime";
+import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
+
 const Dashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState("movies");
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const itemsPerPage = 2;
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [regions, setRegions] = useState<IRegion[]>([]);
     const [vouchers, setVouchers] = useState<IVoucher[]>([]);
     const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
     const [blogs, setBlogs] = useState<IBlog[]>([]);
-
+    const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
     const [newRegionName, setNewRegionName] = useState("");
     const [showMovieForm, setShowMovieForm] = useState(false);
     const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(undefined);
     const [editingRegion, setEditingRegion] = useState<IRegion | null>(null);
+    const [showTimeForm, setShowTimeForm] = useState(false);
+    const [selectedShowtime, setSelectedShowtime] = useState<IShowtime | null>(null);
+    const [showShowtimeForm, setShowShowtimeForm] = useState(false);
 
     useEffect(() => {
         getTheaters()
@@ -46,7 +52,15 @@ const Dashboard: React.FC = () => {
         getBlogs()
             .then((data) => setBlogs(data))
             .catch(() => setBlogs([]));
-
+        getShowTimes()
+            .then((data) => {
+                console.log('Showtimes API response:', data);
+                setShowtimes(data && Array.isArray(data) ? data : []);
+            })
+            .catch((error) => {
+                console.error('Error fetching showtimes:', error);
+                setShowtimes([]);
+            });
     }, []);
 
     // Lọc và phân trang cho từng tab
@@ -125,6 +139,22 @@ const Dashboard: React.FC = () => {
     } = filterAndPaginate<IVoucher>(
         vouchers,
         (voucher) => (voucher.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
+    );
+
+    // Showtimes
+    const {
+        paginated: paginatedShowtimes,
+        totalPages: totalShowtimePages,
+    } = filterAndPaginate<IShowtime>(
+        showtimes,
+        (showtime) => {
+            const movie = movies.find(m => m._id === showtime.movieId._id);
+            const theater = theaters.find(t => t._id === showtime.theaterId._id);
+            return (
+                (movie?.title?.toLowerCase() ?? "").includes(searchTerm.toLowerCase()) ||
+                (theater?.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
+            );
+        }
     );
 
     // Reset page when tab/searchTerm thay đổi
@@ -232,6 +262,12 @@ const Dashboard: React.FC = () => {
         setShowMovieForm(true);
     };
 
+    ///////////////Suất chiếu////////////////
+    const handleShowtimeDetail = (showtime: IShowtime) => {
+        setSelectedShowtime(showtime);
+        setShowTimeForm(true);
+    };
+
     return (
         <div className="min-h-screen flex font-roboto bg-white">
             {/* Sidebar */}
@@ -262,7 +298,7 @@ const Dashboard: React.FC = () => {
                             { label: "Khu vực", value: "regions", icon: "🌏" },
                             { label: "Rạp", value: "theaters", icon: "🏢" },
                             { label: "Voucher", value: "vouchers", icon: "🎟️" },
-                            // { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
+                            { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
                         ].map((tab) => (
                             <li
                                 key={tab.value}
@@ -767,6 +803,91 @@ const Dashboard: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Showtimes Tab */}
+                    {activeTab === "showtimes" && (
+                        <div>
+                            <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                                Quản lý suất chiếu
+                            </h2>
+                            <div className="flex justify-between items-center mb-4">
+                                <input
+                                    type="text"
+                                    placeholder="Tìm kiếm suất chiếu..."
+                                    className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                                <motion.button
+                                    className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => setShowShowtimeForm(true)}
+                                >
+                                    Thêm suất chiếu mới
+                                </motion.button>
+                                <div>
+                                    <span>
+                                        Trang {currentPage} / {totalShowtimePages}
+                                    </span>
+                                    <button
+                                        className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage((p) => p - 1)}
+                                    >
+                                        Trước
+                                    </button>
+                                    <button
+                                        className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50"
+                                        disabled={currentPage === totalShowtimePages}
+                                        onClick={() => setCurrentPage((p) => p + 1)}
+                                    >
+                                        Sau
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                                <table className="min-w-full">
+                                    <thead className="bg-black text-white">
+                                        <tr>
+                                            <th className="p-3 text-left">STT</th>
+                                            <th className="p-3 text-left">Phim</th>
+                                            <th className="p-3 text-left">Rạp</th>
+                                            <th className="p-3 text-left">Ngày bắt đầu</th>
+                                            <th className="p-3 text-left">Ngày kết thúc</th>
+                                            <th className="p-3 text-left">Số suất chiếu</th>
+                                            <th className="p-3 text-left">Chi tiết xuất chiếu</th>
+
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedShowtimes.map((showtime, idx) => (
+                                            <tr key={showtime._id} className="border-b hover:bg-gray-100">
+                                                <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                                                <td className="p-3">
+                                                    {showtime.movieId.title}
+                                                </td>
+                                                <td className="p-3">
+                                                    {showtime.theaterId.name}
+                                                </td>
+                                                <td className="p-3">{new Date(showtime.showDate.start).toLocaleDateString("vi-VN")}</td>
+                                                <td className="p-3">{new Date(showtime.showDate.end).toLocaleDateString("vi-VN")}</td>
+                                                <td className="p-3">{showtime.showTimes.length}</td>
+                                                <td className="p-3">
+                                                    <button className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600"
+                                                        onClick={() => handleShowtimeDetail(showtime)}
+                                                    >
+                                                        Xem chi tiết
+                                                    </button>
+                                                </td>
+
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                 </main>
             </div>
 
@@ -779,6 +900,92 @@ const Dashboard: React.FC = () => {
                     onCancel={() => {
                         setShowMovieForm(false);
                         setSelectedMovie(undefined);
+                    }}
+                />
+            )}
+
+            {/* Showtime Detail Modal */}
+            {showTimeForm && selectedShowtime && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold">
+                                Chi tiết suất chiếu - {selectedShowtime.movieId.title}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowTimeForm(false);
+                                    setSelectedShowtime(null);
+                                }}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="font-semibold">Rạp chiếu:</p>
+                                    <p>{selectedShowtime.theaterId.name}</p>
+                                </div>
+                                <div>
+                                    <p className="font-semibold">Thời gian chiếu:</p>
+                                    <p>
+                                        {new Date(selectedShowtime.showDate.start).toLocaleDateString("vi-VN")} -
+                                        {new Date(selectedShowtime.showDate.end).toLocaleDateString("vi-VN")}
+                                    </p>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-semibold mb-2">Danh sách suất chiếu:</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                        <thead className="bg-gray-100">
+                                            <tr>
+                                                <th className="p-2 text-left">Ngày</th>
+                                                <th className="p-2 text-left">Giờ bắt đầu</th>
+                                                <th className="p-2 text-left">Giờ kết thúc</th>
+                                                <th className="p-2 text-left">Phòng chiếu</th>
+                                                <th className="p-2 text-left">Số ghế trống</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {selectedShowtime.showTimes.map((time, index) => (
+                                                <tr key={index} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2">{new Date(time.date).toLocaleDateString("vi-VN")}</td>
+                                                    <td className="p-2">{new Date(time.start).toLocaleTimeString("vi-VN")}</td>
+                                                    <td className="p-2">{new Date(time.end).toLocaleTimeString("vi-VN")}</td>
+                                                    <td className="p-2">{time.room}</td>
+                                                    <td className="p-2">
+                                                        {time.seats.filter(seat => seat.status === 'available').length} / {time.seats.length}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Showtime Form Modal */}
+            {showShowtimeForm && (
+                <ShowtimeForm
+                    onCancel={() => setShowShowtimeForm(false)}
+                    onSuccess={() => {
+                        setShowShowtimeForm(false);
+                        // Refresh showtimes data
+                        getShowTimes()
+                            .then((data) => {
+                                console.log('Showtimes API response:', data);
+                                setShowtimes(data && Array.isArray(data) ? data : []);
+                            })
+                            .catch((error) => {
+                                console.error('Error fetching showtimes:', error);
+                                setShowtimes([]);
+                            });
                     }}
                 />
             )}

@@ -1,35 +1,77 @@
-import { Showtime, IShowtime } from "../models/Showtime";
+import { IShowtime, Showtime } from "../models/Showtime";
 
-export default class ShowtimeService {
+
+
+
+
+class ShowtimeService {
     async getShowtimes(): Promise<IShowtime[]> {
-        return Showtime.find();
+        try {
+            const showtimes = await Showtime.find()
+                .populate('movieId', 'title')
+                .populate('theaterId', 'name');
+            return showtimes;
+        } catch (error) {
+            throw error;
+        }
     }
 
     async getShowtimeById(id: string): Promise<IShowtime | null> {
-        return Showtime.findById(id);
+        try {
+            const showtime = await Showtime.findById(id)
+                .populate('movieId', 'title')
+                .populate('theaterId', 'name');
+            return showtime;
+        } catch (error) {
+            throw error;
+        }
     }
 
     async addShowtime(showtimeData: Partial<IShowtime>): Promise<IShowtime> {
-        const showtime = new Showtime(showtimeData);
-        return showtime.save();
+        try {
+            const newShowtime = new Showtime(showtimeData);
+            await newShowtime.save();
+            return newShowtime;
+        } catch (error) {
+            throw error;
+        }
     }
 
     async updateShowtime(id: string, showtimeData: Partial<IShowtime>): Promise<IShowtime | null> {
-        return Showtime.findByIdAndUpdate(id, showtimeData, { new: true });
+        try {
+            const updatedShowtime = await Showtime.findByIdAndUpdate(
+                id,
+                showtimeData,
+                { new: true }
+            );
+            return updatedShowtime;
+        } catch (error) {
+            throw error;
+        }
     }
 
     async deleteShowtime(id: string): Promise<IShowtime | null> {
-        return Showtime.findByIdAndDelete(id);
+        try {
+            const deletedShowtime = await Showtime.findByIdAndDelete(id);
+            return deletedShowtime;
+        } catch (error) {
+            throw error;
+        }
     }
 
-
-    async getShowtimesByTheaterMovie(theaterId: string, movieId: string) {
-
-        // Lấy các suất chiếu mà selectedDate nằm trong khoảng showDate.start và showDate.end
-        return Showtime.find({
-            theaterId,
-            movieId
-
-        });
+    async getShowtimesByTheaterMovie(theaterId: string, movieId: string): Promise<IShowtime[]> {
+        try {
+            const showtimes = await Showtime.find({
+                theaterId,
+                movieId
+            })
+                .populate('movieId', 'title')
+                .populate('theaterId', 'name');
+            return showtimes;
+        } catch (error) {
+            throw error;
+        }
     }
 }
+
+export default ShowtimeService;

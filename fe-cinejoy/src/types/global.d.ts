@@ -90,28 +90,37 @@ declare global {
 
     interface IShowtime {
         _id: string;
-        movieId: string; // ID của phim
-        theaterId: string; // ID của rạp chiếu
+        movieId: {
+            _id: string;
+            title: string;
+        };
+        theaterId: {
+            _id: string;
+            name: string;
+        };
         showDate: {
-            start: string; // ISO string, ví dụ "2025-06-10T10:00:00Z"
-            end: string; // ISO string, ví dụ "2025-06-10T11:36:00Z"
-        }
-        ; // ISO string, ví dụ "2025-06-10"
+            start: string;
+            end: string;
+        };
         showTimes: Array<{
             date: string;
             start: string;
             end: string;
             room: string;
-            seats: ISeat[];
-            _id: string; // ID suất chiếu
+            seats: Array<{
+                seatId: string;
+                status: string;
+                type: string;
+                price: number;
+            }>;
         }>;
     }
 
     interface ISeat {
-        seatId: string; // ID ghế, ví dụ: "A1"
-        status: string; // Trạng thái, ví dụ: "available", "reserved", "occupied"
-        type: string; // Loại ghế, ví dụ: "normal", "VIP"
-        price: number; // Giá vé
+        _id: string;
+        row: string;
+        number: number;
+        status: 'available' | 'reserved' | 'sold';
     }
 
 
@@ -174,3 +183,7 @@ declare global {
         trangThaiThanhToan: string;
     }
 }
+
+
+
+

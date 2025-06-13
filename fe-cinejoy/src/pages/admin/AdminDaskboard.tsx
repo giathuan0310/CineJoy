@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import MovieForm from "@/pages/admin/Form/MovieForm";
 import { toast } from "react-toastify";
 
-import { getShowTimes } from "@/apiservice/apiShowTime";
+import { getShowTimes, updateShowtime, deleteShowtime } from "@/apiservice/apiShowTime";
 import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
 
 const Dashboard: React.FC = () => {
@@ -32,6 +32,7 @@ const Dashboard: React.FC = () => {
     const [showTimeForm, setShowTimeForm] = useState(false);
     const [selectedShowtime, setSelectedShowtime] = useState<IShowtime | null>(null);
     const [showShowtimeForm, setShowShowtimeForm] = useState(false);
+    const [editingShowtime, setEditingShowtime] = useState<IShowtime | null>(null);
 
     useEffect(() => {
         getTheaters()
@@ -266,6 +267,37 @@ const Dashboard: React.FC = () => {
     const handleShowtimeDetail = (showtime: IShowtime) => {
         setSelectedShowtime(showtime);
         setShowTimeForm(true);
+    };
+
+    const handleDeleteShowtime = async (id: string) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa suất chiếu này?')) {
+            try {
+                await deleteShowtime(id);
+                setShowtimes(prevShowtimes => prevShowtimes.filter(showtime => showtime._id !== id));
+                toast.success('Xóa suất chiếu thành công!');
+
+            } catch (error) {
+                console.error('Error deleting showtime:', error);
+                toast.error('Xóa suất chiếu thất bại!');
+            }
+        }
+    };
+
+    const fetchShowtimes = async () => {
+        try {
+            const response = await getShowTimes();
+            if (response && response.data) {
+                setShowtimes(response.data);
+            }
+        } catch (error) {
+            console.error('Error fetching showtimes:', error);
+            toast.error('Không thể tải danh sách suất chiếu');
+        }
+    };
+
+    const handleEditShowtime = (showtime: IShowtime) => {
+        setEditingShowtime(showtime);
+        setShowShowtimeForm(true);
     };
 
     return (
@@ -855,7 +887,8 @@ const Dashboard: React.FC = () => {
                                             <th className="p-3 text-left">Ngày bắt đầu</th>
                                             <th className="p-3 text-left">Ngày kết thúc</th>
                                             <th className="p-3 text-left">Số suất chiếu</th>
-                                            <th className="p-3 text-left">Chi tiết xuất chiếu</th>
+                                            <th className="p-3 text-left">Chi tiết suất chiếu</th>
+                                            <th className="p-3 text-left">Hành Động</th>
 
                                         </tr>
                                     </thead>
@@ -873,12 +906,33 @@ const Dashboard: React.FC = () => {
                                                 <td className="p-3">{new Date(showtime.showDate.end).toLocaleDateString("vi-VN")}</td>
                                                 <td className="p-3">{showtime.showTimes.length}</td>
                                                 <td className="p-3">
-                                                    <button className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600"
+                                                    <motion.button
                                                         onClick={() => handleShowtimeDetail(showtime)}
+                                                        className="text-indigo-600 hover:text-indigo-900 mr-4"
                                                     >
                                                         Xem chi tiết
-                                                    </button>
+                                                    </motion.button>
+
                                                 </td>
+                                                <td className="p-3">
+                                                    <motion.button
+                                                        onClick={() => handleEditShowtime(showtime)}
+                                                        className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                    >
+                                                        Sửa
+                                                    </motion.button>
+                                                    <motion.button
+                                                        onClick={() => handleDeleteShowtime(showtime._id)}
+                                                        className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-red-600"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                    >
+                                                        Xóa
+                                                    </motion.button>
+                                                </td>
+
 
                                             </tr>
                                         ))}
@@ -973,9 +1027,13 @@ const Dashboard: React.FC = () => {
             {/* Showtime Form Modal */}
             {showShowtimeForm && (
                 <ShowtimeForm
-                    onCancel={() => setShowShowtimeForm(false)}
+                    onCancel={() => {
+                        setShowShowtimeForm(false);
+                        setEditingShowtime(null);
+                    }}
                     onSuccess={() => {
                         setShowShowtimeForm(false);
+                        setEditingShowtime(null);
                         // Refresh showtimes data
                         getShowTimes()
                             .then((data) => {
@@ -987,6 +1045,7 @@ const Dashboard: React.FC = () => {
                                 setShowtimes([]);
                             });
                     }}
+                    editData={editingShowtime || undefined}
                 />
             )}
         </div>

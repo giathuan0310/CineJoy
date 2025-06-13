@@ -58,7 +58,7 @@ const CardInfMovie = () => {
     const [showMoreDes, setShowMoreDes] = useState(false);
     const [activeTab, setActiveTab] = useState<"nowShowing" | "upcoming" | "special" | "all">("nowShowing");
     const [openModal, setOpenModal] = useState(false);
-    const [selectedCity, setSelectedCity] = useState("Hà Nội");
+    const [selectedCity, setSelectedCity] = useState("");
     const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
@@ -77,6 +77,7 @@ const CardInfMovie = () => {
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theater, setTheater] = useState<ITheater[]>([]);
     const [region, setRegion] = useState<IRegion[]>([]);
+    const cityOptions = [...new Set(theater.map(c => c.location.city))];
     useEffect(() => {
         const fetchMovie = async () => {
             try {
@@ -100,6 +101,7 @@ const CardInfMovie = () => {
         const fetchTheater = async () => {
             try {
                 const response = await getTheaters();
+                console.log('All theaters:', response);
                 setTheater(Array.isArray(response) ? response : []);
             } catch (error) {
                 console.error("Lỗi khi lấy thông tin rạp:", error);
@@ -176,6 +178,25 @@ const CardInfMovie = () => {
             setSelectedDate(""); // reset ngày nếu không có suất chiếu
         }
     }, [showtimes]);
+
+    // Khi dữ liệu rạp thay đổi, nếu selectedCity không còn rạp nào, tự động chọn thành phố đầu tiên có rạp
+    useEffect(() => {
+        if (theater.length > 0) {
+            const citiesWithCinemas = [...new Set(theater.map(c => c.location.city))];
+            if (!citiesWithCinemas.includes(selectedCity)) {
+                setSelectedCity(citiesWithCinemas[0]);
+            }
+        }
+    }, [theater]);
+
+    // Khi đổi thành phố, chọn lại rạp đầu tiên hoặc reset nếu không có rạp
+    useEffect(() => {
+        if (filteredCinemas.length > 0) {
+            setSelectedCinemaId(filteredCinemas[0]._id);
+        } else {
+            setSelectedCinemaId('');
+        }
+    }, [selectedCity, theater]);
 
 
 
@@ -362,10 +383,9 @@ const CardInfMovie = () => {
                                     value={selectedCity}
                                     onChange={e => setSelectedCity(e.target.value)}
                                 >
-
-                                    {region.map((r) => (
-                                        <option key={r._id} value={r.name}>
-                                            {r.name}
+                                    {cityOptions.map((city) => (
+                                        <option key={city} value={city}>
+                                            {city}
                                         </option>
                                     ))}
                                 </select>

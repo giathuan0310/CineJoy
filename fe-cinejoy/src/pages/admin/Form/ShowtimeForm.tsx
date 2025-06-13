@@ -2,24 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getMovies } from '@/apiservice/apiMovies';
 import { getTheaters } from '@/apiservice/apiTheater';
+import { createShowtime, updateShowtime } from '@/apiservice/apiShowTime';
 import { toast } from 'react-toastify';
 
 interface ShowtimeFormProps {
     onCancel: () => void;
-    onSuccess: (data: any) => void;
+    onSuccess: () => void;
+    editData?: IShowtime;
 }
 
-const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess }) => {
+const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editData }) => {
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [formData, setFormData] = useState({
-        movieId: '',
-        theaterId: '',
+        movieId: editData?.movieId._id || '',
+        theaterId: editData?.theaterId._id || '',
         showDate: {
-            start: '',
-            end: ''
+            start: editData?.showDate.start ? new Date(editData.showDate.start).toISOString().split('T')[0] : '',
+            end: editData?.showDate.end ? new Date(editData.showDate.end).toISOString().split('T')[0] : ''
         },
-        showTimes: [{
+        showTimes: editData?.showTimes.map(st => ({
+            date: new Date(st.date).toISOString().split('T')[0],
+            start: new Date(st.start).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            end: new Date(st.end).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+            room: st.room,
+            seats: st.seats
+        })) || [{
             date: '',
             start: '',
             end: '',
@@ -51,39 +59,59 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess }) => {
         fetchData();
     }, []);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Validate form data
-        if (!formData.movieId || !formData.theaterId || !formData.showDate.start || !formData.showDate.end) {
-            toast.error('Vui lòng điền đầy đủ thông tin cơ bản');
-            return;
+        try {
+            // Validate form data
+            if (!formData.movieId || !formData.theaterId || !formData.showDate.start || !formData.showDate.end) {
+                toast.error('Vui lòng điền đầy đủ thông tin cơ bản');
+                return;
+            }
+
+            // Validate showtimes
+            const invalidShowtime = formData.showTimes.find(st =>
+                !st.date || !st.start || !st.end || !st.room
+            );
+            if (invalidShowtime) {
+                toast.error('Vui lòng điền đầy đủ thông tin cho tất cả suất chiếu');
+                return;
+            }
+
+            // Convert dates to ISO strings and format data for API
+            const formattedData = {
+                movieId: {
+                    _id: formData.movieId,
+                    title: movies.find(m => m._id === formData.movieId)?.title || ''
+                },
+                theaterId: {
+                    _id: formData.theaterId,
+                    name: theaters.find(t => t._id === formData.theaterId)?.name || ''
+                },
+                showDate: {
+                    start: new Date(formData.showDate.start).toISOString(),
+                    end: new Date(formData.showDate.end).toISOString()
+                },
+                showTimes: formData.showTimes.map(st => ({
+                    date: new Date(st.date).toISOString(),
+                    start: new Date(`${st.date}T${st.start}`).toISOString(),
+                    end: new Date(`${st.date}T${st.end}`).toISOString(),
+                    room: st.room,
+                    seats: st.seats
+                }))
+            };
+
+            if (editData) {
+                await updateShowtime(editData._id, formattedData);
+                toast.success('Cập nhật suất chiếu thành công!');
+            } else {
+                await createShowtime(formattedData);
+                toast.success('Thêm suất chiếu thành công!');
+            }
+            onSuccess();
+        } catch (error) {
+            console.error('Error saving showtime:', error);
+            toast.error(editData ? 'Cập nhật suất chiếu thất bại!' : 'Thêm suất chiếu thất bại!');
         }
-
-        // Validate showtimes
-        const invalidShowtime = formData.showTimes.find(st =>
-            !st.date || !st.start || !st.end || !st.room
-        );
-        if (invalidShowtime) {
-            toast.error('Vui lòng điền đầy đủ thông tin cho tất cả suất chiếu');
-            return;
-        }
-
-        // Convert dates to ISO strings
-        const formattedData = {
-            ...formData,
-            showDate: {
-                start: new Date(formData.showDate.start).toISOString(),
-                end: new Date(formData.showDate.end).toISOString()
-            },
-            showTimes: formData.showTimes.map(st => ({
-                ...st,
-                date: new Date(st.date).toISOString(),
-                start: new Date(`${st.date}T${st.start}`).toISOString(),
-                end: new Date(`${st.date}T${st.end}`).toISOString()
-            }))
-        };
-
-        onSuccess(formattedData);
     };
 
     const addShowTime = () => {
@@ -112,6 +140,20 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess }) => {
     };
 
     const updateShowTime = (index: number, field: string, value: string) => {
+        if (field === 'end') {
+            const startTime = formData.showTimes[index].start;
+            if (startTime && value <= startTime) {
+                toast.error('Giờ kết thúc phải lớn hơn giờ bắt đầu');
+                return;
+            }
+        }
+        if (field === 'start') {
+            const endTime = formData.showTimes[index].end;
+            if (endTime && value >= endTime) {
+                toast.error('Giờ bắt đầu phải nhỏ hơn giờ kết thúc');
+                return;
+            }
+        }
         setFormData(prev => ({
             ...prev,
             showTimes: prev.showTimes.map((showTime, i) =>
@@ -173,7 +215,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold">Thêm suất chiếu mới</h3>
+                    <h3 className="text-xl font-semibold">{editData ? 'Sửa suất chiếu' : 'Thêm suất chiếu mới'}</h3>
                     <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">✕</button>
                 </div>
 
@@ -332,7 +374,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess }) => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                         >
-                            Thêm suất chiếu
+                            {editData ? 'Cập nhật' : 'Thêm suất chiếu'}
                         </motion.button>
                     </div>
                 </form>

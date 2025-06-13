@@ -61,6 +61,7 @@ declare global {
         ageRating: string;
         reviews: IReview[];
         averageRating: number;
+        [key: string]: any;
     }
 
     // Nếu có review:

@@ -189,13 +189,9 @@ const Dashboard: React.FC = () => {
     const handleDeleteMovies = async (movieId: string) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa ?')) {
             try {
-                await deleteMovie(movieId); // Gọi API xóa
-                setRegions((prevRegions) =>
-                    prevRegions.filter((movie) => movie._id !== movieId) // Cập nhật state sau khi xóa thành công
-                );
+                await deleteMovie(movieId);
+                setMovies(prevMovies => prevMovies.filter(movie => movie._id !== movieId));
                 toast.success('Xóa Movie thành công!');
-                // Sau khi xóa, có thể cần reset trang về 1 hoặc kiểm tra lại tổng số trang
-                // Ví dụ: setCurrentPage(1); // hoặc kiểm tra lại logic phân trang của bạn
             } catch (error) {
                 console.error('Lỗi khi xóa movie:', error);
                 toast.error('Xóa movie thất bại!');

@@ -3,18 +3,11 @@ import React, { useState, useEffect } from "react";
 import { getVouchers } from "@/apiservice/apiVoucher";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getTheaters } from "@/apiservice/apiTheater";
-import { getMovies } from "@/apiservice/apiMovies";
+import { deleteMovie, getMovies, createMovie, updateMovie } from "@/apiservice/apiMovies";
 import { getRegions, addRegion, deleteRegion } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
 import { motion } from "framer-motion";
-
-
-
-
-
-
-
-
+import MovieForm from "@/pages/admin/Form/MovieForm";
 
 const Dashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState("movies");
@@ -29,6 +22,8 @@ const Dashboard: React.FC = () => {
     const [blogs, setBlogs] = useState<IBlog[]>([]);
 
     const [newRegionName, setNewRegionName] = useState("");
+    const [showMovieForm, setShowMovieForm] = useState(false);
+    const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(undefined);
 
     useEffect(() => {
         getTheaters()
@@ -51,8 +46,6 @@ const Dashboard: React.FC = () => {
             .catch(() => setBlogs([]));
 
     }, []);
-
-
 
     // Lọc và phân trang cho từng tab
     const filterAndPaginate = <T,>(
@@ -80,8 +73,6 @@ const Dashboard: React.FC = () => {
             (movie.title?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
 
     );
-
-
 
     // Blogs
     const {
@@ -134,13 +125,12 @@ const Dashboard: React.FC = () => {
         (voucher) => (voucher.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
     );
 
-
-
     // Reset page when tab/searchTerm thay đổi
     React.useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, searchTerm]);
 
+    ////////////////////////Xử lý CRUD khu vực////////////////////////
     const handleAddRegion = async (e: React.FormEvent) => {
         e.preventDefault();
         console.log("Adding region:", newRegionName);
@@ -152,7 +142,6 @@ const Dashboard: React.FC = () => {
             console.error("Failed to add region:", error);
         }
     };
-
     const handleDeleteRegion = async (regionId: string) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa khu vực này?')) {
             try {
@@ -169,8 +158,58 @@ const Dashboard: React.FC = () => {
             }
         }
     };
+    /////////////////////////////////////////////////////////////////
 
+    ////////////////////////Xử lý CRUD phim ////////////////////////
+    const handleDeleteMovies = async (movieId: string) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa ?')) {
+            try {
+                await deleteMovie(movieId); // Gọi API xóa
+                setRegions((prevRegions) =>
+                    prevRegions.filter((movie) => movie._id !== movieId) // Cập nhật state sau khi xóa thành công
+                );
+                alert('Xóa Movie thành công!');
+                // Sau khi xóa, có thể cần reset trang về 1 hoặc kiểm tra lại tổng số trang
+                // Ví dụ: setCurrentPage(1); // hoặc kiểm tra lại logic phân trang của bạn
+            } catch (error) {
+                console.error('Lỗi khi xóa movie:', error);
+                alert('Xóa movie thất bại!');
+            }
+        }
+    };
 
+    const handleAddMovie = async (movieData: Partial<IMovie>) => {
+        try {
+            const newMovie = await createMovie(movieData as IMovie);
+            setMovies(prev => [...prev, newMovie]);
+            setShowMovieForm(false);
+            alert('Thêm phim thành công!');
+        } catch (error) {
+            console.error('Lỗi khi thêm phim:', error);
+            alert('Thêm phim thất bại!');
+        }
+    };
+
+    const handleUpdateMovie = async (movieData: Partial<IMovie>) => {
+        if (!selectedMovie?._id) return;
+        try {
+            const updatedMovie = await updateMovie(selectedMovie._id, movieData as IMovie);
+            setMovies(prev => prev.map(movie =>
+                movie._id === selectedMovie._id ? updatedMovie : movie
+            ));
+            setShowMovieForm(false);
+            setSelectedMovie(undefined);
+            alert('Cập nhật phim thành công!');
+        } catch (error) {
+            console.error('Lỗi khi cập nhật phim:', error);
+            alert('Cập nhật phim thất bại!');
+        }
+    };
+
+    const handleEditMovie = (movie: IMovie) => {
+        setSelectedMovie(movie);
+        setShowMovieForm(true);
+    };
 
     return (
         <div className="min-h-screen flex font-roboto bg-white">
@@ -257,6 +296,17 @@ const Dashboard: React.FC = () => {
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
+                                <motion.button
+                                    className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => {
+                                        setSelectedMovie(undefined);
+                                        setShowMovieForm(true);
+                                    }}
+                                >
+                                    Thêm phim mới
+                                </motion.button>
                                 <div>
                                     <span>
                                         Trang {currentPage} / {totalMoviePages}
@@ -286,10 +336,12 @@ const Dashboard: React.FC = () => {
                                             <th className="p-3 text-left">Tên phim</th>
                                             <th className="p-3 text-left">Ngày phát hành</th>
                                             <th className="p-3 text-left">Thời lượng</th>
+                                            <th className="p-3 text-left">Diễn Viên</th>
                                             <th className="p-3 text-left">Thể loại</th>
                                             <th className="p-3 text-left">Đạo diễn</th>
                                             <th className="p-3 text-left">Trạng thái</th>
-                                            <th className="p-3 text-left">Đánh giá TB</th>
+                                            <th className="p-3 text-left">Ngôn Ngữ</th>
+                                            <th className="p-3 text-left">Hành Động</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -297,15 +349,38 @@ const Dashboard: React.FC = () => {
                                             <tr key={movie._id} className="border-b hover:bg-gray-100">
                                                 <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                                 <td className="p-3">
-                                                    <img src={movie.posterImage} alt={movie.title} className="w-16 h-20 object-cover rounded" />
+                                                    <img src={movie.image} alt={movie.title} className="w-16 h-20 object-cover rounded" />
                                                 </td>
                                                 <td className="p-3">{movie.title}</td>
-                                                <td className="p-3">{movie.releaseDate}</td>
+                                                <td className="p-3">{new Date(movie.releaseDate).toLocaleDateString("vi-VN")}</td>
                                                 <td className="p-3">{movie.duration} phút</td>
-                                                <td className="p-3">{movie.genre.join(", ")}</td>
+                                                <td className="p-3">{movie.actors.join(", ").length > 10
+                                                    ? movie.actors.join(", ").substring(0, 10) + '...'
+                                                    : movie.actors.join(", ")}</td>
+                                                <td className="p-3">{movie.genre.join(", ").length > 10
+                                                    ? movie.genre.join(", ").substring(0, 10) + '...'
+                                                    : movie.genre.join(", ")}</td>
                                                 <td className="p-3">{movie.director}</td>
                                                 <td className="p-3">{movie.status}</td>
-                                                <td className="p-3">{movie.averageRating}</td>
+                                                <td className="p-3">{movie.language}</td>
+                                                <td className="p-3">
+                                                    <motion.button
+                                                        className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleEditMovie(movie)}
+                                                    >
+                                                        Sửa
+                                                    </motion.button>
+                                                    <motion.button
+                                                        className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-red-600"
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleDeleteMovies(movie._id)}
+                                                    >
+                                                        Xóa
+                                                    </motion.button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -313,8 +388,6 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
                     )}
-
-
 
                     {/* Blogs Tab */}
                     {activeTab === "blogs" && (
@@ -543,14 +616,7 @@ const Dashboard: React.FC = () => {
                                                     >
                                                         Xóa
                                                     </motion.button>
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
 
-
-                                                    >
-
-                                                    </motion.button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -680,10 +746,21 @@ const Dashboard: React.FC = () => {
                         </div>
                     )}
 
-
-
                 </main>
             </div>
+
+
+            {/* Movie Form Modal */}
+            {showMovieForm && (
+                <MovieForm
+                    movie={selectedMovie}
+                    onSubmit={selectedMovie ? handleUpdateMovie : handleAddMovie}
+                    onCancel={() => {
+                        setShowMovieForm(false);
+                        setSelectedMovie(undefined);
+                    }}
+                />
+            )}
         </div>
     );
 };

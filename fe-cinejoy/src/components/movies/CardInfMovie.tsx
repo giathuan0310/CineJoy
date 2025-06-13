@@ -424,6 +424,7 @@ const CardInfMovie = () => {
                                             <div className="flex gap-3 flex-wrap">
                                                 {showTimesOfSelectedDate.map((showtime, idx) => (
                                                     <button
+
                                                         key={idx}
                                                         className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
                                                         onClick={() => navigate(`/selectSeat`, {

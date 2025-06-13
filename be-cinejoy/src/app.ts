@@ -20,8 +20,9 @@ app.use(cors({ origin: "http://localhost:3000" })); // Cấu hình CORS để ch
 connectDB();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
 //impoer routes
 app.use('/movies', moviesRouter);
 app.use('/theaters', theaterRouter);

@@ -24,7 +24,7 @@ export const getMovieById = async (id: string) => {
 };
 export const createMovie = async (movie: IMovie) => {
     try {
-        const response = await axiosClient.post<IMovie>("/movies", movie);
+        const response = await axiosClient.post<IMovie>("/movies/add", movie);
         return response.data;
     } catch (error) {
         console.error("Error creating movie:", error);
@@ -34,7 +34,7 @@ export const createMovie = async (movie: IMovie) => {
 
 export const updateMovie = async (id: string, movie: IMovie) => {
     try {
-        const response = await axiosClient.put<IBackendResponse<IMovie>>(`/movies/${id}`, movie);
+        const response = await axiosClient.put<IMovie>(`/movies/update/${id}`, movie);
         return response.data;
     } catch (error) {
         console.error("Error updating movie:", error);

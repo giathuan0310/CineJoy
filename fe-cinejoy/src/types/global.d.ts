@@ -7,36 +7,30 @@ declare global {
         error: number | string;
         data?: T;
     }
+
+    interface IUser {
+        _id: string;
+        fullName: string;
+        email: string;
+        phoneNumber: string;
+        gender: string;
+        avatar: string;
+        dateOfBirth: string;
+        role: string;
+        isActive: boolean;
+    }
     
     interface IRegister {
-        _id: string;
-        email: string;
-        fullName: string;
+        user: IUser;
+        accessToken: string;
     }
     interface ILogin {
+        user: IUser;
         accessToken: string;
-        refreshToken: string;
-        user: {
-            email: string;
-            phone: string;
-            fullName: string;
-            role: string;
-            avatar: string;
-            id: string;
-        }
     }
 
     interface IRefreshToken {
         accessToken: string;
-    }
-
-    interface IUser {
-        email: string;
-        phone: string;
-        fullName: string;
-        role: string;
-        avatar: string;
-        id: string;
     }
 
     interface IFetchAccount {

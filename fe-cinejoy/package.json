@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
     "@tailwindcss/vite": "^4.1.8",
     "@types/axios": "^0.9.36",
     "antd": "^5.25.4",
@@ -25,7 +26,8 @@
     "react-router-dom": "6.27.0",
     "sass": "^1.89.1",
     "tailwindcss": "^4.1.8",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

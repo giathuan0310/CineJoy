@@ -47,7 +47,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
 //import routes
-app.use('/auth', authRouter);
+app.use('/v1/api/auth', authRouter);
 app.use('/movies', moviesRouter);
 app.use('/theaters', theaterRouter);
 app.use("/showtimes", ShowtimeRouter);

@@ -1,6 +1,6 @@
 import { getMovies } from "@/apiservice/apiMovies";
-import React, { use, useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 
 const MovieList: React.FC = () => {

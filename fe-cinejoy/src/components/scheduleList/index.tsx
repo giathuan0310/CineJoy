@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// import { getRegions, getTheaters } from "@/apiservice/apiTheater";
+import { useState } from "react";
 
 interface Cinema {
   id: number;
@@ -90,6 +91,42 @@ const dates = [
 const ScheduleList: React.FC = () => {
   const [selectedCinemaId, setSelectedCinemaId] = useState(1);
   const [selectedDate, setSelectedDate] = useState(dates[0].value);
+  // const [selectedCity, setSelectedCity] = useState("Hà Nội");
+  // const [theater, setTheater] = useState<ITheater[]>([]);
+  // const [region, setRegion] = useState<IRegion[]>([]);
+
+  // useEffect(() => {
+  //     const fetchTheater = async () => {
+  //         try {
+  //             const response = await getTheaters();
+  //             setTheater(Array.isArray(response) ? response : []);
+  //         } catch (error) {
+  //             console.error("Lỗi khi lấy thông tin rạp:", error);
+  //         }
+  //     }
+
+  //     const fetchRegion = async () => {
+  //         try {
+  //             const response = await getRegions();
+  //             setRegion(Array.isArray(response) ? response : []);
+  //         } catch (error) {
+  //             console.error("Lỗi khi lấy thông tin vùng:", error);
+  //         }
+  //     }
+
+  //     fetchTheater();
+  //     fetchRegion();
+  //   }, []);
+
+  //   const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
+
+  //   // Khi đổi thành phố, chọn lại rạp đầu tiên
+  //   useEffect(() => {
+  //     if (filteredCinemas.length > 0) {
+  //         setSelectedCinemaId(filteredCinemas[0]._id);
+  //     }
+  //   }, [selectedCity]);
+
 
   return (
     <div className="flex flex-col bg-white rounded-2xl shadow p-6 gap-6 my-8 mx-30">

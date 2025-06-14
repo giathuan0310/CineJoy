@@ -50,7 +50,11 @@ const ChatbotService = {
 - Độ tuổi: ${movie.ageRating || "Chưa cập nhật"}
 - Trạng thái: ${movie.status || "Chưa cập nhật"}
 - Đánh giá: ${movie.averageRating ? movie.averageRating.toFixed(1) + "/5" : "Chưa có đánh giá"}
+- poster: ${movie.posterImage || "Chưa có poster"}
+-hình: ${movie.image || "Chưa có "}
 - Mô tả: ${movie.description || "Chưa có mô tả"}
+-video tra
+
             `).join('\n');
         } catch (error) {
             console.error("Error fetching movies:", error);
@@ -135,6 +139,34 @@ const ChatbotService = {
             return "Xin lỗi, tôi không thể trả lời ngay lúc này. Bạn có thể hỏi thêm về phim hoặc rạp chiếu phim không?";
         }
     },
+
+    // Gửi tin nhắn đến Facebook Messenger
+    sendMessage: async (recipientId: string, message: string) => {
+        try {
+            const response = await axios.post(
+                `https://graph.facebook.com/v18.0/me/messages`,
+                {
+                    recipient: {
+                        id: recipientId
+                    },
+                    message: {
+                        text: message
+                    }
+                },
+                {
+                    params: {
+                        access_token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+                    }
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error sending message to Facebook:', error);
+            throw error;
+        }
+    },
+
+
 };
 
 export default ChatbotService;

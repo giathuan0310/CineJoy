@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import tuongtacIcon from '../assets/tuongtac.png';
+import { FaFacebookF } from 'react-icons/fa';
 
 interface Message {
     sender: 'user' | 'bot';
@@ -12,6 +13,7 @@ interface ChatResponse {
 }
 
 const Chatbot: React.FC = () => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputMessage, setInputMessage] = useState('');
@@ -59,19 +61,49 @@ const Chatbot: React.FC = () => {
     };
 
     return (
-        <div className="fixed bottom-4 right-4 z-50">
-            {!isOpen ? (
-                <button
-                    onClick={() => setIsOpen(true)}
-                    className="bg-blue-400 text-white rounded-full p-2 shadow-lg hover:bg-blue-700 transition-colors"
-                >
-                    <img
-                        src={tuongtacIcon}
-                        alt="Chat with CineJoy"
-                        className="h-16 w-16 object-contain"
-                    />
-                </button>
-            ) : (
+        <div className="fixed bottom-8 right-8 flex flex-col items-center">
+            {/* Nút menu chính */}
+            <button
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                className="bg-blue-400 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors"
+            >
+                <img
+                    src={tuongtacIcon}
+                    alt="Chat with CineJoy"
+                    className="h-12 w-12 object-contain"
+                />
+            </button>
+
+            {/* Các nút nhỏ, chỉ hiện khi menu mở */}
+            {isMenuOpen && (
+                <div className="relative mt-4 flex flex-col items-center space-y-4">
+                    {/* Nút Facebook */}
+                    <a
+                        href="https://www.facebook.com/profile.php?id=61577387097700"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-blue-600 text-white rounded-full p-3 shadow-md hover:bg-blue-800 transition-transform transform active:scale-90"
+                        title="Đến fanpage Facebook"
+                    >
+                        <FaFacebookF size={24} />
+                    </a>
+                    {/* Nút Chat web */}
+                    <button
+                        onClick={() => { setIsOpen(true); setIsMenuOpen(false); }}
+                        className="bg-blue-500 text-white rounded-full p-3 shadow-lg hover:bg-blue-700 transition-colors"
+                        title="Chat trên web"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                            <path d="M8 12h8M8 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                    {/* Có thể thêm nút Zalo, Hotline... tương tự */}
+                </div>
+            )}
+
+            {/* Khung chat web */}
+            {isOpen && (
                 <div className="bg-white rounded-lg shadow-xl w-96 h-[500px] flex flex-col">
                     {/* Header */}
                     <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">

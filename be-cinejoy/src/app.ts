@@ -13,10 +13,16 @@ import chatbotRouter from './routes/chatbotRoutes';
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
+// Cấu hình CORS để cho phép truy cập từ cả localhost và ngrok
+app.use(cors({
+    origin: [
+        "http://localhost:3000",
+        "https://*.ngrok-free.app"
+    ]
+}));
 
-app.use(cors({ origin: "http://localhost:3000" })); // Cấu hình CORS để cho phép truy cập từ localhost:3000
 // Connect to MongoDB
 connectDB();
 
@@ -33,8 +39,6 @@ app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
 app.use("/chatbot", chatbotRouter);
-
-
 
 // Start the server
 app.listen(PORT, () => {

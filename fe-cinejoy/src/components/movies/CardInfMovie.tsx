@@ -2,7 +2,7 @@ import { getMovieById, getMovies } from "@/apiservice/apiMovies";
 import { getShowTimesByFilter } from "@/apiservice/apiShowTime";
 import { getRegions, getTheaters } from "@/apiservice/apiTheater";
 import React, { useEffect, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -71,7 +71,6 @@ const CardInfMovie = () => {
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-    const days = getDateRange(showtimes[0]?.showDate.start, showtimes[0]?.showDate.end);
     // Giả sử showtimes là mảng các document, mỗi doc có showTimes là mảng các suất chiếu
     const allShowTimes = showtimes.flatMap(st => st.showTimes || []);
     const showTimesOfSelectedDate = allShowTimes.filter(
@@ -434,7 +433,7 @@ const CardInfMovie = () => {
                                                     <button
                                                         key={idx}
                                                         className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
-                                                        onClick={() => navigate(`/selectSeat/${showtime._id}`)}
+                                                        onClick={() => navigate(`/selectSeat`)}
                                                     >
                                                         {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
                                                     </button>

@@ -177,8 +177,8 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
 
 export const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
       res.status(400).json({
         status: false,
         error: 1,
@@ -188,7 +188,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
       return;
     }
 
-    const result = await authService.resetPassword(email, password);
+    const result = await authService.resetPassword(email, newPassword);
     res.status(200).json(result);
     return;
   } catch (error: any) {

@@ -117,7 +117,7 @@ const login = async (email: string, password: string) => {
 const refreshAccessToken = async (refreshToken: string) => {
   try {
     const decoded = jwt.verify(refreshToken, JWT_SECRET) as { id: string };
-
+    
     const rawUser = await User.findById(decoded.id);
     if (!rawUser || !rawUser.isActive) {
       return {
@@ -174,7 +174,9 @@ const getAccount = async (userId: string) => {
     status: true,
     error: 0,
     message: "Lấy thông tin tài khoản thành công",
-    data: userWithoutPassword,
+    data: {
+      user: userWithoutPassword
+    },
   };
 };
 

@@ -228,8 +228,8 @@ const HomePage = () => {
                 </div>
             </div>
 
-            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating />
-            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" />
+            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="nowShowing" />
+            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="upcoming" />
             <ScheduleList />
 
             <div className="bg-[#cccccc2b] min-h-screen py-10 px-4">

@@ -11,8 +11,8 @@ const createInstanceAxios = (baseURL: string) => {
 
   const handleRefreshToken = async () => {
       return await mutex.runExclusive(async () => {
-        const res = await instance.post<IRefreshToken>('/v1/api/auth/refreshToken');
-        if (res && res.data) return res.data?.accessToken;
+        const res = await instance.post<IBackendResponse<IRefreshToken>>('/v1/api/auth/refreshToken');
+        if (res && res.data) return res.data.data?.accessToken;
         else return null;
       });
   }
@@ -30,8 +30,6 @@ const createInstanceAxios = (baseURL: string) => {
 
   // Add a response interceptor
   instance.interceptors.response.use(function (response) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (response && response.data)  return response.data as any;
     return response;
   }, async function (error) {
     if (error.config && error.response && +error.response.status === 401) {

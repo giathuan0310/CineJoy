@@ -4,40 +4,33 @@ declare global {
     interface IBackendResponse<T> {
         status?: string | string[];
         message: string;
-        errorCode: number | string;
+        error: number | string;
         data?: T;
     }
 
-    interface IRegister {
+    interface IUser {
         _id: string;
-        email: string;
         fullName: string;
+        email: string;
+        phoneNumber: string;
+        gender: string;
+        avatar: string;
+        dateOfBirth: string;
+        role: string;
+        isActive: boolean;
     }
-
-    interface ILogin {
+    
+    interface IRegister {
+        user: IUser;
         accessToken: string;
-        refreshToken: string;
-        user: {
-            email: string;
-            phone: string;
-            fullName: string;
-            role: string;
-            avatar: string;
-            id: string;
-        }
+    }
+    interface ILogin {
+        user: IUser;
+        accessToken: string;
     }
 
     interface IRefreshToken {
         accessToken: string;
-    }
-
-    interface IUser {
-        email: string;
-        phone: string;
-        fullName: string;
-        role: string;
-        avatar: string;
-        id: string;
     }
 
     interface IFetchAccount {

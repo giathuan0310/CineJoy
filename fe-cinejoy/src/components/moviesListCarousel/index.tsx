@@ -2,15 +2,10 @@ import { Link } from 'react-router-dom';
 import { FaStar } from 'react-icons/fa';
 import Carousel from 'react-multi-carousel';
 import 'react-multi-carousel/lib/styles.css';
-
-interface Movie {
-  id: number;
-  title: string;
-  posterUrl: string;
-  ageRating: string;
-  genres: string[];
-  rating: number;
-}
+import { useEffect, useState } from 'react';
+import { getMovies } from '@/apiservice/apiMovies';
+import { Modal } from 'antd';
+import useAppStore from '@/store/app.store';
 
 interface Size {
     max: number;
@@ -35,6 +30,7 @@ interface IProps {
   titleColor?: string;
   bg?: boolean;
   starRating?: boolean;
+  status: string;
 }
 
 const responsive: Responsive = {
@@ -64,58 +60,35 @@ const getRatingBadgeColor = (rating: string): string => {
   return 'bg-yellow-500';
 };
 
+const getYoutubeEmbedUrl = (url?: string) => {
+  if (!url) return "";
+  // Nếu đã là link embed thì trả về luôn
+  if (url.includes("embed")) return url;
+  // Lấy id từ link watch hoặc share
+  const match = url.match(/(?:\?v=|\/embed\/|\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+  }
+  return url;
+}
+
 const MoviesListCarousel = (props: IProps) => {
-  // Fake movie data (replace with API fetch)
-  const movies: Movie[] = [
-    {
-      id: 1,
-      title: 'Vây Hãm Tại Đài Bắc',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1735969147/50.Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_lr0jp4_wbdemr.jpg',
-      ageRating: '16+',
-      genres: ['Hành động', 'Giật gân'],
-      rating: 4
-    },
-    {
-      id: 2,
-      title: 'Vùng Đất Bị Nguyền Rủa',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1735969149/56._A%CC%81c_Quy%CC%89_Truy_Ho%CC%82%CC%80n_xdqdbj_jziajq.webp',
-      ageRating: '12+',
-      genres: ['Kinh dị', 'Bí ẩn'],
-      rating: 4
-    },
-    {
-      id: 3,
-      title: 'Robot Hoàng Đã',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1742694499/57_Nobita_va%CC%80_Cuo%CC%A3%CC%82c_Phie%CC%82u_Lu%CC%9Bu_Va%CC%80o_The%CC%82%CC%81_Gio%CC%9B%CC%81i_Trong_Tranh_nyf1uc.webp',
-      ageRating: '15+',
-      genres: ['Khoa học viễn tưởng', 'Phiêu lưu'],
-      rating: 4
-    },
-    {
-      id: 4,
-      title: 'Tiên Tri Tử Thần',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1742732596/58_Quy%CC%89_Nha%CC%A3%CC%82p_Tra%CC%80ng_xsxfca.jpg',
-      ageRating: '15+',
-      genres: ['Kinh dị', 'Siêu nhiên'],
-      rating: 4
-    },
-    {
-      id: 5,
-      title: 'Tiếng Gọi Của Oán Hồn',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1740891016/23_Emma_Va%CC%80_Vu%CC%9Bo%CC%9Bng_Quo%CC%82%CC%81c_Ti%CC%81_Hon_s3b1ao.webp',
-      ageRating: '12+',
-      genres: ['Kinh dị', 'Tâm lý'],
-      rating: 5
-    },
-    {
-      id: 6,
-      title: 'Trò Chơi Sống Còn',
-      posterUrl: 'https://res.cloudinary.com/ddia5yfia/image/upload/v1742733309/60_Vietnamese_Concert_Film_hiwmpg.png',
-      ageRating: '16+',
-      genres: ['Tâm lý', 'Hồi hộp'],
-      rating: 5
-    }
-  ];
+  const [movies, setMovies] = useState<IMovie[]>([]);
+  const [isTrailerModalOpen, setIsTrailerModalOpen] = useState<boolean>(false);
+  const [currentMovieForModal, setCurrentMovieForModal] = useState<IMovie | null>(null);
+  const { setIsModalOpen } = useAppStore();
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      const res = await getMovies();
+
+      if (res) {
+        setMovies(Array.isArray(res) ? res : []);
+      }
+    };
+
+    fetchMovies();
+  }, []);
 
 
   const renderStars = (rating: number) => {
@@ -146,57 +119,124 @@ const MoviesListCarousel = (props: IProps) => {
           itemClass="px-2"
           containerClass="pb-12"
         >
-          {movies.map((movie) => (
-            <div
-                key={movie.id}
-                className="relative group cursor-pointer overflow-hidden rounded-md transition-all duration-300 hover:scale-110 hover:z-999"
-            >
-                {/* Number Badge */}
-                <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/80 border-2 border-red-600 text-white flex items-center justify-center font-bold z-10">
-                    {movie.id}
-                </div>
-                
-                {/* Age Rating Badge */}
-                <div className={`absolute top-4 right-4 ${getRatingBadgeColor(movie.ageRating)} text-white px-2 py-1 rounded font-bold z-1`}>
-                    {movie.ageRating}
-                </div>
-                
-                {/* Movie Poster */}
-                <Link to={`/movies/${movie.id}`}>
-                <div className="relative aspect-[2/3]">
-                    <img
-                        className="w-full h-full object-cover border border-white rounded-xl"
-                        src={movie.posterUrl}
-                        alt={movie.title}
-                    />
+          {movies
+            .filter((movie) => movie.status === props.status)
+            .map((movie, index) => {
+              console.log(`Movie: ${movie.title}, Trailer: ${movie.trailer}`);
+              return (
+                <Link to={`/movies/${movie._id}`} key={movie._id}>
+                  <div
+                    className="relative group cursor-pointer overflow-hidden rounded-md transition-all duration-300 hover:scale-110 hover:z-999"
+                  >
+                    {/* Number Badge */}
+                    <div className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/80 border-2 border-red-600 text-white flex items-center justify-center font-bold z-10">
+                      {index + 1}
+                    </div>
                     
-                    {/* Play button overlay for video trailer movies - shown on hover */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                                <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                            </svg>
+                    {/* Age Rating Badge */}
+                    <div className={`absolute top-4 right-4 ${getRatingBadgeColor(movie.ageRating)} text-white px-2 py-1 rounded font-bold z-1`}>
+                      {movie.ageRating}
+                    </div>
+                    
+                    {/* Movie Poster */}
+                    <div className="relative aspect-[2/3]">
+                        <img
+                            className="w-full h-full object-cover border border-white rounded-xl"
+                            src={movie.posterImage}
+                            alt={movie.title}
+                        />
+                        
+                        {/* Play button overlay for video trailer movies - shown on hover */}
+                        <div 
+                          className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center group-hover:opacity-100 transition-opacity duration-300 ${movie.trailer ? 'opacity-0' : 'opacity-0'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            if (movie.trailer) {
+                              setCurrentMovieForModal(movie);
+                              setIsTrailerModalOpen(true);
+                              setIsModalOpen(true);
+                            }
+                          }}
+                          style={{ zIndex: 10 }} // Đảm bảo nút play nằm trên Link
+                        >
+                            <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center">
+                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                    <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+                                </svg>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                    
+                    {/* Movie Info */}
+                    <div className="mt-3">
+                        <h3 className={`${props.titleColor ? "text-[#0f1b4c]" : "text-yellow-500"} font-semibold text-lg truncate`}>{movie.title}</h3>
+                        <p className="text-gray-400 text-sm truncate">{movie.genre.join(', ')}</p>
+                        {props.starRating && (
+                          <div className="flex items-center mt-1">
+                            {renderStars(movie.averageRating)}
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 </Link>
-                
-                {/* Movie Info */}
-                <div className="mt-3">
-                    <h3 className={`${props.titleColor ? "text-[#0f1b4c]" : "text-yellow-500"} font-semibold text-lg truncate`}>{movie.title}</h3>
-                    <p className="text-gray-400 text-sm truncate">{movie.genres.join(', ')}</p>
-                    {props.starRating && (
-                      <div className="flex items-center mt-1">
-                        {renderStars(movie.rating)}
-                      </div>
-                    )}
-                </div>
-            </div>
-            ))}
+              );
+            })}
         </Carousel>
       </div>
+
+      <Modal
+        title={null}
+        open={isTrailerModalOpen}
+        onCancel={() => setIsTrailerModalOpen(false)}
+        footer={null}
+        centered
+        width={800}
+        bodyStyle={{ padding: 0 }}
+        destroyOnClose
+        getContainer={false}
+      >
+        {currentMovieForModal && (
+          <div className="p-4">
+            <iframe
+              width="100%"
+              height="450"
+              src={getYoutubeEmbedUrl(currentMovieForModal.trailer)}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="Movie Trailer"
+              className='mt-3'
+            ></iframe>
+            <div className="mt-4 flex items-start">
+              <img
+                src={currentMovieForModal.posterImage}
+                alt={currentMovieForModal.title}
+                className="w-35 h-auto rounded-md mr-4"
+              />
+              <div>
+                <div className='flex items-center gap-2'>
+                  <h3 className="text-xl font-bold text-[#0f1b4c] mb-1">{currentMovieForModal.title}</h3>
+                  <p className="text-gray-600 text-lg mb-1">
+                    - {currentMovieForModal.genre.join(', ')}
+                  </p>
+                </div>
+                <p className="text-gray-700 text-sm line-clamp-3">{currentMovieForModal.description}</p>
+              </div>
+            </div>
+            <div className="text-center mt-4">
+              <button
+                className="bg-gray-200 text-gray-800 px-6 py-2 rounded-full hover:bg-gray-300 transition cursor-pointer"
+                onClick={() => setIsTrailerModalOpen(false)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

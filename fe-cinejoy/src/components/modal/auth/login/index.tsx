@@ -2,9 +2,12 @@ import { Button, Input, Modal, Form } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { FaFacebook } from 'react-icons/fa';
 import { FcGoogle } from 'react-icons/fc';
-import type { InputRef } from 'antd';
+import type { FormProps, InputRef } from 'antd';
 import ModalRegister from '../register';
 import ModalForgotPassword from '../forgotPassword';
+import { loginApi } from '@/services/api';
+import useAppStore from '@/store/app.store';
+import { useAlertContextApp } from '@/context/alert.context';
 
 type FieldType = {
     email: string;
@@ -21,6 +24,10 @@ const ModalLogin = (props: IProps) => {
     const [form] = Form.useForm();
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
     const [isForgotPasswordModalOpen, setIsForgotPasswordOpen] = useState<boolean>(false);
+    const [isSubmit, setIsSubmit] = useState<boolean>(false);
+    const { setUser, setIsAuthenticated } = useAppStore();
+    const { messageApi } = useAlertContextApp();
+
     const inputRef = useRef<InputRef>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -64,6 +71,30 @@ const ModalLogin = (props: IProps) => {
         props.onClose(false);
     };
 
+    const handleSubmit: FormProps<FieldType>['onFinish'] = async (values) => {
+        setIsSubmit(true);
+        const { email, password } = values;
+        const res = await loginApi({
+            email,
+            password,
+        });
+        if (res.data) {
+            localStorage.setItem("accessToken", res.data.accessToken);
+            setUser(res.data.user);
+            setIsAuthenticated(true);
+            messageApi!.open({
+                type: "success",
+                content: "Đăng nhập thành công!",
+            });
+            props.onClose(false);
+        } else
+            messageApi!.open({
+                type: "error",
+                content: res.message,
+            });
+        setIsSubmit(false);      
+    };
+
     return (
         <>
             <Modal
@@ -76,7 +107,7 @@ const ModalLogin = (props: IProps) => {
             >
                 <div className="text-center font-semibold text-xl text-[#0f1b4c] mt-4 mb-6 select-none">Đăng nhập</div>
 
-                <Form layout="vertical" form={form} style={{ padding: '5px 20px 0 20px' }}>
+                <Form layout="vertical" form={form} onFinish={handleSubmit} style={{ padding: '5px 20px 0 20px' }}>
                     <Form.Item<FieldType>
                         label="Nhập Email"
                         name="email"
@@ -103,6 +134,7 @@ const ModalLogin = (props: IProps) => {
                             block
                             className="bg-blue-600 hover:bg-blue-700"
                             size='large'
+                            loading={isSubmit}
                         >
                             Đăng nhập
                         </Button>

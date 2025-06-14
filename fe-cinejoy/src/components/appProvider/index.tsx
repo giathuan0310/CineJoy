@@ -24,9 +24,9 @@ const AppProvider: React.FC<Props> = ({ children }) => {
     };
     handleFetchAccount();
   }, [isAppLoading, isAuthenticated, fetchAccount]);
-  
+
   if (isAppLoading) {
-    
+
     return (
       <>
         {contextHolder}

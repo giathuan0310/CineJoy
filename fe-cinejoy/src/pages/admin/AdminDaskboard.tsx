@@ -9,7 +9,7 @@ import { getBlogs } from "@/apiservice/apiBlog";
 import { motion } from "framer-motion";
 import MovieForm from "@/pages/admin/Form/MovieForm";
 import { toast } from "react-toastify";
-
+import banner from "@/assets/banner.jpg";
 import { getShowTimes, updateShowtime, deleteShowtime } from "@/apiservice/apiShowTime";
 import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
 
@@ -367,13 +367,16 @@ const Dashboard: React.FC = () => {
                     >
                         Đăng xuất
                     </button>
+
                 </header>
 
                 {/* Content */}
                 <main className="p-6">
+
                     {/* Movies Tab */}
                     {activeTab === "movies" && (
                         <div>
+
                             <h2 className="text-2xl font-semibold mb-6 text-black select-none">
                                 Quản lý phim
                             </h2>

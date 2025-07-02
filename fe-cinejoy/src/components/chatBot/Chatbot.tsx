@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import tuongtacIcon from '../assets/tuongtac.png';
+import tuongtacIcon from 'assets/tuongtac.png';
 import { FaFacebookF } from 'react-icons/fa';
 
 interface Message {
@@ -19,6 +19,12 @@ const Chatbot: React.FC = () => {
     const [inputMessage, setInputMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    
+    const defaultBotMessage: Message = {
+        sender: 'bot',
+        text: 'Chào bạn! CineJoy xin chào. Bạn cần thông tin gì về phim, lịch chiếu, giá vé hay các dịch vụ của rạp không ạ?',
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,6 +33,15 @@ const Chatbot: React.FC = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        if (isOpen && messages.length === 0) {
+            setMessages([defaultBotMessage]);
+        }
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isOpen]);
 
     const handleSendMessage = async () => {
         if (!inputMessage.trim()) return;
@@ -86,7 +101,6 @@ const Chatbot: React.FC = () => {
                             <path d="M8 12h8M8 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         </svg>
                     </button>
-                    {/* Có thể thêm nút Zalo, Hotline... tương tự */}
                 </div>
             )}
 
@@ -114,7 +128,7 @@ const Chatbot: React.FC = () => {
                                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 <div
-                                    className={`max-w-[80%] rounded-lg p-3 ${message.sender === 'user'
+                                    className={`max-w-[90%] rounded-lg p-3 ${message.sender === 'user'
                                         ? 'bg-blue-600 text-white'
                                         : 'bg-gray-100 text-gray-800'
                                         }`}
@@ -141,6 +155,7 @@ const Chatbot: React.FC = () => {
                     <div className="border-t p-2">
                         <div className="flex space-x-2">
                             <input
+                                ref={inputRef}
                                 type="text"
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}

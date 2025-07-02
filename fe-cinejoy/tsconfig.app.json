@@ -14,6 +14,7 @@
       "pages/*": ["./src/pages/*"],
       "styles/*": ["./src/styles/*"],
       "services/*": ["./src/services/*"],
+      "context/*": ["./src/context/*"],
     },
 
     /* Bundler mode */

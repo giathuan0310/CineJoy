@@ -1,5 +1,5 @@
 import React from "react";
-import Seat from "./Seat";
+import Seat from "components/movies/booking_seats/Seat";
 
 interface SeatLayoutProps {
     selectedSeats: string[];

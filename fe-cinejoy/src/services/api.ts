@@ -44,3 +44,8 @@ export const fetchAccountApi = async () => {
     });
     return response.data;
 };
+
+export const updateUser = async (id: string, data: { fullName?: string; phoneNumber?: string; gender?: string; avatar?: string; dateOfBirth?: string; role?: string; isActive?: boolean, settings?: { darkMode: boolean}}) => {
+    const response = await axios.put<IBackendResponse<IUser>>(`/v1/api/user/${id}`, data);
+    return response.data;
+};

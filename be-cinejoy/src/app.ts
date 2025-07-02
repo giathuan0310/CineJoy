@@ -12,6 +12,7 @@ import BlogRouter from './routes/BlogRouter';
 import VoucherRouter from './routes/VoucherRouter';
 import RegionRouter from './routes/RegionRouter';
 import chatbotRouter from './routes/chatbotRoutes';
+import UserRouter from './routes/UserRouter';
 dotenv.config();
 
 const app: Application = express();
@@ -43,14 +44,13 @@ app.use(
 connectDB();
 
 // Middleware
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-
 //import routes
 app.use('/v1/api/auth', authRouter);
+app.use("/v1/api/user", UserRouter);
 app.use('/movies', moviesRouter);
 app.use('/theaters', theaterRouter);
 app.use("/showtimes", ShowtimeRouter);
@@ -59,7 +59,6 @@ app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
 app.use("/chatbot", chatbotRouter);
-
 
 // Start the server
 app.listen(PORT, () => {

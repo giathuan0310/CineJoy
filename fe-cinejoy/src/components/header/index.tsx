@@ -1,11 +1,11 @@
 import { MdDarkMode } from "react-icons/md";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
 import { Dropdown } from 'antd';
 import ModalLogin from '@/components/modal/auth/login';
 import useAppStore from '@/store/app.store';
-import { logoutApi } from '@/services/api';
+import { logoutApi, updateUser } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
 import Logo from 'assets/CineJoyLogo.png';
 
@@ -49,6 +49,30 @@ const Header = () => {
     }
   };
 
+  const handleDarkMode = async () => {
+    if (isAuthenticated && user?._id) {
+        setIsDarkMode(!user.settings.darkMode);
+        try {
+            const res = await updateUser(user._id, { settings: { darkMode: !user.settings.darkMode } });
+            if (res.data && res.status) {
+                setUser(res.data);
+            }
+        } catch (error) {
+            setIsDarkMode(user.settings.darkMode);
+            messageApi?.open({ type: "error", content: "Cập nhật dark mode thất bại!" });
+            console.log(error);
+        }
+    } else {
+        setIsDarkMode(!isDarkMode);
+    }
+  }
+
+  useEffect(() => {
+    if (user && typeof user.settings?.darkMode === 'boolean') {
+      setIsDarkMode(user.settings.darkMode);
+    }
+  }, [user]);
+
   const items = [
     {
       key: "profile",
@@ -72,7 +96,6 @@ const Header = () => {
         key: 'admin',
     })
   }
-
 
     return (
         <>
@@ -112,7 +135,7 @@ const Header = () => {
                                     <FaSearch size={16} />
                                 </button>
                             </div>
-                            <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={() =>  setIsDarkMode(!isDarkMode)}> 
+                            <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={handleDarkMode}> 
                                 {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
                             </div>
                             <Dropdown menu={{ items }} placement="bottom" overlayStyle={{ zIndex: 9999 }}>
@@ -136,7 +159,7 @@ const Header = () => {
                                         <FaSearch size={16} />
                                     </button>
                                 </div>
-                                <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={() =>  setIsDarkMode(!isDarkMode)}> 
+                                <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={handleDarkMode}> 
                                     {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
                                 </div>
                                 <button

@@ -18,6 +18,9 @@ declare global {
         dateOfBirth: string;
         role: string;
         isActive: boolean;
+        settings: {
+            darkMode: boolean;
+        }
     }
     
     interface IRegister {

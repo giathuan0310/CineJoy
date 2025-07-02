@@ -26,6 +26,9 @@ export interface IUser extends Document {
     otpExpires?: Date;
     createdAt: Date;
     updatedAt: Date;
+    settings?: {
+        darkMode: boolean;
+    };
     comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -50,6 +53,9 @@ const UserSchema = new Schema<IUser>(
         isActive: { type: Boolean, default: true },
         otp: { type: String, required: false },
         otpExpires: { type: Date, required: false },
+        settings: {
+            darkMode: { type: Boolean, default: false },
+        },
     },  
     {
         timestamps: true,

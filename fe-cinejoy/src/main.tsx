@@ -12,7 +12,6 @@ import Select from 'pages/client/SelectSeat';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import { ToastContainer } from 'react-toastify';
 
-
 const router = createBrowserRouter([
   {
     path: '/',

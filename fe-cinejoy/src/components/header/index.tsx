@@ -83,11 +83,6 @@ const Header = () => {
                         <Link to="/" className="flex items-center">
                             <img className='w-[90px] object-cover inline-block' src={Logo} alt="Logo" />
                         </Link>
-
-                        <div className="flex flex-col items-center text-sm select-none">
-                            <p className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-[15px] leading-4 font-normal`}>Đặt vé</p>
-                            <p className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-[15px] leading-4 font-normal`}>xem phim</p>
-                        </div>
                     </div>
 
                     {/* Navigation */}

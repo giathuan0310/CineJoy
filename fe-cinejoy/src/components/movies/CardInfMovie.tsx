@@ -1,8 +1,9 @@
 import { getMovieById, getMovies } from "@/apiservice/apiMovies";
 import { getShowTimesByFilter } from "@/apiservice/apiShowTime";
 import { getRegions, getTheaters } from "@/apiservice/apiTheater";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import useAppStore from "@/store/app.store";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -34,10 +35,6 @@ function getDateRange(start: string, end: string) {
     return result;
 }
 
-
-
-
-
 function getYoutubeEmbedUrl(url?: string) {
     if (!url) return "";
     // Nếu đã là link embed thì trả về luôn
@@ -63,7 +60,7 @@ const CardInfMovie = () => {
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-
+    const { isDarkMode } = useAppStore();
     const allShowTimes = showtimes.flatMap(st => st.showTimes || []);
     const showTimesOfSelectedDate = allShowTimes.filter(
         st => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
@@ -144,7 +141,7 @@ const CardInfMovie = () => {
     const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
 
     // Khi đổi thành phố, chọn lại rạp đầu tiên
-    React.useEffect(() => {
+    useEffect(() => {
         if (filteredCinemas.length > 0) {
             setSelectedCinemaId(filteredCinemas[0]._id);
         }
@@ -302,14 +299,16 @@ const CardInfMovie = () => {
                         ></iframe>
                     </div>
                     {/* Danh sách phim bên phải */}
-                    <div className="w-full md:w-[400px] bg-[#F6F6F6] flex flex-col rounded-2xl">
+                    <div className={`w-full md:w-[400px] flex flex-col rounded-2xl ${
+                        isDarkMode ? "bg-gray-800 text-white" : "bg-[#F6F6F6]"
+                    }`}>
                         <div className="flex justify-center gap-4 mb-8 pt-3 pb-3 pl-3 pr-3">
-
-
                             <button
-                                className={`w-50 h-8 border rounded font-semibold transition ${activeTab === "nowShowing"
+                                className={`w-50 h-8 border rounded font-semibold transition cursor-pointer ${activeTab === "nowShowing"
                                     ? "bg-[#b55210] text-white text-sm"
-                                    : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
+                                    : isDarkMode
+                                        ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
+                                        : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
                                     }`}
                                 onClick={() => setActiveTab("nowShowing")}
                             >
@@ -317,27 +316,29 @@ const CardInfMovie = () => {
                             </button>
 
                             <button
-                                className={` w-50 h-8 border rounded font-semibold transition ${activeTab === "upcoming"
+                                className={` w-50 h-8 border rounded font-semibold transition cursor-pointer ${activeTab === "upcoming"
                                     ? "bg-[#dd6c0f] text-white"
-                                    : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
+                                    : isDarkMode
+                                        ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
+                                        : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
                                     }`}
                                 onClick={() => setActiveTab("upcoming")}
                             >
                                 Phim sắp chiếu
                             </button>
-
-
                         </div>
                         <ul className="space-y-4">
                             {filteredMovies.map((item) => (
                                 <li
                                     key={item._id}
-                                    className="flex items-center gap-3 rounded-lg p-2 border-b border-gray-300 mx-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    className={`flex items-center gap-3 rounded-lg p-2 border-b mx-2 cursor-pointer transition-colors ${
+                                        isDarkMode ? "border-gray-700 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-100"
+                                    }`}
                                     onClick={() => navigate(`/movies/${item._id}`)}
                                 >
                                     <img src={item.image} alt={item.title} className="w-12 h-16 object-cover rounded" />
                                     <div>
-                                        <div className="text-black font-semibold">{item.title}</div>
+                                        <div className={`font-semibold ${isDarkMode ? "text-white" : "text-black"}`}>{item.title}</div>
                                         <div className="text-gray-600 text-sm">{item.genre.join(", ")}</div>
                                         <div className="text-yellow-400 text-sm">
                                             {"★".repeat(item.reviews.reduce((acc, review) => acc + (review.rating || 0), 0) / item.reviews.length || 0)}
@@ -353,8 +354,8 @@ const CardInfMovie = () => {
 
             {/* Modal đặt vé */}
             {openModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-2xl shadow-lg max-w-5xl w-full p-8 relative">
+                <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40">
+                    <div className={`rounded-2xl shadow-lg max-w-5xl w-full p-8 relative ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
 
                         {/* Thông tin phim trên modal */}
                         <div className="flex items-start gap-6 mb-6">
@@ -364,24 +365,24 @@ const CardInfMovie = () => {
                                 className="w-36 h-52 object-cover rounded-lg shadow"
                             />
                             <div>
-                                <div className="text-3xl font-semibold text-[#162d5a] mb-2">{movie?.title}</div>
+                                <div className={`text-3xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-[#162d5a]"}`}>{movie?.title}</div>
                                 <div className="mb-2">
                                     <span className="inline-block bg-green-600 text-white text-sm font-bold px-2 py-0.5 rounded mr-2 align-middle">{movie?.ageRating}</span>
-                                    <span className="text-gray-700 font-medium">Thời lượng:</span> <span className="text-gray-800">{movie?.duration} phút</span>
+                                    <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Thời lượng:</span> <span className={`${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{movie?.duration} phút</span>
                                 </div>
                                 <div className="mb-2">
-                                    <span className="text-gray-700 font-medium">Thể loại:</span> <span className="text-gray-800">{movie?.genre.join(", ")}</span>
+                                    <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Thể loại:</span> <span className={`${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{movie?.genre.join(", ")}</span>
                                 </div>
                                 <div>
-                                    <span className="text-gray-700 font-medium">Diễn viên:</span> <span className="text-gray-800">{movie?.actors.join(", ")}</span>
+                                    <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Diễn viên:</span> <span className={`${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{movie?.actors.join(", ")}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="flex gap-4">
                             {/* Left: Cinema List */}
-                            <div className="w-1/3 pr-4 border-r">
+                            <div className={`w-1/3 pr-4 ${isDarkMode ? "border-gray-700" : "border-r"}`}>
                                 <select
-                                    className="w-full border rounded px-3 py-2 mb-3"
+                                    className={`w-full border rounded px-3 py-2 mb-3 ${isDarkMode ? "bg-gray-800 text-white border-gray-600" : "bg-white border"}`}
                                     value={selectedCity}
                                     onChange={e => setSelectedCity(e.target.value)}
                                 >
@@ -396,9 +397,9 @@ const CardInfMovie = () => {
                                     {filteredCinemas.map((cinema) => (
                                         <button
                                             key={cinema._id}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left ${selectedCinemaId === cinema._id
-                                                ? "bg-blue-50 border-blue-700"
-                                                : "bg-white border-gray-200"
+                                            className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${selectedCinemaId === cinema._id
+                                                ? (isDarkMode ? "bg-blue-800 border-blue-600 text-white" : "bg-blue-50 border-blue-700")
+                                                : (isDarkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200")
                                                 }`}
                                             onClick={() => setSelectedCinemaId(cinema._id)}
                                         >
@@ -409,7 +410,7 @@ const CardInfMovie = () => {
                                             />
                                             <div>
                                                 <div className="font-semibold">{cinema.name}</div>
-                                                <div className="text-xs text-gray-500">{cinema.location.address}</div>
+                                                <div className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{cinema.location.address}</div>
                                             </div>
                                         </button>
                                     ))}
@@ -421,9 +422,9 @@ const CardInfMovie = () => {
                                     {dates.map((date) => (
                                         <button
                                             key={date.value}
-                                            className={`px-4 py-2 rounded font-medium ${selectedDate === date.value
+                                            className={`px-4 py-2 rounded font-medium cursor-pointer ${selectedDate === date.value
                                                 ? "bg-blue-900 text-white"
-                                                : "bg-gray-100 text-blue-900"
+                                                : (isDarkMode ? "bg-gray-700 text-blue-200" : "bg-gray-100 text-blue-900")
                                                 }`}
                                             onClick={() => setSelectedDate(date.value)}
                                         >
@@ -437,8 +438,8 @@ const CardInfMovie = () => {
                                     {showtimes.length > 0 ? (
                                         <>
                                             <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-lg text-gray-700">•</span>
-                                                <span className="text-gray-700 font-medium">
+                                                <span className={`text-lg ${isDarkMode ? "text-gray-400" : "text-gray-700"}`}>•</span>
+                                                <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                                                     Suất chiếu ngày {selectedDate.split("-").reverse().join("/")}
                                                 </span>
 
@@ -448,7 +449,7 @@ const CardInfMovie = () => {
                                                     <button
 
                                                         key={idx}
-                                                        className="border px-4 py-2 rounded text-gray-800 bg-white hover:bg-blue-50"
+                                                        className={`border px-4 py-2 rounded cursor-pointer ${isDarkMode ? "text-gray-100 bg-gray-700 hover:bg-blue-800 border-gray-600" : "text-gray-800 bg-white hover:bg-blue-50"}`}
 
                                                         onClick={() => navigate(`/selectSeat`, {
                                                             state: {
@@ -482,12 +483,12 @@ const CardInfMovie = () => {
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="text-gray-500 mt-6">Không có suất chiếu</div>
+                                        <div className={`mt-6 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Không có suất chiếu</div>
                                     )}
                                 </div>
                                 <div className="flex justify-end mt-10">
                                     <button
-                                        className="px-8 py-2 rounded bg-gray-300 text-gray-500 font-semibold "
+                                        className={`px-8 py-2 rounded font-semibold cursor-pointer ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-300 text-gray-500"}`}
                                         onClick={() => setOpenModal(false)}
                                     >
                                         Hủy

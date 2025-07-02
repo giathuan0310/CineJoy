@@ -1,3 +1,4 @@
+import { MdDarkMode } from "react-icons/md";
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
@@ -11,12 +12,12 @@ import Logo from 'assets/CineJoyLogo.png';
 const Header = () => {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
-  const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen } = useAppStore();
+  const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen, isDarkMode, setIsDarkMode } = useAppStore();
   const { messageApi } = useAlertContextApp();
 
   const handleOpenLoginModal = (value: boolean) => {
     setModalOpen(value);
-    setLoginModalOpen(true)
+    setLoginModalOpen(true);
   };
 
   const handleCloseLoginModal = (value: boolean) => {
@@ -25,7 +26,7 @@ const Header = () => {
   };
 
   const handleLogout = async () => {
-    try {
+    try {  
       setIsAppLoading(true);
       const response = await logoutApi();
       if (response.status) {
@@ -51,31 +52,31 @@ const Header = () => {
   const items = [
     {
       key: "profile",
-      label: "Thông tin cá nhân",
+      label: <div className="text-center">Thông tin cá nhân</div>,
     //   onClick: () => navigate("/profile"),
     },
     {
       key: "/history",
-      label: "Vé đã mua",
+      label: <div className="text-center">Vé đã mua</div>,
     //   onClick: () => navigate("/history"),
     },
     {
       key: "logout",
-      label: "Đăng xuất",
+      label: <div className="text-center">Đăng xuất</div>,
       onClick: handleLogout,
     },
   ];
-//   if (user?.role === 'ADMIN') {
-//     items.unshift({
-//         label: <Link to='/admin'>Trang quản trị</Link>,
-//         key: 'admin',
-//     })
-//   }
+  if (user?.role === 'ADMIN') {
+    items.unshift({
+        label: <Link to='/admin'><div className="text-center">Trang quản trị</div></Link>,
+        key: 'admin',
+    })
+  }
 
 
     return (
         <>
-            <header className={`sticky top-0 ${loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"} bg-[#eee] shadow-sm border-b border-[#ccc]`}>
+            <header className={`sticky top-0 ${loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"} ${isDarkMode ? "bg-[#23272f]" : "bg-[#eee]"} shadow-sm border-b border-[#ccc]`}>
                 <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
                     {/* Logo */}
                     <div className='flex items-center gap-6'>
@@ -84,33 +85,41 @@ const Header = () => {
                         </Link>
 
                         <div className="flex flex-col items-center text-sm select-none">
-                            <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">Đặt vé</p>
-                            <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">xem phim</p>
+                            <p className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-[15px] leading-4 font-normal`}>Đặt vé</p>
+                            <p className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-[15px] leading-4 font-normal`}>xem phim</p>
                         </div>
                     </div>
 
                     {/* Navigation */}
                     <nav className="hidden md:flex items-center gap-10 mx-4">
-                        <NavLink to="/" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
+                        <NavLink to="/" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Trang chủ
                         </NavLink>
-                        <NavLink to="/movies" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
+                        <NavLink to="/movies" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Phim
                         </NavLink>
-                        <NavLink to="/news" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
+                        <NavLink to="/news" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Tin tức
                         </NavLink>
-                        <NavLink to="/members" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
+                        <NavLink to="/members" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Thành viên
                         </NavLink>
-                        <NavLink to="/contact" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
+                        <NavLink to="/contact" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Liên hệ
                         </NavLink>
                     </nav>
 
                     {/* Right section */}
                     {isAuthenticated ? (
-                        <>
+                        <div className="flex items-center gap-6">
+                            <div className="relative">
+                                <button className="text-gray-700 hover:text-gray-900 bg-white rounded-full p-2.5 border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250">
+                                    <FaSearch size={16} />
+                                </button>
+                            </div>
+                            <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={() =>  setIsDarkMode(!isDarkMode)}> 
+                                {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
+                            </div>
                             <Dropdown menu={{ items }} placement="bottom" overlayStyle={{ zIndex: 9999 }}>
                                 <div className="flex items-center space-x-2 cursor-pointer hover:text-red-500 transition-all duration-300 hover:opacity-80 mr-3">
                                     <img
@@ -118,12 +127,12 @@ const Header = () => {
                                         alt="User Avatar"
                                         className="w-9 h-9 mr-3 rounded-full object-cover"
                                     />
-                                    <span className="text-md font-medium">
+                                    <span className={`text-md font-medium ${isDarkMode ? "text-white" : ""}`}>
                                         {user?.fullName}
                                     </span>
                                 </div>
                             </Dropdown>
-                        </>
+                        </div>
                     ) : (
                         <>
                             <div className="flex items-center gap-6">
@@ -132,8 +141,11 @@ const Header = () => {
                                         <FaSearch size={16} />
                                     </button>
                                 </div>
+                                <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={() =>  setIsDarkMode(!isDarkMode)}> 
+                                    {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
+                                </div>
                                 <button
-                                    className="bg-[#061b4b] text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer"
+                                    className={`${isDarkMode ? "bg-blue-700" : "bg-[#061b4b]"} text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
                                     onClick={() => handleOpenLoginModal(false)}
                                 >
                                     Đăng nhập

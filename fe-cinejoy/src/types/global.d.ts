@@ -54,6 +54,7 @@ declare global {
         ageRating: string;
         reviews: IReview[];
         averageRating: number;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         [key: string]: any;
     }
 
@@ -83,14 +84,8 @@ declare global {
 
     interface IShowtime {
         _id: string;
-        movieId: {
-            _id: string;
-            title: string;
-        };
-        theaterId: {
-            _id: string;
-            name: string;
-        };
+        movieId: IMovie;
+        theaterId: ITheater;
         showDate: {
             start: string;
             end: string;

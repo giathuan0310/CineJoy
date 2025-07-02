@@ -76,7 +76,7 @@ const MoviesListCarousel = (props: IProps) => {
   const [movies, setMovies] = useState<IMovie[]>([]);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState<boolean>(false);
   const [currentMovieForModal, setCurrentMovieForModal] = useState<IMovie | null>(null);
-  const { setIsModalOpen } = useAppStore();
+  const { setIsModalOpen, isDarkMode } = useAppStore();
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -105,11 +105,10 @@ const MoviesListCarousel = (props: IProps) => {
     return stars;
   };
   
-
   return (
-    <div className={`${props.bg ? "bg-[#b3c3a726]" : "bg-[url('https://vticinema.web.app/assets/notification_bg-B6yeZWl8.jpg')]"} py-16 px-8`}>
+    <div className={`${props.bg ? isDarkMode ? "bg-[#23272f]" : "bg-[#b3c3a726]" : "bg-[url('https://vticinema.web.app/assets/notification_bg-B6yeZWl8.jpg')]"} py-16 px-8`}>
       <div className="container mx-auto px-4 md:px-8">
-        <h2 className={`${props.titleColor ? `text-[${props.titleColor}]` : "text-white"} text-3xl font-medium mb-10 text-center`}>{props.title}</h2>
+        <h2 className={`${props.titleColor ? isDarkMode ? "text-white"  : `text-[${props.titleColor}]` : "text-white"} text-3xl font-medium mb-10 text-center`}>{props.title}</h2>
         
         <Carousel 
           responsive={responsive}
@@ -122,7 +121,6 @@ const MoviesListCarousel = (props: IProps) => {
           {movies
             .filter((movie) => movie.status === props.status)
             .map((movie, index) => {
-              console.log(`Movie: ${movie.title}, Trailer: ${movie.trailer}`);
               return (
                 <Link to={`/movies/${movie._id}`} key={movie._id}>
                   <div
@@ -172,7 +170,7 @@ const MoviesListCarousel = (props: IProps) => {
                     
                     {/* Movie Info */}
                     <div className="mt-3">
-                        <h3 className={`${props.titleColor ? "text-[#0f1b4c]" : "text-yellow-500"} font-semibold text-lg truncate`}>{movie.title}</h3>
+                        <h3 className={`${props.titleColor ? isDarkMode ? "text-white" : "text-[#0f1b4c]"  : "text-yellow-500"} font-semibold text-lg truncate`}>{movie.title}</h3>
                         <p className="text-gray-400 text-sm truncate">{movie.genre.join(', ')}</p>
                         {props.starRating && (
                           <div className="flex items-center mt-1">

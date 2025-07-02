@@ -1,244 +1,391 @@
-// import { getRegions, getTheaters } from "@/apiservice/apiTheater";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getTheaters } from "@/apiservice/apiTheater";
+import useAppStore from "@/store/app.store";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import { getMovieById } from "@/apiservice/apiMovies";
+import { getShowTimesByTheater } from "@/apiservice/apiShowTime";
 
-interface Cinema {
-  id: number;
-  name: string;
-  address: string;
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+interface IFlattenedShowtime {
+  date: string;
+  start: string;
+  end: string;
+  room: string;
+  seats: Array<{
+      seatId: string;
+      status: string;
+      type: string;
+      price: number;
+  }>;
+  movieId: string;
+  movieTitle: string;
+  ageRating: string;
+  genre: string[];
+  theaterId: string;
+  theaterName: string;
 }
 
-interface Movie {
-  id: number;
-  title: string;
-  poster: string;
-  age: string;
-  subtitle: string;
-  showtimes: string[];
+// const dates = [
+//   { label: "Hôm nay\n7", value: "2024-05-07" },
+//   { label: "Ngày mai\n8", value: "2024-05-08" },
+//   { label: "Thứ 5\n9", value: "2024-05-09" },
+//   { label: "Thứ 6\n10", value: "2024-05-10" },
+//   { label: "Thứ 7\n11", value: "2024-05-11" },
+//   { label: "Chủ nhật\n12", value: "2024-05-12" },
+//   { label: "Thứ 2\n13", value: "2024-05-13" },
+// ];
+
+const getVNDayLabel = (date: Date, idx: number) => {
+  const days = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+  const dayOfWeek = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
+
+  if (idx === 0) return `Hôm nay\n${date.getDate()}`;
+  if (idx === 1) return `Ngày mai\n${date.getDate()}`;
+
+  // For other days (not today/tomorrow)
+  if (dayOfWeek === 0) { // If it\'s Sunday
+    return `Thứ CN\n${date.getDate()}`;
+  } else { // For Monday to Saturday
+    return `${days[dayOfWeek]}\n${date.getDate()}`;
+  }
+};
+
+const getDateRange = (start: string, end: string) => {
+  const result = [];
+  let current = dayjs(start);
+  const last = dayjs(end);
+  let idx = 0;
+  while (current.isSameOrBefore(last, "day")) {
+      result.push({
+          label: getVNDayLabel(current.toDate(), idx),
+          value: current.format("YYYY-MM-DD"),
+      });
+      current = current.add(1, "day");
+      idx++;
+  }
+  return result;
 }
-
-const cinemas: Cinema[] = [
-  {
-    id: 1,
-    name: "CGV Aeon Long Biên",
-    address: "Tầng 4 - TTTM AEON Long Biên, Số 27 Cổ Linh, Quận Long Biên, Hà Nội",
-  },
-  {
-    id: 2,
-    name: "CGV Aeon Hà Đông",
-    address: "Tầng 4 - TTTM AEON Hà Đông, Hà Nội",
-  },
-  {
-    id: 3,
-    name: "CGV Hồ Gươm Plaza",
-    address: "Tầng 4 - Hồ Gươm Plaza, Hà Nội",
-  },
-  {
-    id: 4,
-    name: "CGV Vincom Ocean Park",
-    address: "Tầng 4 - Vincom Ocean Park, Hà Nội",
-  },
-];
-
-const movies: Movie[] = [
-  {
-    id: 1,
-    title: "Vây Hãm Tại Đài Bắc",
-    poster:
-      "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969147/50.Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_lr0jp4_wbdemr.jpg",
-    age: "16+",
-    subtitle: "2D Phụ đề",
-    showtimes: ["03:00 PM ~ 04:52 PM", "05:15 PM ~ 07:07 PM"],
-  },
-  {
-    id: 2,
-    title: "Vùng Đất Bị Nguyền Rủa",
-    poster:
-      "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969149/56._A%CC%81c_Quy%CC%89_Truy_Ho%CC%82%CC%80n_xdqdbj_jziajq.webp",
-    age: "12+",
-    subtitle: "2D Phụ đề",
-    showtimes: ["03:00 PM ~ 04:59 PM", "05:15 PM ~ 07:14 PM"],
-  },
-  {
-    id: 3,
-    title: "Robot Hoang Dã",
-    poster:
-      "https://res.cloudinary.com/ddia5yfia/image/upload/v1742694499/57_Nobita_va%CC%80_Cuo%CC%A3%CC%82c_Phie%CC%82u_Lu%CC%9Bu_Va%CC%80o_The%CC%82%CC%81_Gio%CC%9B%CC%81i_Trong_Tranh_nyf1uc.webp",
-    age: "15+",
-    subtitle: "2D Phụ đề",
-    showtimes: ["03:00 PM ~ 05:04 PM", "05:15 PM ~ 07:19 PM"],
-  },
-  {
-    id: 4,
-    title: "Tiên Tri Tử Thần",
-    poster:
-      "https://res.cloudinary.com/ddia5yfia/image/upload/v1742732596/58_Quy%CC%89_Nha%CC%A3%CC%82p_Tra%CC%80ng_xsxfca.jpg",
-    age: "15+",
-    subtitle: "2D Phụ đề",
-    showtimes: ["03:00 PM ~ 05:26 PM", "05:15 PM ~ 07:41 PM"],
-  },
-];
-
-const dates = [
-  { label: "Hôm nay\n7", value: "2024-05-07" },
-  { label: "Ngày mai\n8", value: "2024-05-08" },
-  { label: "Thứ 5\n9", value: "2024-05-09" },
-  { label: "Thứ 6\n10", value: "2024-05-10" },
-  { label: "Thứ 7\n11", value: "2024-05-11" },
-  { label: "Chủ nhật\n12", value: "2024-05-12" },
-  { label: "Thứ 2\n13", value: "2024-05-13" },
-];
 
 const ScheduleList: React.FC = () => {
-  const [selectedCinemaId, setSelectedCinemaId] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(dates[0].value);
-  // const [selectedCity, setSelectedCity] = useState("Hà Nội");
-  // const [theater, setTheater] = useState<ITheater[]>([]);
-  // const [region, setRegion] = useState<IRegion[]>([]);
+  const today = dayjs().format("YYYY-MM-DD");
+  const sevenDaysLater = dayjs().add(6, "day").format("YYYY-MM-DD");
 
-  // useEffect(() => {
-  //     const fetchTheater = async () => {
-  //         try {
-  //             const response = await getTheaters();
-  //             setTheater(Array.isArray(response) ? response : []);
-  //         } catch (error) {
-  //             console.error("Lỗi khi lấy thông tin rạp:", error);
-  //         }
-  //     }
+  const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(today);
+  const [selectedCity, setSelectedCity] = useState("");
+  const [theater, setTheater] = useState<ITheater[]>([]);
+  const [dates, setDates] = useState<{ label: string; value: string }[]>(getDateRange(today, sevenDaysLater));
+  const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
+  const [movieDetails, setMovieDetails] = useState<{[key: string]: IMovie}>({});
+  const [groupedShowtimes, setGroupedShowtimes] = useState<{[key: string]: {movie: IMovie, showtimes: IFlattenedShowtime[]}}>({});
+  
+  console.log('selectedCinemaId:', selectedCinemaId);
+  console.log('showtimes:', showtimes);
 
-  //     const fetchRegion = async () => {
-  //         try {
-  //             const response = await getRegions();
-  //             setRegion(Array.isArray(response) ? response : []);
-  //         } catch (error) {
-  //             console.error("Lỗi khi lấy thông tin vùng:", error);
-  //         }
-  //     }
+  useEffect(() => {
+    if (showtimes.length > 0 && selectedDate) {
+      const allShowTimes: IFlattenedShowtime[] = showtimes
+        .map((st: IShowtime) => {
+          const movie = st.movieId as IMovie; 
+          const theaterData = st.theaterId as ITheater;
 
-  //     fetchTheater();
-  //     fetchRegion();
-  //   }, []);
+          return st.showTimes.map(innerSt => ({
+            ...innerSt,
+            movieId: movie._id,
+            movieTitle: movie.title,
+            ageRating: movie.ageRating,
+            genre: movie.genre,
+            theaterId: theaterData._id,
+            theaterName: theaterData.name,
+          }));
+        })
+        .flat();
 
-  //   const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
+      console.log('selectedDate (inside useEffect for grouping):', selectedDate);
+      const showTimesOfSelectedDate = allShowTimes.filter(
+        st => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
+      );
+      console.log('showTimesOfSelectedDate (inside useEffect for grouping):', showTimesOfSelectedDate);
 
-  //   // Khi đổi thành phố, chọn lại rạp đầu tiên
-  //   useEffect(() => {
-  //     if (filteredCinemas.length > 0) {
-  //         setSelectedCinemaId(filteredCinemas[0]._id);
-  //     }
-  //   }, [selectedCity]);
+      const newGroupedShowtimes = showTimesOfSelectedDate.reduce((acc, showtime) => {
+        const movieId = showtime.movieId;
+        if (movieDetails[movieId]) {
+          if (!acc[movieId]) {
+            acc[movieId] = { movie: movieDetails[movieId], showtimes: [] };
+          }
+          acc[movieId].showtimes.push(showtime);
+        }
+        return acc;
+      }, {} as {[key: string]: {movie: IMovie, showtimes: IFlattenedShowtime[]}});
+
+      console.log('newGroupedShowtimes (after calculation):', newGroupedShowtimes);
+      setGroupedShowtimes(newGroupedShowtimes);
+    }
+  }, [showtimes, selectedDate, movieDetails]);
+
+  console.log('groupedShowtimes (outside useEffect - current state):', groupedShowtimes);
+
+  const { isDarkMode } = useAppStore();
+
+  const cityOptions = [...new Set(theater.map(c => c.location.city))];
+
+  useEffect(() => {
+      const fetchTheater = async () => {
+          try {
+              const response = await getTheaters();
+              setTheater(Array.isArray(response) ? response : []);
+          } catch (error) {
+              console.error("Lỗi khi lấy thông tin rạp:", error);
+          }
+      }
+
+      fetchTheater();
+    }, []);
+
+    useEffect(() => {
+        if (selectedCinemaId) {
+            getShowTimesByTheater(selectedCinemaId)
+                .then((data) => setShowtimes(data || []))
+                .catch((error) => {
+                    console.error("Error fetching showtimes:", error);
+                    setShowtimes([]);
+                });
+        } else {
+            setShowtimes([]);
+        }
+    }, [selectedCinemaId]);
+
+    useEffect(() => {
+        const fetchMovieDetails = async () => {
+            const uniqueMovieIds = [...new Set(showtimes.map(st => st.movieId && st.movieId._id).filter(id => id))];
+            const details: {[key: string]: IMovie} = {};
+            for (const movieId of uniqueMovieIds) {
+                try {
+                    const movie = await getMovieById(movieId);
+                    if (movie) {
+                        details[movieId] = movie;
+                    }
+                } catch (error) {
+                    console.error(`Lỗi khi lấy thông tin phim ${movieId}:`, error);
+                }
+            }
+            setMovieDetails(details);
+        };
+        if (showtimes.length > 0) {
+            fetchMovieDetails();
+        } else {
+            setMovieDetails({});
+        }
+    }, [showtimes]);
+
+    // Khi đổi rạp, nếu rạp không có ngày đang chọn thì chọn ngày đầu tiên có suất chiếu
+    useEffect(() => {
+      console.log('useEffect showtimes triggered. Current showtimes:', showtimes);
+      
+      if (showtimes.length > 0) {
+          const minStart = showtimes.reduce(
+              (min, st) => st.showDate?.start && st.showDate.start < min ? st.showDate.start : min,
+              showtimes[0].showDate?.start
+          );
+          const maxEnd = showtimes.reduce(
+              (max, st) => st.showDate?.end && st.showDate.end > max ? st.showDate.end : max,
+              showtimes[0].showDate?.end
+          );
+
+          console.log('Calculated minStart:', minStart);
+          console.log('Calculated maxEnd:', maxEnd);
+
+          if (minStart && maxEnd) {
+              const newDates = getDateRange(minStart, maxEnd);
+              console.log('New dates from getDateRange:', newDates);
+              setDates(newDates);
+
+              const todayDayjs = dayjs(today); // today constant from component scope
+              const currentSelectedDateDayjs = dayjs(selectedDate);
+              const minStartDayjs = dayjs(minStart);
+              const maxEndDayjs = dayjs(maxEnd);
+
+              let dateToSet = minStartDayjs.format("YYYY-MM-DD"); // Default to minStart
+
+              // Option 1: Prioritize today if it's within the new showtime range
+              if (todayDayjs.isSameOrAfter(minStartDayjs, 'day') && todayDayjs.isSameOrBefore(maxEndDayjs, 'day')) {
+                  dateToSet = todayDayjs.format("YYYY-MM-DD");
+                  console.log('Setting selectedDate to today as it is within range:', dateToSet);
+              } 
+              // Option 2: If not today, and the previously selected date is within the new showtime range, keep it.
+              else if (currentSelectedDateDayjs.isSameOrAfter(minStartDayjs, 'day') && currentSelectedDateDayjs.isSameOrBefore(maxEndDayjs, 'day')) {
+                  dateToSet = currentSelectedDateDayjs.format("YYYY-MM-DD");
+                  console.log('Keeping current selectedDate as it is within new range and today is not in range:', dateToSet);
+              }
+              // Option 3: Otherwise, use minStart (already set as default)
+              else {
+                  console.log('Setting selectedDate to minStart as neither today nor current selectedDate is within new range:', dateToSet);
+              }
+              
+              if (selectedDate !== dateToSet) { // Only update if necessary to avoid unnecessary re-renders/loops
+                  setSelectedDate(dateToSet);
+              }
+          }
+      } else {
+        // Nếu không có suất chiếu, đặt lại ngày về hôm nay
+        const todayConst = dayjs().format("YYYY-MM-DD");
+        const sevenDaysLaterConst = dayjs().add(6, "day").format("YYYY-MM-DD");
+        setDates(getDateRange(todayConst, sevenDaysLaterConst));
+        setSelectedDate(todayConst);
+      }
+    }, [showtimes]);
+
+    // Khi dữ liệu rạp thay đổi, nếu selectedCity không còn rạp nào, tự động chọn thành phố đầu tiên có rạp
+    useEffect(() => {
+        if (theater.length > 0) {
+            const citiesWithCinemas = [...new Set(theater.map(c => c.location.city))];
+            if (!citiesWithCinemas.includes(selectedCity)) {
+                setSelectedCity(citiesWithCinemas[0]);
+            }
+        }
+    }, [theater]);
+
+    const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
+
+    // Khi đổi thành phố, chọn lại rạp đầu tiên hoặc reset nếu không có rạp
+    useEffect(() => {
+      if (filteredCinemas.length > 0) {
+        setSelectedCinemaId(filteredCinemas[0]._id);
+      } else {
+        setSelectedCinemaId('');
+      }
+    }, [selectedCity, theater]);
+
+    console.log('dates: ', dates);
+    
 
 
   return (
-    <div className="flex flex-col bg-white rounded-2xl shadow p-6 gap-6 my-8 mx-30">
-      <h2 className="text-3xl font-bold text-[#0f1b4c] text-center mb-4">
-        LỊCH CHIẾU PHIM
-      </h2>
-      <div className="flex items-center gap-5">
-        <label className="block text-gray-700 font-medium mb-2">Vị trí</label>
-        <select className="w-[250px] text-sm border rounded p-2 cursor-pointer">
-          <option>Hà Nội</option>
-          <option>Hồ Chí Minh</option>
-        </select>
-      </div>
-      <div className="flex">
-        {/* Left: Cinema List */}
-        <div className="w-2/6 mr-10">
-          <div className="flex flex-col gap-2">
-            {cinemas.map((cinema) => (
-              <button
-                key={cinema.id}
-                className={`flex items-center gap-2 px-3 py-2 rounded border cursor-pointer ${selectedCinemaId !== cinema.id ? "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]" : null} ${
-                  selectedCinemaId === cinema.id
-                    ? "bg-[#e4e6ee] border-[#0f1b4c]"
-                    : "bg-white border-gray-200"
-                }`}
-                onClick={() => setSelectedCinemaId(cinema.id)}
-              >
-                <img
-                  src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
-                  alt="CGV"
-                  className="w-9 h-9"
-                />
-                <span className="text-gray-800">{cinema.name}</span>
-              </button>
+    <div className={`${isDarkMode ? "bg-[#181a1f]" : "bg-white"} py-8 border`}>
+      <div className={`${isDarkMode ? "bg-[#282a36] text-white" : "bg-white text-[#0f1b4c]"} flex flex-col rounded-2xl shadow p-6 gap-6 mx-30`}>
+        <h2 className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-3xl font-bold text-center mb-4`}>
+          LỊCH CHIẾU PHIM
+        </h2>
+        <div className="flex items-center gap-5">
+          <label className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} block font-medium mb-2`}>Vị trí</label>
+          <select
+            className={`${isDarkMode ? "bg-[#3a3c4a] text-white border-gray-600" : "bg-white text-gray-800 border-gray-200"} w-[250px] text-sm border rounded p-2 cursor-pointer`}
+            value={selectedCity}
+            onChange={e => setSelectedCity(e.target.value)}
+          >
+            {cityOptions.map((city) => (
+                <option key={city} value={city}>
+                    {city}
+                </option>
             ))}
-          </div>
+          </select>
         </div>
-  
-        {/* Right: Schedule */}
-        <div className="flex-1">
-          <div className="flex items-center gap-3 border border-[#ddd] rounded px-4 py-2 mb-4">
-            <img className="w-10 h-10" src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg" alt="logo" />
-            <div className="select-none">
-              <span className="font-semibold text-[#333]">
-                Lịch chiếu {cinemas.find((c) => c.id === selectedCinemaId)?.name}
-              </span>
-              <div className="text-gray-600 text-sm">
-                {cinemas.find((c) => c.id === selectedCinemaId)?.address}{" "}
-              </div>
+        <div className="flex">
+          {/* Left: Cinema List */}
+          <div className="w-2/6 mr-10">
+            <div className="flex flex-col gap-2">
+              {filteredCinemas.map((cinema) => (
+                <button
+                  key={cinema._id}
+                  className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left ${selectedCinemaId !== cinema._id
+                      ? `${isDarkMode ? "hover:bg-gray-700 hover:border-blue-400" : "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"} ${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200" : "bg-white border-gray-200"}`
+                      : `${isDarkMode ? "bg-blue-900 border-blue-400" : "bg-[#e4e6ee] border-[#0f1b4c]"} ${isDarkMode ? "text-gray-200" : "text-gray-800"}`
+                    }`}
+                  onClick={() => setSelectedCinemaId(cinema._id)}
+                >
+                  <img
+                    src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
+                    alt="CGV"
+                    className="w-9 h-9"
+                  />
+                  <span className={`${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{cinema.name}</span>
+                </button>
+              ))}
             </div>
           </div>
-          {/* Date Tabs */}
-          <div className="flex gap-2 mb-4">
-            {dates.map((date) => (
-              <button
-                key={date.value}
-                className={`px-3 py-1 rounded font-[400px] cursor-pointer ${
-                  selectedDate === date.value
-                    ? "bg-[#0f1b4c] text-white"
-                    : "bg-gray-100 text-[#0f1b4c]"
-                }`}
-                onClick={() => setSelectedDate(date.value)}
-              >
-                {date.label.split("\n").map((line, idx) => (
-                  <span key={idx} className={idx === 0 ? "block" : "block text-lg font-bold"}>{line}</span>
-                ))}
-              </button>
-            ))}
-          </div>
-          {/* Movie List */}
-          <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-2 pb-2">
-            {movies.map((movie) => (
-              <div
-                key={movie.id}
-                className="flex gap-4 bg-white rounded-lg shadow-sm p-3"
-              >
-                <img
-                  src={movie.poster}
-                  alt={movie.title}
-                  className="w-20 h-28 object-cover rounded"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded text-white ${
-                        movie.age === "16+"
-                          ? "bg-red-500"
-                          : movie.age === "15+"
-                          ? "bg-yellow-500"
-                          : movie.age === "12+"
-                          ? "bg-yellow-400"
-                          : "bg-green-500"
-                      }`}
-                    >
-                      {movie.age}
-                    </span>
-                    <span className="font-bold text-blue-900">{movie.title}</span>
-                  </div>
-                  <div className="text-gray-500 text-sm mb-2">{movie.subtitle}</div>
-                  <div className="flex gap-2 flex-wrap">
-                    {movie.showtimes.map((time, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-gray-50 border border-gray-300 rounded px-2 py-0.5 text-sm cursor-pointer hover:bg-[#0f1b4c] hover:text-white transition-all duration-250 ease-in-out"
-                      >
-                        {time}
-                      </span>
-                    ))}
-                  </div>
+    
+          {/* Right: Schedule */}
+          <div className="flex-1">
+            <div className={`${isDarkMode ? "border-gray-600" : "border-[#ddd]"} flex items-center gap-3 border rounded px-4 py-2 mb-4`}>
+              <img className="w-10 h-10" src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg" alt="logo" />
+              <div className="select-none">
+                <span className={`${isDarkMode ? "text-gray-100" : "text-[#333]"} font-semibold`}>
+                  Lịch chiếu {filteredCinemas.find((c) => c._id === selectedCinemaId)?.name}
+                </span>
+                <div className={`${isDarkMode ? "text-gray-400" : "text-gray-600"} text-sm`}>
+                  {filteredCinemas.find((c) => c._id === selectedCinemaId)?.location.address}{" "}
                 </div>
               </div>
-            ))}
+            </div>
+            {/* Date Tabs */}
+            <div className="flex gap-2 mb-4">
+              {dates.map((date) => (
+                  <button
+                      key={date.value}
+                      className={`px-4 py-2 rounded font-medium cursor-pointer ${selectedDate === date.value
+                          ? "bg-blue-900 text-white"
+                          : (isDarkMode ? "bg-gray-700 text-blue-200" : "bg-gray-100 text-blue-900")
+                          }`}
+                      onClick={() => setSelectedDate(date.value)}
+                  >
+                      {date.label.split("\n").map((line, idx) => (
+                          <span key={idx} className={idx === 0 ? "block" : "block text-lg font-bold"}>{line}</span>
+                      ))}
+                  </button>
+              ))}
+            </div>
+            {/* Movie List */}
+            <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-2 pb-2">
+              {Object.values(groupedShowtimes).map(({ movie, showtimes: movieShowtimes }) => (
+                <div
+                  key={movie._id}
+                  className={`${isDarkMode ? "bg-[#282a36] shadow-md" : "bg-white shadow-sm"} flex gap-4 rounded-lg p-3`}
+                >
+                  <img
+                    src={movie.image}
+                    alt={movie.title}
+                    className="w-20 h-28 object-cover rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded text-white ${
+                          movie.ageRating === "T18+"
+                            ? "bg-red-500"
+                            : movie.ageRating === "T15+"
+                            ? "bg-yellow-500"
+                            : movie.ageRating === "T12+"
+                            ? "bg-yellow-400"
+                            : "bg-green-500"
+                        }`}
+                      >
+                        {movie.ageRating}
+                      </span>
+                      <span className={`${isDarkMode ? "text-blue-400" : "text-blue-900"} font-bold`}>{movie.title}</span>
+                    </div>
+                    <div className={`${isDarkMode ? "text-gray-400" : "text-gray-500"} text-sm mb-2`}>{movie.genre.join(", ")}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      {movieShowtimes.map((showtime, idx) => (
+                        <span
+                          key={idx}
+                          className={`${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200 hover:bg-blue-700" : "bg-gray-50 border border-gray-300 text-gray-800 hover:bg-[#0f1b4c]"} rounded px-2 py-0.5 text-sm cursor-pointer hover:text-white transition-all duration-250 ease-in-out`}
+                        >
+                          {dayjs(showtime.start).format("HH:mm")} - {dayjs(showtime.end).format("HH:mm")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

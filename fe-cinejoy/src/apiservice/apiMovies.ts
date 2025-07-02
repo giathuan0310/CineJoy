@@ -68,7 +68,7 @@ export const createMovie = async (movie: IMovie) => {
 
         // Log FormData contents
         console.log('FormData contents:');
-        for (let pair of formData.entries()) {
+        for (const pair of formData.entries()) {
             console.log(pair[0], pair[1]);
         }
 
@@ -78,6 +78,7 @@ export const createMovie = async (movie: IMovie) => {
             },
         });
         return response.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error("Error creating movie:", error);
         if (error.response) {
@@ -135,7 +136,7 @@ export const updateMovie = async (id: string, movie: IMovie) => {
 
         // Log FormData contents
         console.log('FormData contents for update:');
-        for (let pair of formData.entries()) {
+        for (const pair of formData.entries()) {
             console.log(pair[0], pair[1]);
         }
 
@@ -145,6 +146,7 @@ export const updateMovie = async (id: string, movie: IMovie) => {
             },
         });
         return response.data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error("Error updating movie:", error);
         if (error.response) {

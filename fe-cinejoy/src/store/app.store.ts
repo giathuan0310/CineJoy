@@ -6,11 +6,13 @@ interface AppState {
   isAuthenticated: boolean;
   isAppLoading: boolean;
   isModalOpen: boolean;
+  isDarkMode: boolean;
 
   setUser: (user: IUser | null) => void;
   setIsAuthenticated: (value: boolean) => void;
   setIsAppLoading: (value: boolean) => void;
   setIsModalOpen: (value: boolean) => void;
+  setIsDarkMode: (value: boolean) => void;
 
   fetchAccount: () => Promise<void>;
 }
@@ -21,11 +23,13 @@ const useAppStore = create<AppState>((set, get) => ({
   isAuthenticated: false,
   isAppLoading: true,
   isModalOpen: false,
+  isDarkMode: false,
 
   setUser: (user) => set({ user }),
   setIsAuthenticated: (value) => set({ isAuthenticated: value }),
   setIsAppLoading: (value) => set({ isAppLoading: value }),
   setIsModalOpen: (value) => set({ isModalOpen: value }),
+  setIsDarkMode: (value) => set({ isDarkMode: value }),
 
   fetchAccount: async () => {
     try {

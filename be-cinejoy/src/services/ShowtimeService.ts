@@ -80,8 +80,6 @@ class ShowtimeService {
             })
                 .populate('movieId', 'title ageRating genre')
                 .populate('theaterId', 'name');
-            console.log('showTimes: ', showtimes);
-            
             return showtimes;
         } catch (error) {
             throw error;

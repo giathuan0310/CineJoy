@@ -33,16 +33,6 @@ interface IFlattenedShowtime {
   theaterName: string;
 }
 
-// const dates = [
-//   { label: "Hôm nay\n7", value: "2024-05-07" },
-//   { label: "Ngày mai\n8", value: "2024-05-08" },
-//   { label: "Thứ 5\n9", value: "2024-05-09" },
-//   { label: "Thứ 6\n10", value: "2024-05-10" },
-//   { label: "Thứ 7\n11", value: "2024-05-11" },
-//   { label: "Chủ nhật\n12", value: "2024-05-12" },
-//   { label: "Thứ 2\n13", value: "2024-05-13" },
-// ];
-
 const getVNDayLabel = (date: Date, idx: number) => {
   const days = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
   const dayOfWeek = date.getDay(); // 0 for Sunday, 1 for Monday, etc.
@@ -51,9 +41,9 @@ const getVNDayLabel = (date: Date, idx: number) => {
   if (idx === 1) return `Ngày mai\n${date.getDate()}`;
 
   // For other days (not today/tomorrow)
-  if (dayOfWeek === 0) { // If it\'s Sunday
-    return `Thứ CN\n${date.getDate()}`;
-  } else { // For Monday to Saturday
+  if (dayOfWeek === 0) { // Nếu là Chủ nhật
+    return `Chủ nhật\n${date.getDate()}`;
+  } else { // Thứ 2 đến Thứ 7
     return `${days[dayOfWeek]}\n${date.getDate()}`;
   }
 };
@@ -86,9 +76,7 @@ const ScheduleList: React.FC = () => {
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const [movieDetails, setMovieDetails] = useState<{[key: string]: IMovie}>({});
   const [groupedShowtimes, setGroupedShowtimes] = useState<{[key: string]: {movie: IMovie, showtimes: IFlattenedShowtime[]}}>({});
-  
-  console.log('selectedCinemaId:', selectedCinemaId);
-  console.log('showtimes:', showtimes);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (showtimes.length > 0 && selectedDate) {
@@ -109,11 +97,9 @@ const ScheduleList: React.FC = () => {
         })
         .flat();
 
-      console.log('selectedDate (inside useEffect for grouping):', selectedDate);
       const showTimesOfSelectedDate = allShowTimes.filter(
         st => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
       );
-      console.log('showTimesOfSelectedDate (inside useEffect for grouping):', showTimesOfSelectedDate);
 
       const newGroupedShowtimes = showTimesOfSelectedDate.reduce((acc, showtime) => {
         const movieId = showtime.movieId;
@@ -126,12 +112,12 @@ const ScheduleList: React.FC = () => {
         return acc;
       }, {} as {[key: string]: {movie: IMovie, showtimes: IFlattenedShowtime[]}});
 
-      console.log('newGroupedShowtimes (after calculation):', newGroupedShowtimes);
       setGroupedShowtimes(newGroupedShowtimes);
+    } else {
+      // Nếu không có suất chiếu thì clear luôn groupedShowtimes
+      setGroupedShowtimes({});
     }
   }, [showtimes, selectedDate, movieDetails]);
-
-  console.log('groupedShowtimes (outside useEffect - current state):', groupedShowtimes);
 
   const { isDarkMode } = useAppStore();
 
@@ -152,12 +138,14 @@ const ScheduleList: React.FC = () => {
 
     useEffect(() => {
         if (selectedCinemaId) {
+            setLoading(true);
             getShowTimesByTheater(selectedCinemaId)
                 .then((data) => setShowtimes(data || []))
                 .catch((error) => {
                     console.error("Error fetching showtimes:", error);
                     setShowtimes([]);
-                });
+                })
+                .finally(() => setLoading(false));
         } else {
             setShowtimes([]);
         }
@@ -188,57 +176,13 @@ const ScheduleList: React.FC = () => {
 
     // Khi đổi rạp, nếu rạp không có ngày đang chọn thì chọn ngày đầu tiên có suất chiếu
     useEffect(() => {
-      console.log('useEffect showtimes triggered. Current showtimes:', showtimes);
-      
-      if (showtimes.length > 0) {
-          const minStart = showtimes.reduce(
-              (min, st) => st.showDate?.start && st.showDate.start < min ? st.showDate.start : min,
-              showtimes[0].showDate?.start
-          );
-          const maxEnd = showtimes.reduce(
-              (max, st) => st.showDate?.end && st.showDate.end > max ? st.showDate.end : max,
-              showtimes[0].showDate?.end
-          );
+      // Luôn chỉ lấy 7 ngày từ hôm nay
+      const todayConst = dayjs().format("YYYY-MM-DD");
+      const sevenDaysLaterConst = dayjs().add(6, "day").format("YYYY-MM-DD");
+      setDates(getDateRange(todayConst, sevenDaysLaterConst));
 
-          console.log('Calculated minStart:', minStart);
-          console.log('Calculated maxEnd:', maxEnd);
-
-          if (minStart && maxEnd) {
-              const newDates = getDateRange(minStart, maxEnd);
-              console.log('New dates from getDateRange:', newDates);
-              setDates(newDates);
-
-              const todayDayjs = dayjs(today); // today constant from component scope
-              const currentSelectedDateDayjs = dayjs(selectedDate);
-              const minStartDayjs = dayjs(minStart);
-              const maxEndDayjs = dayjs(maxEnd);
-
-              let dateToSet = minStartDayjs.format("YYYY-MM-DD"); // Default to minStart
-
-              // Option 1: Prioritize today if it's within the new showtime range
-              if (todayDayjs.isSameOrAfter(minStartDayjs, 'day') && todayDayjs.isSameOrBefore(maxEndDayjs, 'day')) {
-                  dateToSet = todayDayjs.format("YYYY-MM-DD");
-                  console.log('Setting selectedDate to today as it is within range:', dateToSet);
-              } 
-              // Option 2: If not today, and the previously selected date is within the new showtime range, keep it.
-              else if (currentSelectedDateDayjs.isSameOrAfter(minStartDayjs, 'day') && currentSelectedDateDayjs.isSameOrBefore(maxEndDayjs, 'day')) {
-                  dateToSet = currentSelectedDateDayjs.format("YYYY-MM-DD");
-                  console.log('Keeping current selectedDate as it is within new range and today is not in range:', dateToSet);
-              }
-              // Option 3: Otherwise, use minStart (already set as default)
-              else {
-                  console.log('Setting selectedDate to minStart as neither today nor current selectedDate is within new range:', dateToSet);
-              }
-              
-              if (selectedDate !== dateToSet) { // Only update if necessary to avoid unnecessary re-renders/loops
-                  setSelectedDate(dateToSet);
-              }
-          }
-      } else {
-        // Nếu không có suất chiếu, đặt lại ngày về hôm nay
-        const todayConst = dayjs().format("YYYY-MM-DD");
-        const sevenDaysLaterConst = dayjs().add(6, "day").format("YYYY-MM-DD");
-        setDates(getDateRange(todayConst, sevenDaysLaterConst));
+      // Nếu ngày đang chọn không nằm trong 7 ngày này thì đặt lại về hôm nay
+      if (!getDateRange(todayConst, sevenDaysLaterConst).some(d => d.value === selectedDate)) {
         setSelectedDate(todayConst);
       }
     }, [showtimes]);
@@ -263,10 +207,6 @@ const ScheduleList: React.FC = () => {
         setSelectedCinemaId('');
       }
     }, [selectedCity, theater]);
-
-    console.log('dates: ', dates);
-    
-
 
   return (
     <div className={`${isDarkMode ? "bg-[#181a1f]" : "bg-white"} py-8 border`}>
@@ -295,7 +235,7 @@ const ScheduleList: React.FC = () => {
               {filteredCinemas.map((cinema) => (
                 <button
                   key={cinema._id}
-                  className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left ${selectedCinemaId !== cinema._id
+                  className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${selectedCinemaId !== cinema._id
                       ? `${isDarkMode ? "hover:bg-gray-700 hover:border-blue-400" : "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"} ${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200" : "bg-white border-gray-200"}`
                       : `${isDarkMode ? "bg-blue-900 border-blue-400" : "bg-[#e4e6ee] border-[#0f1b4c]"} ${isDarkMode ? "text-gray-200" : "text-gray-800"}`
                     }`}
@@ -328,63 +268,97 @@ const ScheduleList: React.FC = () => {
             {/* Date Tabs */}
             <div className="flex gap-2 mb-4">
               {dates.map((date) => (
-                  <button
-                      key={date.value}
-                      className={`px-4 py-2 rounded font-medium cursor-pointer ${selectedDate === date.value
-                          ? "bg-blue-900 text-white"
-                          : (isDarkMode ? "bg-gray-700 text-blue-200" : "bg-gray-100 text-blue-900")
-                          }`}
-                      onClick={() => setSelectedDate(date.value)}
-                  >
-                      {date.label.split("\n").map((line, idx) => (
-                          <span key={idx} className={idx === 0 ? "block" : "block text-lg font-bold"}>{line}</span>
-                      ))}
-                  </button>
+                <button
+                  key={date.value}
+                  className={`w-[100px] p-2 rounded font-medium cursor-pointer text-center ${selectedDate === date.value
+                      ? "bg-blue-900 text-white"
+                      : (isDarkMode ? "bg-gray-700 text-blue-200" : "bg-gray-100 text-blue-900")
+                      }`}
+                  onClick={() => setSelectedDate(date.value)}
+                >
+                  {date.label.split("\n").map((line, idx) => (
+                    <span key={idx} className={idx === 0 ? "block" : "block text-lg font-bold"}>{line}</span>
+                  ))}
+                </button>
               ))}
             </div>
             {/* Movie List */}
             <div className="flex flex-col gap-4 max-h-[500px] overflow-y-auto pr-2 pb-2">
-              {Object.values(groupedShowtimes).map(({ movie, showtimes: movieShowtimes }) => (
-                <div
-                  key={movie._id}
-                  className={`${isDarkMode ? "bg-[#282a36] shadow-md" : "bg-white shadow-sm"} flex gap-4 rounded-lg p-3`}
-                >
-                  <img
-                    src={movie.image}
-                    alt={movie.title}
-                    className="w-20 h-28 object-cover rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded text-white ${
-                          movie.ageRating === "T18+"
-                            ? "bg-red-500"
-                            : movie.ageRating === "T15+"
-                            ? "bg-yellow-500"
-                            : movie.ageRating === "T12+"
-                            ? "bg-yellow-400"
-                            : "bg-green-500"
-                        }`}
-                      >
-                        {movie.ageRating}
-                      </span>
-                      <span className={`${isDarkMode ? "text-blue-400" : "text-blue-900"} font-bold`}>{movie.title}</span>
-                    </div>
-                    <div className={`${isDarkMode ? "text-gray-400" : "text-gray-500"} text-sm mb-2`}>{movie.genre.join(", ")}</div>
-                    <div className="flex gap-2 flex-wrap">
-                      {movieShowtimes.map((showtime, idx) => (
-                        <span
-                          key={idx}
-                          className={`${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200 hover:bg-blue-700" : "bg-gray-50 border border-gray-300 text-gray-800 hover:bg-[#0f1b4c]"} rounded px-2 py-0.5 text-sm cursor-pointer hover:text-white transition-all duration-250 ease-in-out`}
-                        >
-                          {dayjs(showtime.start).format("HH:mm")} - {dayjs(showtime.end).format("HH:mm")}
-                        </span>
-                      ))}
+              {loading ? (
+                // Skeleton loading UI
+                Array.from({ length: 2 }).map((_, idx) => (
+                  <div key={idx} className={`flex gap-4 rounded-lg p-3 animate-pulse ${isDarkMode ? "bg-[#23242a]" : "bg-gray-100"}`}>
+                    <div className="w-20 h-28 bg-gray-300 rounded" style={{ backgroundColor: isDarkMode ? '#444' : '#e5e7eb' }}></div>
+                    <div className="flex-1 space-y-3 py-2">
+                      <div className="h-5 w-1/3 rounded bg-gray-300" style={{ backgroundColor: isDarkMode ? '#444' : '#e5e7eb' }}></div>
+                      <div className="h-4 w-1/2 rounded bg-gray-200" style={{ backgroundColor: isDarkMode ? '#333' : '#f3f4f6' }}></div>
+                      <div className="flex gap-2 mt-2">
+                        <div className="h-7 w-16 rounded bg-gray-200" style={{ backgroundColor: isDarkMode ? '#333' : '#f3f4f6' }}></div>
+                        <div className="h-7 w-16 rounded bg-gray-200" style={{ backgroundColor: isDarkMode ? '#333' : '#f3f4f6' }}></div>
+                        <div className="h-7 w-16 rounded bg-gray-200" style={{ backgroundColor: isDarkMode ? '#333' : '#f3f4f6' }}></div>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : Object.values(groupedShowtimes).length === 0 ? (
+                <div
+                  className={`flex flex-col items-center justify-center h-[320px] w-full ${isDarkMode ? "bg-[#23242a]" : "bg-white"} rounded-lg shadow border border-dashed ${isDarkMode ? "border-gray-600" : "border-gray-200"}`}
+                  style={{ minHeight: 280 }}
+                >
+                  <img
+                    src="https://cdn-icons-png.flaticon.com/512/2748/2748558.png"
+                    alt="not found"
+                    className="w-24 h-24 mb-4"
+                    style={{ filter: isDarkMode ? 'grayscale(1) brightness(0.7)' : 'none', opacity: 0.5 }}
+                  />
+                  <div className={`text-lg font-semibold text-center ${isDarkMode ? "text-gray-300" : "text-gray-500"}`}>
+                    Úi, Không tìm thấy suất chiếu.<br />
+                    <span className="font-normal text-base">Bạn hãy thử tìm ngày khác nhé</span>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                Object.values(groupedShowtimes).map(({ movie, showtimes: movieShowtimes }) => (
+                  <div
+                    key={movie._id}
+                    className={`${isDarkMode ? "bg-[#282a36] shadow-md" : "bg-white shadow-sm"} flex gap-4 rounded-lg p-3`}
+                  >
+                    <img
+                      src={movie.image}
+                      alt={movie.title}
+                      className="w-20 h-28 object-cover rounded"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded text-white ${
+                            movie.ageRating === "T18+"
+                              ? "bg-red-500"
+                              : movie.ageRating === "T15+"
+                              ? "bg-yellow-500"
+                              : movie.ageRating === "T12+"
+                              ? "bg-yellow-400"
+                              : "bg-green-500"
+                          }`}
+                        >
+                          {movie.ageRating}
+                        </span>
+                        <span className={`${isDarkMode ? "text-blue-400" : "text-blue-900"} font-bold`}>{movie.title}</span>
+                      </div>
+                      <div className={`${isDarkMode ? "text-gray-400" : "text-gray-500"} text-sm mb-2`}>{movie.genre.join(", ")}</div>
+                      <div className="flex gap-2 flex-wrap">
+                        {movieShowtimes.map((showtime, idx) => (
+                          <span
+                            key={idx}
+                            className={`${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200 hover:bg-blue-700" : "bg-gray-50 border border-gray-300 text-gray-800 hover:bg-[#0f1b4c]"} rounded px-2 py-0.5 text-sm cursor-pointer hover:text-white transition-all duration-250 ease-in-out`}
+                          >
+                            {dayjs(showtime.start).format("HH:mm")} - {dayjs(showtime.end).format("HH:mm")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

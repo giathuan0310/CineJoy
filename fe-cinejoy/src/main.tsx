@@ -33,15 +33,12 @@ const router = createBrowserRouter([
         path: "/selectSeat",
         element: <Select />
       },
-
     ]
-
   },
   {
     path: "/admin",
     element: <Dashboard />
   },
-
 ]);
 
 createRoot(document.getElementById('root')!).render(

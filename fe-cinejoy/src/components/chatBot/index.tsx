@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import tuongtacIcon from 'assets/tuongtac.png';
+import Logo from 'assets/CineJoyLogo.png'
 import { FaFacebookF } from 'react-icons/fa';
 
 interface Message {
@@ -24,7 +25,7 @@ const Chatbot: React.FC = () => {
     
     const defaultBotMessage: Message = {
         sender: 'bot',
-        text: 'Chào bạn! CineJoy xin chào. Bạn cần thông tin gì về phim, lịch chiếu, giá vé hay các dịch vụ của rạp không ạ?',
+        text: 'CineJoy xin chào! Bạn cần thông tin gì về phim, lịch chiếu, giá vé hay các dịch vụ của rạp không ạ?',
     };
 
     const scrollToBottom = () => {
@@ -126,8 +127,11 @@ const Chatbot: React.FC = () => {
                 {isOpen && (
                     <div className="bg-white rounded-lg shadow-xl w-80 h-[400px] flex flex-col">
                         {/* Header */}
-                        <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
-                            <h3 className="font-semibold select-none">CineJoy Assistant</h3>
+                        <div className="bg-blue-600 text-white px-2.5 py-1.5 rounded-t-lg flex justify-between items-center">
+                            <div className='flex items-center gap-1'>
+                                <img className='w-15 object-cover' src={Logo} alt="avatar" />
+                                <h3 className="font-semibold select-none">CineJoy Assistant</h3>
+                            </div>
                             <button
                                 onClick={() => setIsOpen(false)}
                                 className="text-white hover:text-gray-200 cursor-pointer"
@@ -212,9 +216,9 @@ const Chatbot: React.FC = () => {
 
             {showScrollTop && (
                 <button
-                onClick={handleScrollToTop}
-                className={`fixed ${isMenuOpen ? "bottom-60" : "bottom-40"} right-5 ${isOpen ? "z-[9998]" : "z-[9999]"} bg-blue-600 hover:bg-blue-800 text-white p-3.5 rounded-full shadow-lg transition-all duration-300 cursor-pointer`}
-                title="Lên đầu trang"
+                    onClick={handleScrollToTop}
+                    className={`fixed ${isMenuOpen ? "bottom-60" : "bottom-40"} right-5 ${isOpen ? "z-[9998]" : "z-[9999]"} bg-blue-600 hover:bg-blue-800 text-white p-3.5 rounded-full shadow-lg transition-all duration-300 cursor-pointer`}
+                    title="Lên đầu trang"
                 >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />

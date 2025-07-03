@@ -1,6 +1,6 @@
 import { MdDarkMode } from "react-icons/md";
 import { useState, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { FaSearch } from 'react-icons/fa';
 import { Dropdown } from 'antd';
 import ModalLogin from '@/components/modal/auth/login';
@@ -10,6 +10,7 @@ import { useAlertContextApp } from '@/context/alert.context';
 import Logo from 'assets/CineJoyLogo.png';
 
 const Header = () => {
+  const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen, isDarkMode, setIsDarkMode } = useAppStore();
@@ -77,7 +78,7 @@ const Header = () => {
     {
       key: "profile",
       label: <div className="text-center">Thông tin cá nhân</div>,
-    //   onClick: () => navigate("/profile"),
+      onClick: () => navigate("/profile"),
     },
     {
       key: "/history",

@@ -9,6 +9,7 @@ import HomePage from 'pages/client/Home';
 import Movies from 'pages/client/Movies';
 import MoviesDetail from 'pages/client/MoviesDetail';
 import Select from 'pages/client/SelectSeat';
+import Profile from 'pages/client/Profile';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import { ToastContainer } from 'react-toastify';
 
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
         path: "/selectSeat",
         element: <Select />
       },
+      {
+        path: "/profile",
+        element: <Profile />
+      }
     ]
   },
   {

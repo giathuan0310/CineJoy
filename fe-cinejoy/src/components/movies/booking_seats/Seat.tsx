@@ -1,4 +1,5 @@
 import React from "react";
+import useAppStore from '@/store/app.store';
 
 interface SeatProps {
     selectedSeats: string[];
@@ -31,7 +32,7 @@ const seatImages: Record<string, string> = {
 };
 
 const Seat: React.FC<SeatProps> = ({ selectedSeats, soldSeats, onSelect }) => {
-
+    const { isDarkMode } = useAppStore();
     const getSeatStatus = (seatName: string) => {
         if (soldSeats.includes(seatName)) return "sold";
         if (selectedSeats.includes(seatName)) return "selected";
@@ -47,7 +48,9 @@ const Seat: React.FC<SeatProps> = ({ selectedSeats, soldSeats, onSelect }) => {
                         return (
                             <button
                                 key={seatName}
-                                className="relative flex flex-col items-center bg-transparent border-none p-0"
+                                className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded-full transition-all duration-200 cursor-pointer
+                                    ${status === 'empty' ? 'hover:scale-110' : ''}
+                                `}
                                 onClick={() => {
                                     if (status !== "sold") onSelect(seatName);
                                 }}
@@ -60,8 +63,9 @@ const Seat: React.FC<SeatProps> = ({ selectedSeats, soldSeats, onSelect }) => {
                                     className="w-8 h-8"
                                 />
                                 <span
-                                    className="absolute top-1 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-700 pointer-events-none"
-                                    style={{ textShadow: "0 1px 2px #fff" }}
+                                    className={`absolute top-1 left-1/2 -translate-x-1/2 text-[10px] font-semibold pointer-events-none
+                                        ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}
+                                    style={{ textShadow: isDarkMode ? '0 1px 2px #222' : '0 1px 2px #fff' }}
                                 >
                                     {seatName}
                                 </span>

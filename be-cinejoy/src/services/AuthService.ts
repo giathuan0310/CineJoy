@@ -82,7 +82,7 @@ const login = async (email: string, password: string) => {
     return {
       status: false,
       error: 1,
-      message: "Tài khoản đã bị vô hiệu hóa",
+      message: "Tài khoản hoặc mật khẩu không chính xác",
       data: null,
     };
   }

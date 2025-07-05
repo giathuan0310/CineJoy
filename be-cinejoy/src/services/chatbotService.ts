@@ -40,21 +40,20 @@ const ChatbotService = {
             }
 
             return movies.map(movie => `
-- Tên phim: ${movie.title || "Chưa có tên"}
-- Thể loại: ${movie.genre?.join(", ") || "Chưa phân loại"}
-- Thời lượng: ${movie.duration || "Chưa cập nhật"} phút
-- Ngày khởi chiếu: ${movie.releaseDate ? new Date(movie.releaseDate).toLocaleDateString('vi-VN') : "Chưa cập nhật"}
-- Đạo diễn: ${movie.director || "Chưa cập nhật"}
-- Diễn viên: ${movie.actors?.join(", ") || "Chưa cập nhật"}
-- Ngôn ngữ: ${movie.language?.join(", ") || "Chưa cập nhật"}
-- Độ tuổi: ${movie.ageRating || "Chưa cập nhật"}
-- Trạng thái: ${movie.status || "Chưa cập nhật"}
-- Đánh giá: ${movie.averageRating ? movie.averageRating.toFixed(1) + "/5" : "Chưa có đánh giá"}
-- poster: ${movie.posterImage || "Chưa có poster"}
--hình: ${movie.image || "Chưa có "}
-- Mô tả: ${movie.description || "Chưa có mô tả"}
--video tra
-
+                - Tên phim: ${movie.title || "Chưa có tên"}
+                - Thể loại: ${movie.genre?.join(", ") || "Chưa phân loại"}
+                - Thời lượng: ${movie.duration || "Chưa cập nhật"} phút
+                - Ngày khởi chiếu: ${movie.releaseDate ? new Date(movie.releaseDate).toLocaleDateString('vi-VN') : "Chưa cập nhật"}
+                - Đạo diễn: ${movie.director || "Chưa cập nhật"}
+                - Diễn viên: ${movie.actors?.join(", ") || "Chưa cập nhật"}
+                - Ngôn ngữ: ${movie.language?.join(", ") || "Chưa cập nhật"}
+                - Độ tuổi: ${movie.ageRating || "Chưa cập nhật"}
+                - Trạng thái: ${movie.status || "Chưa cập nhật"}
+                - Đánh giá: ${movie.averageRating ? movie.averageRating.toFixed(1) + "/5" : "Chưa có đánh giá"}
+                - poster: ${movie.posterImage || "Chưa có poster"}
+                -hình: ${movie.image || "Chưa có "}
+                - Mô tả: ${movie.description || "Chưa có mô tả"}
+                -video tra
             `).join('\n');
         } catch (error) {
             console.error("Error fetching movies:", error);
@@ -165,8 +164,6 @@ const ChatbotService = {
             throw error;
         }
     },
-
-
 };
 
 export default ChatbotService;

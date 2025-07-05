@@ -32,7 +32,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
             <div className={`text-sm mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}><b>Phòng chiếu:</b> {movie.room}</div>
             <div className={`text-sm mb-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}><b>Ghế ngồi:</b> {movie.seats.join(", ")}</div>
             <button
-                className={`mt-2 px-6 py-2 rounded font-semibold transition-all duration-200
+                className={`mt-2 px-6 py-2 rounded font-semibold transition-all duration-200 cursor-pointer
                     ${isDarkMode ? 'bg-cyan-400 hover:bg-cyan-300 text-[#23272f]' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                 onClick={onContinue}
             >

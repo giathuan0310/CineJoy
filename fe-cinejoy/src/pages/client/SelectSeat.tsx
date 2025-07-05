@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import useAppStore from '@/store/app.store';
-
-import MovieInfo from "../../components/movies/booking_seats/MovieInfo";
+import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
-
-
-
 
 export const SelectSeat = () => {
     const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -34,7 +30,6 @@ export const SelectSeat = () => {
         date = "",
         time = "",
         room = "",
-        seats = [],
     } = location.state || {};
 
     const handleSelectSeat = (seat: string) => {

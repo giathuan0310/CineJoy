@@ -5,7 +5,7 @@ import { FaSearch } from 'react-icons/fa';
 import { Dropdown } from 'antd';
 import ModalLogin from '@/components/modal/auth/login';
 import useAppStore from '@/store/app.store';
-import { logoutApi, updateUser } from '@/services/api';
+import { logoutApi, updateUserApi } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
 import Logo from 'assets/CineJoyLogo.png';
 
@@ -54,7 +54,7 @@ const Header = () => {
     if (isAuthenticated && user?._id) {
         setIsDarkMode(!user.settings.darkMode);
         try {
-            const res = await updateUser(user._id, { settings: { darkMode: !user.settings.darkMode } });
+            const res = await updateUserApi(user._id, { settings: { darkMode: !user.settings.darkMode } });
             if (res.data && res.status) {
                 setUser(res.data);
             }
@@ -76,13 +76,13 @@ const Header = () => {
 
   const items = [
     {
-      key: "profile",
+      key: "members",
       label: <div className="text-center">Thông tin cá nhân</div>,
-      onClick: () => navigate("/profile"),
+      onClick: () => navigate("/members"),
     },
     {
       key: "/history",
-      label: <div className="text-center">Vé đã mua</div>,
+      label: <div className="text-center">Lịch sử đặt vé</div>,
     //   onClick: () => navigate("/history"),
     },
     {

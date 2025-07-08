@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from 'react-router-dom';
 
 import { getVouchers } from "@/apiservice/apiVoucher";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
@@ -359,14 +360,12 @@ const Dashboard: React.FC = () => {
                     <h1 className="text-xl font-semibold select-none">
                         Admin Dashboard - CineJoy
                     </h1>
-                    <button
+                    <Link
+                        to="/"
                         className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded transition"
-                        onClick={() => {
-                            window.location.href = "/login";
-                        }}
                     >
-                        Đăng xuất
-                    </button>
+                        Quay về trang chủ
+                    </Link>
                 </header>
 
                 {/* Content */}

@@ -5,7 +5,9 @@ import type { FormProps } from 'antd';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
 import useAppStore from '@/store/app.store';
+import { updateUserApi, uploadAvatarApi } from '@/services/api';
 import 'styles/members.css';
+import { useAlertContextApp } from '@/context/alert.context';
 
 type FieldType = {
   email: string;
@@ -16,13 +18,15 @@ type FieldType = {
 };
 
 const MembersPage = () => {
-  const { user, setUser, isDarkMode } = useAppStore();
   const [form] = Form.useForm();
   const [isSubmit, setIsSubmit] = useState<boolean>(false);
+  const [isUploadSubmit, setIsUploadSubmit] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [activeTabKey, setActiveTabKey] = useState('1');
-
+  const { user, setUser, isDarkMode } = useAppStore();
+  const { messageApi } = useAlertContextApp();
+  
   useEffect(() => {
     if (user) {
       form.setFieldsValue({
@@ -46,8 +50,34 @@ const MembersPage = () => {
 
   const handleSubmit: FormProps<FieldType>['onFinish'] = async (values) => {
     setIsSubmit(true);
-      console.log('submit: ', values); 
-    setIsSubmit(false); 
+    try {
+      const payload = {
+        fullName: values.fullName,
+        phoneNumber: values.phoneNumber,
+        gender: values.gender,
+        dateOfBirth: values.dateOfBirth ? dayjs(values.dateOfBirth).format('YYYY-MM-DD') : undefined,
+      };
+      const res = await updateUserApi(user._id, payload);
+      if (res?.data) {
+        setUser(res.data);
+        messageApi?.open({
+          type: 'success',
+          content: res.message,
+        });
+      } else {
+        messageApi?.open({
+          type: 'error',
+          content: res.message,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      messageApi?.open({
+        type: 'error',
+        content: 'Có lỗi xảy ra!',
+      });
+    }
+    setIsSubmit(false);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,8 +87,38 @@ const MembersPage = () => {
     }
   };
 
-  const handleSaveImage = () => {
-    // TODO: upload ảnh lên server ở đây
+  const handleSaveImage = async () => {
+    if (!selectedImage) return;
+    setIsUploadSubmit(true);
+    try {
+      const uploadRes = await uploadAvatarApi(selectedImage);
+      if (uploadRes?.data?.url) {
+        const updateRes = await updateUserApi(user._id, { avatar: uploadRes.data.url });
+        if (updateRes?.data) {
+          setUser(updateRes.data);
+          messageApi?.open({
+            type: 'success',
+            content: 'Cập nhật ảnh đại diện thành công!',
+          });
+        } else {
+          messageApi?.open({
+            type: 'error',
+            content: updateRes?.message || 'Cập nhật ảnh đại diện thất bại!',
+          });
+        }
+      } else {
+        messageApi?.open({
+          type: 'error',
+          content: uploadRes?.message || 'Tải ảnh lên thất bại!',
+        });
+      }
+    } catch {
+      messageApi?.open({
+        type: 'error',
+        content: 'Có lỗi xảy ra khi cập nhật ảnh!',
+      });
+    }
+    setIsUploadSubmit(false);
     setSelectedImage(null);
     setPreviewImage(null);
   };
@@ -73,10 +133,9 @@ const MembersPage = () => {
           className={clsx("mb-8 cinejoy-profile-tabs", isDarkMode && "darkmode")}
           items={[
             { key: '1', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '1' ? '#fff' : '#bbb' : '' }}>Thông tin cá nhân</span> },
-            { key: '2', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '2' ? '#fff' : '#bbb' : '' }}>Lịch sử đặt vé</span> },
-            { key: '3', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '3' ? '#fff' : '#bbb' : '' }}>Thẻ thành viên</span> },
-            { key: '4', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '4' ? '#fff' : '#bbb' : '' }}>Voucher</span> },
-            { key: '5', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '5' ? '#fff' : '#bbb' : '' }}>Điểm CNJ</span> },
+            { key: '2', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '2' ? '#fff' : '#bbb' : '' }}>Thẻ thành viên</span> },
+            { key: '3', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '3' ? '#fff' : '#bbb' : '' }}>Voucher</span> },
+            { key: '4', label: <span style={{ fontWeight: 600, color: isDarkMode ? activeTabKey === '4' ? '#fff' : '#bbb' : '' }}>Điểm CNJ</span> },
           ]}
         />
       </div>
@@ -127,6 +186,7 @@ const MembersPage = () => {
                     icon={<FaSave />}
                     style={{ background: isDarkMode ? '#27ae60' : '#43a047', borderColor: isDarkMode ? '#27ae60' : '#43a047', fontWeight: 600, borderRadius: 6, minWidth: 140, height: 38, fontSize: 17, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={handleSaveImage}
+                    loading={isUploadSubmit}
                   >
                     Lưu ảnh
                   </Button>
@@ -144,6 +204,11 @@ const MembersPage = () => {
                 label={<span style={{ color: isDarkMode ? '#fff' : undefined }}>Email</span>}
                 name="email"
                 style={{ marginBottom: 0, gridColumn: 'span 2' }}
+                rules={[
+                  { required: true, message: "Vui lòng nhập email!" },
+                  { type: "email", message: "Email không hợp lệ!" },
+                  { pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, message: "Email không được chứa ký tự đặc biệt và không được có dấu!" },
+                ]}
               >
                 <Input
                   size="large"
@@ -158,8 +223,10 @@ const MembersPage = () => {
                 label={<span style={{ color: isDarkMode ? '#fff' : undefined }}>Họ tên</span>}
                 name="fullName"
                 rules={[
-                  { required: true, message: 'Vui lòng nhập họ tên!' },
-                  { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự!' },
+                  { required: true, message: "Vui lòng nhập họ và tên!" },
+                  { whitespace: true, message: "Họ và tên không được chỉ chứa khoảng trắng!" },
+                  { min: 2, message: "Họ và tên phải có ít nhất 2 ký tự!" },
+                  { pattern: /^[^\d]*$/, message: "Họ và tên không được chứa số!" },
                 ]}
                 style={{ marginBottom: 0 }}
               >
@@ -175,8 +242,8 @@ const MembersPage = () => {
                 label={<span style={{ color: isDarkMode ? '#fff' : undefined }}>Số điện thoại</span>}
                 name="phoneNumber"
                 rules={[
-                  { required: true, message: 'Vui lòng nhập số điện thoại!' },
-                  { pattern: /^0[0-9]{9}$/, message: 'Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0!' },
+                  { required: true, message: "Vui lòng nhập số điện thoại!" },
+                  { pattern: /^0[0-9]{9}$/, message: "Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0!" },
                 ]}
                 style={{ marginBottom: 0 }}
               >
@@ -192,7 +259,14 @@ const MembersPage = () => {
                 label={<span style={{ color: isDarkMode ? '#fff' : undefined }}>Ngày sinh</span>}
                 name="dateOfBirth"
                 rules={[
-                  { required: true, message: 'Vui lòng chọn ngày sinh!' },
+                  { required: true, message: "Vui lòng chọn ngày sinh!" },
+                  ({ validator(_, value) {
+                      if (value && value.isAfter(dayjs())) {
+                        return Promise.reject(new Error('Ngày sinh không được lớn hơn ngày hiện tại!'));
+                      }
+                      return Promise.resolve();
+                    }
+                  }),
                 ]}
                 style={{ marginBottom: 0 }}
               >

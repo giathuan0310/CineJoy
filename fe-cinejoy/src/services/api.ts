@@ -49,3 +49,15 @@ export const updateUserApi = async (id: string, data: { fullName?: string; phone
     const response = await axios.put<IBackendResponse<IUser>>(`/v1/api/user/${id}`, data);
     return response.data;
 };
+
+export const uploadAvatarApi = async (file: File) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await axios.post<IBackendResponse<IUpload | null>>('/v1/api/upload', formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        withCredentials: true,
+    });
+    return response.data;
+};

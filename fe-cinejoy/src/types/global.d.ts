@@ -40,6 +40,11 @@ declare global {
         user: IUser;
     }
 
+    interface IUpload {
+        url: string;
+        filename: string;
+    }
+
     interface IMovie {
         _id: string;
         title: string;
@@ -114,8 +119,6 @@ declare global {
         status: 'available' | 'reserved' | 'sold';
     }
 
-
-
     // Voucher
     interface IVoucher {
         _id: string;
@@ -126,7 +129,6 @@ declare global {
         };
         quantity: number;
     }
-
 
     // Blog
     interface IBlog {
@@ -151,10 +153,6 @@ declare global {
         name: string;
     }
 
-
-
-
-
     // Seat & Showtime
     interface ISeat {
         seatId: string;
@@ -162,8 +160,6 @@ declare global {
         type: string;
         price: number;
     }
-
-
 
     interface IOrder {
         _id: string;

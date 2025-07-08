@@ -12,7 +12,7 @@ export const updateUser = async (req: Request, res: Response) => {
             return;
         }
         const { password, ...userWithoutPassword } = updatedUser.toObject();
-        res.json({ status: true, error: 0, message: "Cập nhật user thành công", data: userWithoutPassword });
+        res.json({ status: true, error: 0, message: "Cập nhật user thành công!", data: userWithoutPassword });
     } catch (error) {
         res.status(500).json({ status: false, error: 1, message: "Lỗi server", data: null });
     }

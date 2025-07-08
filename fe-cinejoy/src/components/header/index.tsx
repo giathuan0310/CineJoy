@@ -111,19 +111,19 @@ const Header = () => {
 
                     {/* Navigation */}
                     <nav className="hidden md:flex items-center gap-10 mx-4">
-                        <NavLink to="/" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
+                        <NavLink to="/" className={({ isActive }) => isActive ? `${isDarkMode ? "text-red-700" : "text-[#9d3b0a]"} font-medium hover:text-red-900 transition-colors uppercase text-[18px]` : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Trang chủ
                         </NavLink>
-                        <NavLink to="/movies" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
+                        <NavLink to="/movies" className={({ isActive }) => isActive ? `${isDarkMode ? "text-red-700" : "text-[#9d3b0a]"} font-medium hover:text-red-900 transition-colors uppercase text-[18px]` : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Phim
                         </NavLink>
-                        <NavLink to="/news" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
+                        <NavLink to="/news" className={({ isActive }) => isActive ? `${isDarkMode ? "text-red-700" : "text-[#9d3b0a]"} font-medium hover:text-red-900 transition-colors uppercase text-[18px]` : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Tin tức
                         </NavLink>
-                        <NavLink to="/members" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
+                        <NavLink to="/members" className={({ isActive }) => isActive ? `${isDarkMode ? "text-red-700" : "text-[#9d3b0a]"} font-medium hover:text-red-900 transition-colors uppercase text-[18px]` : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Thành viên
                         </NavLink>
-                        <NavLink to="/contact" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
+                        <NavLink to="/contact" className={({ isActive }) => isActive ? `${isDarkMode ? "text-red-700" : "text-[#9d3b0a]"} font-medium hover:text-red-900 transition-colors uppercase text-[18px]` : `${isDarkMode ? "text-white" : "text-gray-800"} font-medium hover:text-red-600 transition-colors uppercase text-[18px]`}>
                             Liên hệ
                         </NavLink>
                     </nav>

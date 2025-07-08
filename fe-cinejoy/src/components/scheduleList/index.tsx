@@ -209,7 +209,7 @@ const ScheduleList: React.FC = () => {
     }, [selectedCity, theater]);
 
   return (
-    <div className={`${isDarkMode ? "bg-[#181a1f]" : "bg-white"} py-8 border`}>
+    <div className={`${isDarkMode ? "bg-[#181a1f]" : "bg-white"} py-8`}>
       <div className={`${isDarkMode ? "bg-[#282a36] text-white" : "bg-white text-[#0f1b4c]"} flex flex-col rounded-2xl shadow p-6 gap-6 mx-30`}>
         <h2 className={`${isDarkMode ? "text-white" : "text-[#0f1b4c]"} text-3xl font-bold text-center mb-4`}>
           LỊCH CHIẾU PHIM

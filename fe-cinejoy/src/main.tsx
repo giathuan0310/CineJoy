@@ -10,6 +10,7 @@ import Movies from 'pages/client/Movies';
 import MoviesDetail from 'pages/client/MoviesDetail';
 import Select from 'pages/client/SelectSeat';
 import Members from 'pages/client/Members';
+import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import { ToastContainer } from 'react-toastify';
 
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
     path: "/admin",
     element: <Dashboard />
   },
+  {
+    path: "*",
+    element: <Error />
+  }
 ]);
 
 createRoot(document.getElementById('root')!).render(

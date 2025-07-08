@@ -3,14 +3,15 @@ import useAppStore from "@/store/app.store";
 interface IProps {
     image: string;
     title: string;
-    description: string;
+    description: React.ReactNode;
+    member?: boolean;
 }
 
 const NewsCard  = (props: IProps) => {
   const { isDarkMode } = useAppStore();
   return (
     <div className={`${isDarkMode ? "bg-[#282a36] shadow-lg" : "bg-white shadow-md"} rounded-xl overflow-hidden`}>
-      <img src={props.image} alt={props.title} className="w-full h-50 object-cover" />
+      <img src={props.image} alt={props.title} className={`w-full ${props.member ? "h-40" : "h-50"} object-cover`} />
       <div className="p-4">
         <h3 className={`${isDarkMode ? "text-white" : "text-gray-800"} font-semibold text-lg mb-1`}>{props.title}</h3>
         <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"} text-sm`}>{props.description}</p>

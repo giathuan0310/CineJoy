@@ -21,6 +21,7 @@ declare global {
         settings: {
             darkMode: boolean;
         }
+        point?: number;
     }
     
     interface IRegister {

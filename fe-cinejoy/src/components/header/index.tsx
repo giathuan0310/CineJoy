@@ -10,8 +10,8 @@ import { useAlertContextApp } from '@/context/alert.context';
 import Logo from 'assets/CineJoyLogo.png';
 
 const Header = () => {
-  const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const navigate = useNavigate();
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen, isDarkMode, setIsDarkMode } = useAppStore();
   const { messageApi } = useAlertContextApp();

@@ -6,8 +6,9 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import useAppStore from '@/store/app.store';
 import { updateUserApi, uploadAvatarApi } from '@/services/api';
-import 'styles/members.css';
 import { useAlertContextApp } from '@/context/alert.context';
+import MemberCard from '@/components/card/memberCard';
+import 'styles/members.css';
 
 type FieldType = {
   email: string;
@@ -140,7 +141,7 @@ const MembersPage = () => {
         />
       </div>
   
-      <div className={clsx("min-h-[80vh] flex flex-col items-center", isDarkMode ? "bg-[#181c24]" : "bg-white") }>
+      <div className={clsx("min-h-[50vh] flex flex-col items-center", isDarkMode ? "bg-[#181c24]" : "bg-white") }>
         {activeTabKey === '1' ? (
           <div
             className={clsx(
@@ -331,6 +332,8 @@ const MembersPage = () => {
               </Form.Item>
             </Form>
           </div>
+        ) : activeTabKey === '2' ? (
+          <MemberCard user={user} />
         ) : (
           <div className={clsx("text-center py-10 text-lg font-semibold", isDarkMode ? "text-white" : "text-black")}>ĐANG PHÁT TRIỂN TÍNH NĂNG</div>
         )}

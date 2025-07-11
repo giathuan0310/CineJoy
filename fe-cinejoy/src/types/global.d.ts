@@ -129,6 +129,9 @@ declare global {
             endDate: string;
         };
         quantity: number;
+        discountPercent: number;
+        pointToRedeem: number;
+        code?: string;
     }
 
     // Blog

@@ -8,6 +8,7 @@ import useAppStore from '@/store/app.store';
 import { updateUserApi, uploadAvatarApi } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
 import MemberCard from '@/components/card/memberCard';
+import VoucherTab from '@/components/voucher';
 import 'styles/members.css';
 
 type FieldType = {
@@ -24,7 +25,7 @@ const MembersPage = () => {
   const [isUploadSubmit, setIsUploadSubmit] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [activeTabKey, setActiveTabKey] = useState('1');
+  const [activeTabKey, setActiveTabKey] = useState<string>('1');
   const { user, setUser, isDarkMode } = useAppStore();
   const { messageApi } = useAlertContextApp();
   
@@ -334,6 +335,8 @@ const MembersPage = () => {
           </div>
         ) : activeTabKey === '2' ? (
           <MemberCard user={user} />
+        ) : activeTabKey === '3' ? (
+          <VoucherTab />
         ) : (
           <div className={clsx("text-center py-10 text-lg font-semibold", isDarkMode ? "text-white" : "text-black")}>ĐANG PHÁT TRIỂN TÍNH NĂNG</div>
         )}

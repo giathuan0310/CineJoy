@@ -23,7 +23,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ user }) => {
                                 </div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="font-semibold">Điểm tích lũy:</span>
-                                    <span className="text-orange-500 font-bold">{user?.point ?? 0}</span>
+                                    <span className="text-orange-500 font-bold">{user?.point}</span>
                                 </div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="font-semibold">Ngày hết hạn:</span>

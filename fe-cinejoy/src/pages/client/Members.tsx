@@ -4,11 +4,11 @@ import { Input, Select, DatePicker, Button, Form, Tabs } from 'antd';
 import type { FormProps } from 'antd';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
+import MemberCard from '@/components/card/memberCard';
+import VoucherTab from '@/components/voucher';
 import useAppStore from '@/store/app.store';
 import { updateUserApi, uploadAvatarApi } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
-import MemberCard from '@/components/card/memberCard';
-import VoucherTab from '@/components/voucher';
 import 'styles/members.css';
 
 type FieldType = {
@@ -338,7 +338,7 @@ const MembersPage = () => {
         ) : activeTabKey === '3' ? (
           <VoucherTab />
         ) : (
-          <div className={clsx("text-center py-10 text-lg font-semibold", isDarkMode ? "text-white" : "text-black")}>ĐANG PHÁT TRIỂN TÍNH NĂNG</div>
+          <div className={clsx("text-center py-10 text-xl font-semibold uppercase", isDarkMode ? "text-white" : "text-black")}>Đang phát triển tính năng</div>
         )}
       </div>
     </div>

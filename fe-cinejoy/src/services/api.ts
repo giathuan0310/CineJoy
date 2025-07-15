@@ -61,3 +61,13 @@ export const uploadAvatarApi = async (file: File) => {
     });
     return response.data;
 };
+
+export const getMyVouchersApi = async () => {
+    const response = await axios.get<IBackendResponse<IUserVoucher[]>>('/vouchers/my-vouchers');
+    return response.data;
+};
+
+export const redeemVoucherApi = async (voucherId: string) => {
+    const response = await axios.post<IBackendResponse<IUserVoucher>>('/vouchers/redeem', { voucherId });
+    return response.data;
+};

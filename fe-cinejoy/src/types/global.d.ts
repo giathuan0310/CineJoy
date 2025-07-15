@@ -22,6 +22,7 @@ declare global {
             darkMode: boolean;
         }
         point?: number;
+        createdAt: Date;
     }
     
     interface IRegister {
@@ -131,7 +132,26 @@ declare global {
         quantity: number;
         discountPercent: number;
         pointToRedeem: number;
-        code?: string;
+    }
+
+    interface IUserVoucher {
+        _id: string;
+        userId: string;
+        voucherId: {
+            _id: string;
+            name: string;
+            validityPeriod: {
+                startDate: string;
+                endDate: string;
+            };
+            quantity: number;
+            discountPercent: number;
+            pointToRedeem: number;
+        };
+        code: string;
+        status: 'unused' | 'used' | 'expired';
+        redeemedAt: string;
+        usedAt?: string;
     }
 
     // Blog

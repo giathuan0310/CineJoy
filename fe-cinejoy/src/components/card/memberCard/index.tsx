@@ -27,7 +27,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ user }) => {
                                 </div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="font-semibold">Ngày hết hạn:</span>
-                                    <span>{dayjs().add(1, 'year').format('DD/MM/YYYY')}</span>
+                                    <span>{dayjs(user?.createdAt).add(1, 'year').format('DD/MM/YYYY')}</span>
                                 </div>
                             </div>
                         }

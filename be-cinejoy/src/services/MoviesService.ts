@@ -26,4 +26,18 @@ export default class MoviesService {
     deleteMovie(id: string): Promise<IMovie | null> {
         return Movie.findByIdAndDelete(id);
     }
+
+    // Tìm kiếm phim theo từ khóa
+    async searchMovies(keyword: string): Promise<IMovie[]> {
+        const regex = new RegExp(keyword, 'i');
+        return Movie.find({
+            $or: [
+                { title: regex },
+                { genre: regex },
+                { actors: regex },
+                { director: regex },
+                { language: regex },
+            ]
+        });
+    }
 }

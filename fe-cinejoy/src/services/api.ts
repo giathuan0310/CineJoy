@@ -71,3 +71,8 @@ export const redeemVoucherApi = async (voucherId: string) => {
     const response = await axios.post<IBackendResponse<IUserVoucher>>('/vouchers/redeem', { voucherId });
     return response.data;
 };
+
+export const searchMovies = async (keyword: string) => {
+    const response = await axios.get<IBackendResponse<IMovie[]>>(`/movies/search?q=${keyword}`);
+    return response.data;
+};

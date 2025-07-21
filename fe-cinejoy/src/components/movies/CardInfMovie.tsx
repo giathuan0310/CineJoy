@@ -1,6 +1,6 @@
 import { getMovieById, getMovies } from "@/apiservice/apiMovies";
 import { getShowTimesByFilter } from "@/apiservice/apiShowTime";
-import { getRegions, getTheaters } from "@/apiservice/apiTheater";
+import { getTheaters } from "@/apiservice/apiTheater";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import useAppStore from "@/store/app.store";
@@ -9,9 +9,13 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+
 dayjs.extend(isSameOrBefore);
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isSameOrAfter);
+
 const getVNDayLabel = (date: Date, idx: number) => {
     const days = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
     if (idx === 0) return `Hôm nay\n${date.getDate()}`;
@@ -19,37 +23,30 @@ const getVNDayLabel = (date: Date, idx: number) => {
     return `${days[date.getDay()]}\n${date.getDate()}`;
 };
 
-function getDateRange(start: string, end: string) {
-    const result = [];
-    let current = dayjs(start);
-    const last = dayjs(end);
-    let idx = 0;
-    while (current.isSameOrBefore(last, "day")) {
-        result.push({
-            label: getVNDayLabel(current.toDate(), idx),
-            value: current.format("YYYY-MM-DD"),
-        });
-        current = current.add(1, "day");
-        idx++;
-    }
-    return result;
+const get7DaysFromToday = () => {
+    const today = dayjs();
+    return Array.from({ length: 7 }, (_, idx) => {
+        const date = today.add(idx, "day");
+        return {
+            label: getVNDayLabel(date.toDate(), idx),
+            value: date.format("YYYY-MM-DD"),
+        };
+    });
 }
 
-function getYoutubeEmbedUrl(url?: string) {
+const getYoutubeEmbedUrl = (url?: string) => {
     if (!url) return "";
-    // Nếu đã là link embed thì trả về luôn
     if (url.includes("embed")) return url;
-    // Lấy id từ link watch hoặc share
     const match = url.match(/(?:\?v=|\/embed\/|\.be\/)([a-zA-Z0-9_-]{11})/);
     if (match && match[1]) {
         return `https://www.youtube.com/embed/${match[1]}`;
     }
     return url;
 }
-function formatVNTime(iso: string) {
+
+const formatVNTime = (iso: string) => {
     return dayjs(iso).tz("Asia/Ho_Chi_Minh").format("hh:mm A");
 }
-
 
 const CardInfMovie = () => {
     const [showMoreDes, setShowMoreDes] = useState(false);
@@ -58,7 +55,7 @@ const CardInfMovie = () => {
     const [selectedCity, setSelectedCity] = useState("");
     const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<string>("");
-    const [dates, setDates] = useState<{ label: string; value: string }[]>([]);
+    const [dates] = useState<{ label: string; value: string }[]>(get7DaysFromToday());
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
     const { isDarkMode } = useAppStore();
     const allShowTimes = showtimes.flatMap(st => st.showTimes || []);
@@ -66,14 +63,14 @@ const CardInfMovie = () => {
         st => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
     );
 
-    const navigate = useNavigate(); // Thêm dòng này
+    const navigate = useNavigate();
 
     const { id } = useParams<{ id: string }>();
     const [movie, setMovie] = useState<IMovie | null>(null);
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theater, setTheater] = useState<ITheater[]>([]);
-    const [region, setRegion] = useState<IRegion[]>([]);
     const cityOptions = [...new Set(theater.map(c => c.location.city))];
+
     useEffect(() => {
         const fetchMovie = async () => {
             try {
@@ -86,6 +83,7 @@ const CardInfMovie = () => {
                 console.error("Lỗi khi lấy thông tin phim:", error);
             }
         };
+
         const fetchMovies = async () => {
             try {
                 const responses = await getMovies();
@@ -94,6 +92,7 @@ const CardInfMovie = () => {
                 console.error("Lỗi khi lấy thông tin phim:", error);
             }
         }
+
         const fetchTheater = async () => {
             try {
                 const response = await getTheaters();
@@ -104,22 +103,9 @@ const CardInfMovie = () => {
             }
         }
 
-        const fetchRegion = async () => {
-            try {
-                const response = await getRegions();
-                setRegion(Array.isArray(response) ? response : []);
-            } catch (error) {
-                console.error("Lỗi khi lấy thông tin vùng:", error);
-            }
-        }
-
         fetchMovie();
-
         fetchMovies();
-
         fetchTheater();
-
-        fetchRegion();
     }, [id]);
 
     const filteredMovies =
@@ -127,6 +113,10 @@ const CardInfMovie = () => {
             ? movies.filter((movie) => movie.status === "nowShowing" || movie.status === "special")
             : movies.filter((movie) => movie.status === activeTab);
 
+    // Lọc rạp theo thành phố
+    const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
+
+    // Khi đổi rạp, không thay đổi dải ngày, chỉ filter showtimes
     useEffect(() => {
         if (movie?._id && selectedCinemaId) {
             getShowTimesByFilter(movie._id, selectedCinemaId)
@@ -135,45 +125,6 @@ const CardInfMovie = () => {
             setShowtimes([]);
         }
     }, [movie?._id, selectedCinemaId]);
-
-
-    // Lọc rạp theo thành phố
-    const filteredCinemas = theater.filter((c) => c.location.city === selectedCity);
-
-    // Khi đổi thành phố, chọn lại rạp đầu tiên
-    useEffect(() => {
-        if (filteredCinemas.length > 0) {
-            setSelectedCinemaId(filteredCinemas[0]._id);
-        }
-    }, [selectedCity]);
-
-    // Khi đổi rạp, nếu rạp không có ngày đang chọn thì chọn ngày đầu tiên có suất chiếu
-    useEffect(() => {
-        if (showtimes.length > 0) {
-            const minStart = showtimes.reduce(
-                (min, st) => st.showDate?.start && st.showDate.start < min ? st.showDate.start : min,
-                showtimes[0].showDate?.start
-            );
-            const maxEnd = showtimes.reduce(
-                (max, st) => st.showDate?.end && st.showDate.end > max ? st.showDate.end : max,
-                showtimes[0].showDate?.end
-            );
-            if (minStart && maxEnd) {
-                setDates(getDateRange(minStart, maxEnd));
-                // Nếu selectedDate chưa có hoặc không nằm trong khoảng thì set lại
-                if (
-                    !selectedDate ||
-                    selectedDate < minStart.slice(0, 10) ||
-                    selectedDate > maxEnd.slice(0, 10)
-                ) {
-                    setSelectedDate(minStart.slice(0, 10));
-                }
-            }
-        } else {
-            setDates([]);
-            setSelectedDate(""); // reset ngày nếu không có suất chiếu
-        }
-    }, [showtimes]);
 
     // Khi dữ liệu rạp thay đổi, nếu selectedCity không còn rạp nào, tự động chọn thành phố đầu tiên có rạp
     useEffect(() => {
@@ -194,12 +145,22 @@ const CardInfMovie = () => {
         }
     }, [selectedCity, theater]);
 
+    // Set selectedDate mặc định là ngày hôm nay khi khởi tạo
+    useEffect(() => {
+        if (!selectedDate && dates.length > 0) {
+            setSelectedDate(dates[0].value);
+        }
+    }, [dates, selectedDate]);
 
-
+    // Khi đổi rạp, luôn set lại selectedDate về ngày hôm nay
+    useEffect(() => {
+        if (dates.length > 0) {
+            setSelectedDate(dates[0].value);
+        }
+    }, [selectedCinemaId]);
 
     return (
         <>
-
             {/* Phần thông tin chi tiết về phim */}
             <div
                 className="bg-cover bg-center min-h-[100px] py-2  relative"
@@ -277,8 +238,6 @@ const CardInfMovie = () => {
                         </div>
                     </div>
                 </div>
-
-
             </div>
 
             {/* Phần trailer và danh sách phim */}
@@ -416,6 +375,7 @@ const CardInfMovie = () => {
                                     ))}
                                 </div>
                             </div>
+
                             {/* Right: Date & Showtimes */}
                             <div className="flex-1 pl-4">
                                 <div className="flex gap-2 mb-4">
@@ -434,6 +394,7 @@ const CardInfMovie = () => {
                                         </button>
                                     ))}
                                 </div>
+
                                 <div className="mt-2">
                                     {showtimes.length > 0 ? (
                                         <>
@@ -442,15 +403,12 @@ const CardInfMovie = () => {
                                                 <span className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                                                     Suất chiếu ngày {selectedDate.split("-").reverse().join("/")}
                                                 </span>
-
                                             </div>
                                             <div className="flex gap-3 flex-wrap">
                                                 {showTimesOfSelectedDate.map((showtime, idx) => (
                                                     <button
-
                                                         key={idx}
                                                         className={`border px-4 py-2 rounded cursor-pointer ${isDarkMode ? "text-gray-100 bg-gray-700 hover:bg-blue-800 border-gray-600" : "text-gray-800 bg-white hover:bg-blue-50"}`}
-
                                                         onClick={() => navigate(`/selectSeat`, {
                                                             state: {
                                                                 movie: {
@@ -465,17 +423,9 @@ const CardInfMovie = () => {
                                                                 time: formatVNTime(showtime.start),
                                                                 room: showtime.room,
                                                                 seats: [], // sẽ cập nhật khi chọn ghế
-
-
-
-
                                                             }
-
                                                         }
-
                                                         )}
-
-
                                                     >
                                                         {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
                                                     </button>
@@ -502,6 +452,5 @@ const CardInfMovie = () => {
         </>
     );
 };
-
 
 export default CardInfMovie;

@@ -194,4 +194,19 @@ export default class MoviesController {
             res.status(500).json({ message: "Error deleting movie", error });
         }
     }
+
+    // Tìm kiếm phim
+    async searchMovies(req: Request, res: Response): Promise<void> {
+        const keyword = req.query.q as string;
+        if (!keyword || keyword.trim() === "") {
+            res.status(400).json({ status: false, error: 1, message: "Missing search keyword", data: [] });
+            return;
+        }
+        try {
+            const movies = await moviesService.searchMovies(keyword);
+            res.status(200).json({ status: true, error: 0, message: "Get search movie success", data: movies });
+        } catch (error) {
+            res.status(500).json({ status: false, error: 2, message: "Error searching movies", data: [], details: error });
+        }
+    }
 }

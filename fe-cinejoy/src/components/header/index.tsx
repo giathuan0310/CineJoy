@@ -1,20 +1,57 @@
-import { MdDarkMode } from "react-icons/md";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { FaSearch } from 'react-icons/fa';
+import { useDebounce } from 'use-debounce';
 import { Dropdown } from 'antd';
+import { MdDarkMode } from "react-icons/md";
 import ModalLogin from '@/components/modal/auth/login';
+import SearchDropdown from '@/components/header/SearchDropdown';
 import useAppStore from '@/store/app.store';
-import { logoutApi, updateUserApi } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
+import { logoutApi, updateUserApi, searchMovies } from '@/services/api';
 import Logo from 'assets/CineJoyLogo.png';
 
 const Header = () => {
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
   const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
+  const [showSearch, setShowSearch] = useState<boolean>(false);
+  const [searchValue, setSearchValue] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<IMovie[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  const [debouncedValue] = useDebounce(searchValue, 300);
   const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen, isDarkMode, setIsDarkMode } = useAppStore();
   const { messageApi } = useAlertContextApp();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (debouncedValue.trim()) {
+      setLoadingSearch(true);
+      searchMovies(debouncedValue.trim())
+        .then(res => {
+          setSearchResults(res.data || []);
+          setShowDropdown(true);
+        })
+        .finally(() => setLoadingSearch(false));
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+      setLoadingSearch(false);
+    }
+  }, [debouncedValue]);
+
+  const handleChangeSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+    if (e.target.value.trim()) {
+      setLoadingSearch(true);
+    }
+  };
+  const handleSelectMovie = (id: string) => {
+    setShowSearch(false);
+    setShowDropdown(false);
+    setSearchValue('');
+    navigate(`/movies/${id}`);
+  };
 
   const handleOpenLoginModal = (value: boolean) => {
     setModalOpen(value);
@@ -98,7 +135,13 @@ const Header = () => {
     })
   }
 
-    return (
+    const closeSearch = () => {
+        setShowSearch(false);
+        setSearchValue('');
+        setSearchResults([]);
+    };
+
+  return (
         <>
             <header className={`sticky top-0 ${loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"} ${isDarkMode ? "bg-[#23272f]" : "bg-[#eee]"} shadow-sm border-b border-[#ccc]`}>
                 <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
@@ -131,11 +174,19 @@ const Header = () => {
                     {/* Right section */}
                     {isAuthenticated ? (
                         <div className="flex items-center gap-6">
-                            <div className="relative">
-                                <button className="text-gray-700 hover:text-gray-900 bg-white rounded-full p-2.5 border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250">
-                                    <FaSearch size={16} />
-                                </button>
-                            </div>
+                            <SearchDropdown
+                              showSearch={showSearch}
+                              searchValue={searchValue}
+                              searchResults={searchResults}
+                              loadingSearch={loadingSearch}
+                              showDropdown={showDropdown}
+                              searchInputRef={searchInputRef}
+                              handleChangeSearch={handleChangeSearch}
+                              handleSelectMovie={handleSelectMovie}
+                              closeSearch={closeSearch}
+                              setShowDropdown={setShowDropdown}
+                              setShowSearch={setShowSearch}
+                            />
                             <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={handleDarkMode}> 
                                 {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
                             </div>
@@ -155,11 +206,19 @@ const Header = () => {
                     ) : (
                         <>
                             <div className="flex items-center gap-6">
-                                <div className="relative">
-                                    <button className="text-gray-700 hover:text-gray-900 bg-white rounded-full p-2.5 border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250">
-                                        <FaSearch size={16} />
-                                    </button>
-                                </div>
+                                <SearchDropdown
+                                  showSearch={showSearch}
+                                  searchValue={searchValue}
+                                  searchResults={searchResults}
+                                  loadingSearch={loadingSearch}
+                                  showDropdown={showDropdown}
+                                  searchInputRef={searchInputRef}
+                                  handleChangeSearch={handleChangeSearch}
+                                  handleSelectMovie={handleSelectMovie}
+                                  closeSearch={closeSearch}
+                                  setShowDropdown={setShowDropdown}
+                                  setShowSearch={setShowSearch}
+                                />
                                 <div className="cursor-pointer hover:scale-110 transition-all duration-200" onClick={handleDarkMode}> 
                                     {isDarkMode ? <MdDarkMode color="white" size={35} /> : <MdDarkMode size={35} />}
                                 </div>

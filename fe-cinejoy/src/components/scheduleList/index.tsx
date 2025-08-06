@@ -8,6 +8,7 @@ import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import { getMovieById } from "@/apiservice/apiMovies";
 import { getShowTimesByTheater } from "@/apiservice/apiShowTime";
+import { getRegions } from "@/apiservice/apiRegion";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -70,13 +71,14 @@ const ScheduleList: React.FC = () => {
 
   const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(today);
-  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCity, setSelectedCity] = useState<string>("");
   const [theater, setTheater] = useState<ITheater[]>([]);
+  const [regions, setRegions] = useState<IRegion[]>();
   const [dates, setDates] = useState<{ label: string; value: string }[]>(getDateRange(today, sevenDaysLater));
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const [movieDetails, setMovieDetails] = useState<{[key: string]: IMovie}>({});
   const [groupedShowtimes, setGroupedShowtimes] = useState<{[key: string]: {movie: IMovie, showtimes: IFlattenedShowtime[]}}>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (showtimes.length > 0 && selectedDate) {
@@ -121,7 +123,21 @@ const ScheduleList: React.FC = () => {
 
   const { isDarkMode } = useAppStore();
 
-  const cityOptions = [...new Set(theater.map(c => c.location.city))];
+  useEffect(() => {
+    const fetchRegions = async () => {
+      const res = await getRegions();
+      setRegions(res);
+
+      const hoChiMinh = res.find(r => r.name.trim() === "Hồ Chí Minh");
+      if (hoChiMinh) {
+        setSelectedCity(hoChiMinh.name.trim());
+      } else if (res.length > 0) {
+        setSelectedCity(res[0].name.trim());
+      }
+    };
+
+    fetchRegions();
+  }, []);
 
   useEffect(() => {
       const fetchTheater = async () => {
@@ -221,9 +237,9 @@ const ScheduleList: React.FC = () => {
             value={selectedCity}
             onChange={e => setSelectedCity(e.target.value)}
           >
-            {cityOptions.map((city) => (
-                <option key={city} value={city}>
-                    {city}
+            {regions?.map((region) => (
+                <option key={region._id} value={region.name.trim()}>
+                    {region.name}
                 </option>
             ))}
           </select>
@@ -232,23 +248,29 @@ const ScheduleList: React.FC = () => {
           {/* Left: Cinema List */}
           <div className="w-2/6 mr-10">
             <div className="flex flex-col gap-2">
-              {filteredCinemas.map((cinema) => (
-                <button
-                  key={cinema._id}
-                  className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${selectedCinemaId !== cinema._id
-                      ? `${isDarkMode ? "hover:bg-gray-700 hover:border-blue-400" : "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"} ${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200" : "bg-white border-gray-200"}`
-                      : `${isDarkMode ? "bg-blue-900 border-blue-400" : "bg-[#e4e6ee] border-[#0f1b4c]"} ${isDarkMode ? "text-gray-200" : "text-gray-800"}`
-                    }`}
-                  onClick={() => setSelectedCinemaId(cinema._id)}
-                >
-                  <img
-                    src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
-                    alt="CGV"
-                    className="w-9 h-9"
-                  />
-                  <span className={`${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{cinema.name}</span>
-                </button>
-              ))}
+              {filteredCinemas.length === 0 ? (
+                <div className="text-center text-gray-400 py-4">
+                  Không có rạp nào ở khu vực này
+                </div>
+              ) : (
+                filteredCinemas.map((cinema) => (
+                  <button
+                    key={cinema._id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${selectedCinemaId !== cinema._id
+                        ? `${isDarkMode ? "hover:bg-gray-700 hover:border-blue-400" : "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"} ${isDarkMode ? "bg-[#3a3c4a] border-gray-600 text-gray-200" : "bg-white border-gray-200"}`
+                        : `${isDarkMode ? "bg-blue-900 border-blue-400" : "bg-[#e4e6ee] border-[#0f1b4c]"} ${isDarkMode ? "text-gray-200" : "text-gray-800"}`
+                      }`}
+                    onClick={() => setSelectedCinemaId(cinema._id)}
+                  >
+                    <img
+                      src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
+                      alt="CGV"
+                      className="w-9 h-9"
+                    />
+                    <span className={`${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{cinema.name}</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
     

@@ -1,4 +1,5 @@
 import { Movie, IMovie } from "../models/Movies";
+import { removeAccents } from '../utils/removeAccents';
 
 export default class MoviesService {
     // Lấy danh sách phim
@@ -13,6 +14,7 @@ export default class MoviesService {
 
     // Thêm một phim mới
     addMovie(movieData: IMovie): Promise<IMovie> {
+        movieData.titleNoAccent = removeAccents(movieData.title);
         const movie = new Movie(movieData);
         return movie.save();
     }
@@ -29,10 +31,10 @@ export default class MoviesService {
 
     // Tìm kiếm phim theo từ khóa
     async searchMovies(keyword: string): Promise<IMovie[]> {
-        const regex = new RegExp(keyword, 'i');
+        const regex = new RegExp(removeAccents(keyword), 'i');
         return Movie.find({
             $or: [
-                { title: regex },
+                { titleNoAccent: regex },
                 { genre: regex },
                 { actors: regex },
                 { director: regex },

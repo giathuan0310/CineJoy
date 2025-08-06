@@ -56,7 +56,18 @@ export const SelectSeat = () => {
                     time,
                     room,
                     seats: selectedSeats, // cập nhật ghế đã chọn
-                }} onContinue={() => navigate("/thanh-toan")} />
+                }} onContinue={() => navigate("/payment", {
+                    state: {
+                        movie: {
+                            ...movie,
+                        },
+                        seats: selectedSeats,
+                        cinema,
+                        date,
+                        time,
+                        room,
+                    }
+                })} />
             </div>
         </div>
     );

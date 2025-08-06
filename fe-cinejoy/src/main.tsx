@@ -10,6 +10,7 @@ import Movies from 'pages/client/Movies';
 import MoviesDetail from 'pages/client/MoviesDetail';
 import Select from 'pages/client/SelectSeat';
 import Members from 'pages/client/Members';
+import Payment from 'pages/client/Payment';
 import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import { ToastContainer } from 'react-toastify';
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: "/members",
         element: <Members />
+      },
+      {
+        path: "/payment",
+        element: <Payment />
       }
     ]
   },

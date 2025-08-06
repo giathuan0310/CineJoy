@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { useRef } from 'react';
 import { FaCheckCircle } from 'react-icons/fa';
 import MoviesListCarousel from '@/components/moviesListCarousel';
 import ScheduleList from '@/components/scheduleList';
@@ -29,6 +29,21 @@ interface NewsCardProps {
 
 const HomePage = () => {
     const { isDarkMode } = useAppStore();
+    const scheduleRef = useRef<HTMLDivElement>(null);
+    
+    const scrollToSchedule = () => {
+        if (scheduleRef.current) {
+            const element = scheduleRef.current;
+            const elementTop = element.offsetTop;
+            const offsetPosition = elementTop - 50;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+    };
+    
     const cards: CommentCardProps[] = [
         {
             image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1741325255/52_Robot_Hoang_Da%CC%83_acqnjy.jpg",
@@ -199,12 +214,12 @@ const HomePage = () => {
                                 </div>
                             </div>
                             
-                            <Link 
-                                to="/booking" 
-                                className="bg-[#ff6347] hover:bg-[#ff5337] text-white font-medium py-3 px-8 rounded-full transition-all inline-block"
+                            <button 
+                                onClick={scrollToSchedule} 
+                                className="bg-[#ff6347] hover:bg-[#ff5337] text-white font-medium py-3 px-8 rounded-full transition-all inline-block mr-4 cursor-pointer"
                             >
                                 Đặt vé ngay
-                            </Link>
+                            </button>
                         </div>
                         
                         {/* Right Content with Image */}
@@ -232,7 +247,9 @@ const HomePage = () => {
 
             <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="nowShowing" />
             <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="upcoming" />
-            <ScheduleList />
+            <div ref={scheduleRef}>
+                <ScheduleList />
+            </div>
 
             <div className={`${isDarkMode ? "bg-[#1e2229]" : "bg-[#cccccc2b]"} min-h-screen py-10 px-4`}>
                 <h1 className={`text-3xl font-bold text-center ${isDarkMode ? "text-white" : "text-[#0f1b4c]"} mb-10`}>

@@ -47,23 +47,6 @@ const PaymentPage = () => {
     email: user?.email || "",
   });
   const [timeLeft, setTimeLeft] = useState(600);
-
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prevTime) => {
-        if (prevTime <= 1) {
-          // Thời gian hết, có thể thêm logic chuyển hướng hoặc thông báo
-          alert("Hết thời gian đặt vé! Vui lòng thực hiện lại.");
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft]);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;
@@ -129,6 +112,23 @@ const PaymentPage = () => {
   const ticketTotal = seats.length * seatPrice;
   const voucherDiscount = appliedVoucher?.discount || 0;
   const total = ticketTotal + comboTotal - voucherDiscount;
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime <= 1) {
+          // Thời gian hết, có thể thêm logic chuyển hướng hoặc thông báo
+          alert("Hết thời gian đặt vé! Vui lòng thực hiện lại.");
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft]);
 
   return (
     <div

@@ -43,7 +43,42 @@ export default class UserVoucherService {
     data: any;
   }> {
     try {
-      // Tìm voucher theo code trong UserVoucher collection
+      const existingVoucher = await UserVoucher.findOne({
+        code: code,
+        ...(userId && { userId }),
+      });
+
+      if (!existingVoucher) {
+        return {
+          status: false,
+          error: 1,
+          message: "Mã voucher không tồn tại hoặc không thuộc về bạn",
+          data: {
+            message: "Mã voucher không tồn tại hoặc không thuộc về bạn",
+          },
+        };
+      }
+
+      // Kiểm tra trạng thái voucher
+      if (existingVoucher.status === "used") {
+        return {
+          status: false,
+          error: 1,
+          message: "Mã voucher đã được sử dụng",
+          data: null,
+        };
+      }
+
+      if (existingVoucher.status === "expired") {
+        return {
+          status: false,
+          error: 1,
+          message: "Mã voucher đã hết hạn",
+          data: null,
+        };
+      }
+
+      // Tìm voucher chưa sử dụng
       const userVoucher = await UserVoucher.findOne({
         code: code,
         status: "unused",

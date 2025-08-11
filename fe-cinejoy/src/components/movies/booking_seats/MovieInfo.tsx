@@ -33,68 +33,77 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
         className="w-32 h-44 object-cover rounded mb-3"
       />
       <div
-        className={`text-lg font-semibold text-center mb-2 ${
+        className={`text-lg font-semibold text-center mb-4 ${
           isDarkMode ? "text-yellow-300" : "text-[#162d5a]"
         }`}
       >
         {movie.title}
       </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Hình thức:</b> {movie.format}
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Thể loại:</b> {movie.genre}
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Thời lượng:</b> {movie.duration} phút
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Rạp chiếu:</b> {movie.cinema}
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Ngày chiếu:</b> {movie.date}
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Giờ chiếu:</b> {movie.time}
-      </div>
-      <div
-        className={`text-sm mb-1 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Phòng chiếu:</b> {movie.room}
-      </div>
-      <div
-        className={`text-sm mb-3 ${
-          isDarkMode ? "text-gray-300" : "text-gray-700"
-        }`}
-      >
-        <b>Ghế ngồi:</b>{" "}
-        {hasSelectedSeats ? movie.seats.join(", ") : "Chưa chọn"}
+      <div className="w-full space-y-2 mb-4">
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Hình thức:</span>
+          <span>{movie.format}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Thể loại:</span>
+          <span>{movie.genre}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Thời lượng:</span>
+          <span>{movie.duration} phút</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Rạp chiếu:</span>
+          <span>{movie.cinema}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Ngày chiếu:</span>
+          <span>{movie.date}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Giờ chiếu:</span>
+          <span>{movie.time}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Phòng chiếu:</span>
+          <span>{movie.room}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Ghế ngồi:</span>
+          <span>{hasSelectedSeats ? movie.seats.join(", ") : "Chưa chọn"}</span>
+        </div>
       </div>
 
       {/* Thông báo khi chưa chọn ghế */}
@@ -109,7 +118,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
       )}
 
       <button
-        className={`mt-2 px-6 py-2 rounded font-semibold transition-all duration-200 ${
+        className={`mt-2 px-6 py-2 w-full rounded font-semibold transition-all duration-200 ${
           hasSelectedSeats
             ? `cursor-pointer ${
                 isDarkMode

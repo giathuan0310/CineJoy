@@ -33,7 +33,16 @@ const Header = () => {
   const { messageApi } = useAlertContextApp();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [debouncedDarkMode] = useDebounce(isDarkMode, 300);
-  const [previousDarkMode, setPreviousDarkMode] = useState<boolean>(isDarkMode);
+  const [previousDarkMode, setPreviousDarkMode] = useState<boolean | undefined>(
+    undefined
+  );
+
+  // Khởi tạo previousDarkMode khi component mount
+  useEffect(() => {
+    if (previousDarkMode === undefined) {
+      setPreviousDarkMode(isDarkMode);
+    }
+  }, [isDarkMode, previousDarkMode]);
 
   useEffect(() => {
     if (debouncedValue.trim()) {
@@ -56,7 +65,8 @@ const Header = () => {
       debouncedDarkMode !== previousDarkMode &&
       isAuthenticated &&
       user?._id &&
-      debouncedDarkMode !== user.settings?.darkMode
+      debouncedDarkMode !== user.settings?.darkMode &&
+      previousDarkMode !== undefined
     ) {
       const updateDarkModeInDB = async () => {
         try {
@@ -143,11 +153,16 @@ const Header = () => {
   };
 
   useEffect(() => {
-    if (user && typeof user.settings?.darkMode === "boolean") {
+    // Chỉ áp dụng setting của user khi mới đăng nhập hoặc user thay đổi
+    if (
+      user &&
+      typeof user.settings?.darkMode === "boolean" &&
+      previousDarkMode !== user.settings.darkMode
+    ) {
       setIsDarkMode(user.settings.darkMode);
       setPreviousDarkMode(user.settings.darkMode);
     }
-  }, [user, setIsDarkMode]);
+  }, [user, setIsDarkMode, previousDarkMode]);
 
   const items = [
     {

@@ -14,6 +14,7 @@ import Payment from 'pages/client/Payment';
 import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import { ToastContainer } from 'react-toastify';
+import Contact from './pages/client/Contact';
 
 const router = createBrowserRouter([
   {
@@ -43,6 +44,10 @@ const router = createBrowserRouter([
       {
         path: "/payment",
         element: <Payment />
+      },
+      {
+        path: "/contact",
+        element: <Contact />
       }
     ]
   },

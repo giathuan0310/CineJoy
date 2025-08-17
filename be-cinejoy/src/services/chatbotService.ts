@@ -61,6 +61,66 @@ const ChatbotService = {
         }
     },
 
+    // Lấy thông tin rạp chiếu phim
+    getTheaterInfo: async () => {
+        try {
+            const response = await axios.get('http://localhost:5000/theaters');
+            const theaters = response.data;
+            if (!theaters || !Array.isArray(theaters)) {
+                return "Hiện không có thông tin rạp chiếu phim.";
+            }
+            return theaters.map(theater => `
+- Tên rạp: ${theater.name || "Chưa có tên"}
+- Địa chỉ: ${theater.location?.address || "Chưa cập nhật"}
+- Khu vực: ${theater.location?.city || "Chưa cập nhật"}
+
+        `).join('\n');
+        } catch (error) {
+            console.error("Error fetching theaters:", error);
+            return "Không thể lấy thông tin rạp chiếu phim do lỗi hệ thống.";
+        }
+    },
+
+    getShowtimeInfo: async () => {
+        try {
+            const response = await axios.get('http://localhost:5000/showtimes');
+            const showtimes = response.data;
+
+            if (!showtimes || !Array.isArray(showtimes)) {
+                return "Hiện không có thông tin suất chiếu.";
+            }
+
+            return showtimes.slice(0, 10).map(showtime => {
+                const { movieId, theaterId, showDate, showTimes } = showtime;
+
+                const movieTitle = movieId?.title || "Chưa có";
+                const theaterName = theaterId?.name || "Chưa có";
+                const dateRange = showDate
+                    ? `Từ ${new Date(showDate.start).toLocaleDateString('vi-VN')} đến ${new Date(showDate.end).toLocaleDateString('vi-VN')}`
+                    : "Chưa cập nhật";
+
+                const timesDetails = showTimes.map((time: { start: string; end: string; room?: string }) => {
+                    const startTime = new Date(time.start).toLocaleTimeString('vi-VN');
+                    const endTime = new Date(time.end).toLocaleTimeString('vi-VN');
+                    const room = time.room || "Chưa cập nhật";
+
+                    return `  - Phòng: ${room}, Giờ: ${startTime} - ${endTime}`;
+                }).join('\n');
+
+                return `
+- Phim: ${movieTitle}
+- Rạp: ${theaterName}
+- Ngày chiếu: ${dateRange}
+Chi tiết giờ chiếu:
+${timesDetails}
+            `;
+            }).join('\n');
+        } catch (error) {
+            console.error("Error fetching showtimes:", error);
+            return "Không thể lấy thông tin suất chiếu do lỗi hệ thống.";
+        }
+    },
+
     getResponse: async (userMessage: string, sessionId = "default") => {
         const cacheKey = `response:${userMessage}`;
         const cachedResponse = cache.get(cacheKey);
@@ -87,7 +147,10 @@ const ChatbotService = {
 
             // Lấy thông tin phim
             const movieInfo = await ChatbotService.getMovieInfo();
-
+            // Lấy thông tin rạp chiếu phim
+            const theaterInfo = await ChatbotService.getTheaterInfo();
+            // Lấy thông tin suất chiếu
+            const showtimeInfo = await ChatbotService.getShowtimeInfo();
             // Lấy lịch sử trò chuyện
             const pastMessages: any[] = ChatbotService.getConversation(sessionId);
 
@@ -105,6 +168,10 @@ const ChatbotService = {
 
             Danh sách phim hiện có:
             ${movieInfo}
+            Danh sách rạp chiếu phim hiện có:
+            ${theaterInfo}
+            Danh sách suất chiếu hiện có:
+            ${showtimeInfo}
             
             Lịch sử hội thoại:
             ${pastMessages.length > 0
@@ -141,27 +208,53 @@ const ChatbotService = {
 
     // Gửi tin nhắn đến Facebook Messenger
     sendMessage: async (recipientId: string, message: string) => {
-        try {
-            const response = await axios.post(
-                `https://graph.facebook.com/v18.0/me/messages`,
-                {
-                    recipient: {
-                        id: recipientId
+        // Kiểm tra nếu message là link ảnh (hoặc bạn có logic riêng để phát hiện)
+        const imageUrlMatch = message.match(/https?:\/\/[^\s]+(\.jpg|\.jpeg|\.png|\.gif)/i);
+        if (imageUrlMatch) {
+            // Gửi ảnh
+            try {
+                const response = await axios.post(
+                    `https://graph.facebook.com/v18.0/me/messages`,
+                    {
+                        recipient: { id: recipientId },
+                        message: {
+                            attachment: {
+                                type: "image",
+                                payload: { url: imageUrlMatch[0], is_reusable: true }
+                            }
+                        }
                     },
-                    message: {
-                        text: message
+                    {
+                        params: {
+                            access_token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+                        }
                     }
-                },
-                {
-                    params: {
-                        access_token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+                );
+                return response.data;
+            } catch (error) {
+                console.error('Error sending image to Facebook:', error);
+                throw error;
+            }
+        } else {
+            // Gửi text như cũ
+            try {
+                const response = await axios.post(
+                    `https://graph.facebook.com/v18.0/me/messages`,
+                    {
+                        recipient: { id: recipientId },
+                        message: { text: message }
+                    },
+                    {
+                        params: {
+                            access_token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+                        }
                     }
-                }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Error sending message to Facebook:', error);
-            throw error;
+                );
+                return response.data;
+            } catch (error) {
+                console.error('Error sending message to Facebook:', error);
+                throw error;
+            }
         }
     },
 };

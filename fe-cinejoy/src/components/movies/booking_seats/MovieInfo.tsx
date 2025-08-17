@@ -1,42 +1,143 @@
 import React from "react";
+import useAppStore from "@/store/app.store";
 
 interface MovieInfoProps {
-    movie: {
-        title: string;
-        poster: string;
-        format: string;
-        genre: string;
-        duration: number;
-        cinema: string;
-        date: string;
-        time: string;
-        room: string;
-        seats: string[];
-    };
-    onContinue: () => void;
+  movie: {
+    title: string;
+    poster: string;
+    format: string;
+    genre: string;
+    duration: number;
+    cinema: string;
+    date: string;
+    time: string;
+    room: string;
+    seats: string[];
+  };
+  onContinue: () => void;
 }
 
 const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
-    return (
-        <div className="w-full md:w-[340px] bg-[#E7EDE7] rounded-xl shadow p-6 flex flex-col items-center">
-            <img src={movie.poster} alt={movie.title} className="w-32 h-44 object-cover rounded mb-3" />
-            <div className="text-lg font-semibold text-[#162d5a] text-center mb-2">{movie.title}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Hình thức:</b> {movie.format}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Thể loại:</b> {movie.genre}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Thời lượng:</b> {movie.duration} phút</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Rạp chiếu:</b> {movie.cinema}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Ngày chiếu:</b> {movie.date}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Giờ chiếu:</b> {movie.time}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Phòng chiếu:</b> {movie.room}</div>
-            <div className="text-sm text-gray-700 mb-3"><b>Ghế ngồi:</b> {movie.seats.join(", ")}</div>
-            <button
-                className="mt-2 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-semibold"
-                onClick={onContinue}
-            >
-                Tiếp tục
-            </button>
+  const { isDarkMode } = useAppStore();
+  const hasSelectedSeats = movie.seats.length > 0;
+
+  return (
+    <div
+      className={`w-full md:w-[340px] rounded-2xl shadow-lg p-6 flex flex-col items-center ${
+        isDarkMode ? "bg-[#f5f6fa0d] text-white" : "bg-white/80 text-[#162d5a]"
+      }`}
+    >
+      <img
+        src={movie.poster}
+        alt={movie.title}
+        className="w-32 h-44 object-cover rounded mb-3"
+      />
+      <div
+        className={`text-lg font-semibold text-center mb-4 ${
+          isDarkMode ? "text-yellow-300" : "text-[#162d5a]"
+        }`}
+      >
+        {movie.title}
+      </div>
+      <div className="w-full space-y-2 mb-4">
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Hình thức:</span>
+          <span>{movie.format}</span>
         </div>
-    );
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Thể loại:</span>
+          <span>{movie.genre}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Thời lượng:</span>
+          <span>{movie.duration} phút</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Rạp chiếu:</span>
+          <span>{movie.cinema}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Ngày chiếu:</span>
+          <span>{movie.date}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Giờ chiếu:</span>
+          <span>{movie.time}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Phòng chiếu:</span>
+          <span>{movie.room}</span>
+        </div>
+        <div
+          className={`flex justify-between text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}
+        >
+          <span className="font-bold">Ghế ngồi:</span>
+          <span>{hasSelectedSeats ? movie.seats.join(", ") : "Chưa chọn"}</span>
+        </div>
+      </div>
+
+      {/* Thông báo khi chưa chọn ghế */}
+      {!hasSelectedSeats && (
+        <div
+          className={`text-xs mb-2 text-center ${
+            isDarkMode ? "text-red-400" : "text-red-500"
+          }`}
+        >
+          Vui lòng chọn ghế ngồi để tiếp tục
+        </div>
+      )}
+
+      <button
+        className={`mt-2 px-6 py-2 w-full rounded font-semibold transition-all duration-200 ${
+          hasSelectedSeats
+            ? `cursor-pointer ${
+                isDarkMode
+                  ? "bg-cyan-400 hover:bg-cyan-300 text-[#23272f]"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`
+            : `cursor-not-allowed ${
+                isDarkMode
+                  ? "bg-gray-600 text-gray-400"
+                  : "bg-gray-300 text-gray-500"
+              }`
+        }`}
+        onClick={hasSelectedSeats ? onContinue : undefined}
+        disabled={!hasSelectedSeats}
+      >
+        Tiếp tục
+      </button>
+    </div>
+  );
 };
 
 export default MovieInfo;

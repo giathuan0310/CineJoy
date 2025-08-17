@@ -72,6 +72,19 @@ class ShowtimeService {
             throw error;
         }
     }
+
+    async getShowtimesByTheater(theaterId: string): Promise<IShowtime[]> {
+        try {
+            const showtimes = await Showtime.find({
+                theaterId,
+            })
+                .populate('movieId', 'title ageRating genre')
+                .populate('theaterId', 'name');
+            return showtimes;
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 export default ShowtimeService;

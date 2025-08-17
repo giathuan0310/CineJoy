@@ -1,7 +1,7 @@
 import { Modal, Input, Button, Form } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
-import type { InputRef } from 'antd';
+import type { InputRef } from "antd";
 import {
   forgotPasswordApi,
   resetPasswordApi,
@@ -16,10 +16,10 @@ enum STEP {
 }
 
 interface IProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onLoginModalOpen: () => void;
-};
+  isOpen: boolean;
+  onClose: () => void;
+  onLoginModalOpen: () => void;
+}
 
 interface IEmailForm {
   email: string;
@@ -65,7 +65,7 @@ const ModalForgotPassword = (props: IProps) => {
         }
       }, 300);
     }
-  
+
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -87,7 +87,9 @@ const ModalForgotPassword = (props: IProps) => {
     }
   };
 
-  const handleSubmit = async (values: IEmailForm | IOtpForm | INewPasswordForm) => {
+  const handleSubmit = async (
+    values: IEmailForm | IOtpForm | INewPasswordForm
+  ) => {
     setLoading(true);
     try {
       if (currentStep === STEP.EMAIL) {
@@ -103,7 +105,10 @@ const ModalForgotPassword = (props: IProps) => {
         }
       } else if (currentStep === STEP.OTP) {
         const otpValues = values as IOtpForm;
-        const response = await verifyOtpApi({ email: emailValue, otp: otpValues.otp });
+        const response = await verifyOtpApi({
+          email: emailValue,
+          otp: otpValues.otp,
+        });
         if (response.status) {
           setCurrentStep(STEP.NEW_PASSWORD);
           messageApi!.success({ content: response.message, duration: 2 });
@@ -125,9 +130,12 @@ const ModalForgotPassword = (props: IProps) => {
           messageApi!.error({ content: response.message, duration: 2 });
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      messageApi!.error({ content: error.response?.data?.message || "Có lỗi xảy ra!", duration: 2 });
+      messageApi!.error({
+        content: error.response?.data?.message || "Có lỗi xảy ra!",
+        duration: 2,
+      });
       console.error("Lỗi khi xử lý yêu cầu:", error);
     } finally {
       setLoading(false);
@@ -157,7 +165,11 @@ const ModalForgotPassword = (props: IProps) => {
         </div>
       )}
 
-      <h2 className={`text-center font-semibold text-xl text-[#0f1b4c] mb-4 ${currentStep === STEP.EMAIL ? "" : "mt-2"}`}>
+      <h2
+        className={`text-center font-semibold text-xl text-[#0f1b4c] mb-4 ${
+          currentStep === STEP.EMAIL ? "" : "mt-2"
+        }`}
+      >
         {currentStep === STEP.EMAIL && "Quên mật khẩu"}
         {currentStep === STEP.OTP && "Xác minh mã OTP"}
         {currentStep === STEP.NEW_PASSWORD && "Đặt lại mật khẩu mới"}
@@ -203,7 +215,12 @@ const ModalForgotPassword = (props: IProps) => {
               rules={[
                 { required: true, message: "Vui lòng nhập mật khẩu mới!" },
                 { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự!" },
-                { pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, message: "Mật khẩu phải chứa ít nhất 1 chữ thường, 1 chữ in hoa, 1 số và 1 ký tự đặc biệt!" },
+                {
+                  pattern:
+                    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+                  message:
+                    "Mật khẩu phải chứa ít nhất 1 chữ thường, 1 chữ in hoa, 1 số và 1 ký tự đặc biệt!",
+                },
               ]}
             >
               <Input.Password
@@ -218,14 +235,14 @@ const ModalForgotPassword = (props: IProps) => {
               dependencies={["newPassword"]}
               rules={[
                 { required: true, message: "Vui lòng xác nhận mật khẩu mới!" },
-                ({
-                  getFieldValue
-                }) => ({
+                ({ getFieldValue }) => ({
                   validator(_, value) {
                     if (!value || getFieldValue("newPassword") === value) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error("Mật khẩu xác nhận không khớp!"));
+                    return Promise.reject(
+                      new Error("Mật khẩu xác nhận không khớp!")
+                    );
                   },
                 }),
               ]}
@@ -274,9 +291,7 @@ const ModalForgotPassword = (props: IProps) => {
           </>
         )}
         {currentStep === STEP.NEW_PASSWORD && (
-          <div className="mb-1">
-            Vui lòng nhập mật khẩu mới và xác nhận.
-          </div>
+          <div className="mb-1">Vui lòng nhập mật khẩu mới và xác nhận.</div>
         )}
       </div>
     </Modal>

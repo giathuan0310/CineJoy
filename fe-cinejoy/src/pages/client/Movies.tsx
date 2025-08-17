@@ -1,5 +1,6 @@
 import Slider from '@/components/carousel/Carousel';
 import MovieList from '@/components/movies/MovieList';
+import useAppStore from '@/store/app.store';
 
 // const movies = [
 //     {
@@ -43,13 +44,13 @@ import MovieList from '@/components/movies/MovieList';
 
 
 const Movies = () => {
+    const { isDarkMode } = useAppStore();
+
     return (
-        <>
+        <div className={`${isDarkMode ? "bg-[#191b21]" : ""} pb-12`}>
             <Slider />
             <MovieList  />
-
-        </>
-
+        </div>
     );
 };
 

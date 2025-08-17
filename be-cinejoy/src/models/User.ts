@@ -22,10 +22,14 @@ export interface IUser extends Document {
     dateOfBirth: Date;
     role: Role,
     isActive: boolean;
+    point: number;
     otp?: string;
     otpExpires?: Date;
     createdAt: Date;
     updatedAt: Date;
+    settings?: {
+        darkMode: boolean;
+    };
     comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -48,8 +52,12 @@ const UserSchema = new Schema<IUser>(
             enum: Object.values(Role),
         },
         isActive: { type: Boolean, default: true },
+        point: { type: Number, default: 50 },
         otp: { type: String, required: false },
         otpExpires: { type: Date, required: false },
+        settings: {
+            darkMode: { type: Boolean, default: false },
+        },
     },  
     {
         timestamps: true,

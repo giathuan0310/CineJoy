@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from "react";
-
+import { Link } from 'react-router-dom';
+import { motion } from "framer-motion";
+import { toast } from "react-toastify";
 import { getVouchers } from "@/apiservice/apiVoucher";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getTheaters } from "@/apiservice/apiTheater";
 import { deleteMovie, getMovies, createMovie, updateMovie } from "@/apiservice/apiMovies";
 import { getRegions, addRegion, deleteRegion, getRegionById, updateRegion } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
-import { motion } from "framer-motion";
-import MovieForm from "@/pages/admin/Form/MovieForm";
-import { toast } from "react-toastify";
 import banner from "@/assets/banner.jpg";
 import { getShowTimes, updateShowtime, deleteShowtime } from "@/apiservice/apiShowTime";
+import MovieForm from "@/pages/admin/Form/MovieForm";
 import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
+import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
-    const [activeTab, setActiveTab] = useState("movies");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
+    const [activeTab, setActiveTab] = useState<string>("movies");
+    const [searchTerm, setSearchTerm] = useState<string>("");
+    const [currentPage, setCurrentPage] = useState<number>(1);
     const [movies, setMovies] = useState<IMovie[]>([]);
     const [theaters, setTheaters] = useState<ITheater[]>([]);
     const [regions, setRegions] = useState<IRegion[]>([]);
@@ -25,14 +25,17 @@ const Dashboard: React.FC = () => {
     const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
     const [blogs, setBlogs] = useState<IBlog[]>([]);
     const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-    const [newRegionName, setNewRegionName] = useState("");
-    const [showMovieForm, setShowMovieForm] = useState(false);
+    const [newRegionName, setNewRegionName] = useState<string>("");
+    const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
     const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(undefined);
     const [editingRegion, setEditingRegion] = useState<IRegion | null>(null);
-    const [showTimeForm, setShowTimeForm] = useState(false);
+    const [showTimeForm, setShowTimeForm] = useState<boolean>(false);
     const [selectedShowtime, setSelectedShowtime] = useState<IShowtime | null>(null);
-    const [showShowtimeForm, setShowShowtimeForm] = useState(false);
+    const [showShowtimeForm, setShowShowtimeForm] = useState<boolean>(false);
     const [editingShowtime, setEditingShowtime] = useState<IShowtime | null>(null);
+    const { user } = useAppStore();
+    
+    const itemsPerPage = 5;
 
     useEffect(() => {
         getTheaters()
@@ -211,6 +214,7 @@ const Dashboard: React.FC = () => {
             setEditingRegion(region);
             setNewRegionName(region.name);
         } catch (error) {
+            console.log(error);
             toast.error('Không lấy được thông tin khu vực!');
         }
     };
@@ -307,13 +311,13 @@ const Dashboard: React.FC = () => {
                 <div className="p-4 border-b border-gray-800">
                     <div className="flex items-center gap-3">
                         <img
-                            src="https://i.pravatar.cc/100"
-                            alt="Admin Avatar"
+                            src={user?.avatar}
+                            alt={user?.fullName}
                             className="h-10 w-10 rounded-full"
                         />
                         <div>
                             <p className="text-sm font-medium text-white mb-0.5 select-none">
-                                Admin
+                                {user?.fullName}
                             </p>
                             <p className="text-xs text-gray-400 select-none">Quản trị viên</p>
                         </div>
@@ -359,15 +363,12 @@ const Dashboard: React.FC = () => {
                     <h1 className="text-xl font-semibold select-none">
                         Admin Dashboard - CineJoy
                     </h1>
-                    <button
+                    <Link
+                        to="/"
                         className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded transition"
-                        onClick={() => {
-                            window.location.href = "/login";
-                        }}
                     >
-                        Đăng xuất
-                    </button>
-
+                        Quay về trang chủ
+                    </Link>
                 </header>
 
                 {/* Content */}

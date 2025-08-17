@@ -1,4 +1,4 @@
-import { Schema, model, Document } from "mongoose";
+import { Schema, model, Document, Types } from "mongoose";
 
 export interface IVoucher extends Document {
     name: string;
@@ -7,6 +7,8 @@ export interface IVoucher extends Document {
         endDate: Date;
     };
     quantity: number;
+    discountPercent: number;
+    pointToRedeem: number;
 }
 
 const VoucherSchema = new Schema<IVoucher>({
@@ -16,6 +18,8 @@ const VoucherSchema = new Schema<IVoucher>({
         endDate: { type: Date, required: true },
     },
     quantity: { type: Number, required: true },
+    discountPercent: { type: Number, required: true },
+    pointToRedeem: { type: Number, required: true },
 });
 
 export const Voucher = model<IVoucher>("Voucher", VoucherSchema);

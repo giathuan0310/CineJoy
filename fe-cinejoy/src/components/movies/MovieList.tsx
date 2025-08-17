@@ -1,21 +1,21 @@
 import { getMovies } from "@/apiservice/apiMovies";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import useAppStore from "@/store/app.store";
 
 const MovieList: React.FC = () => {
     const [activeTab, setActiveTab] = useState<"nowShowing" | "upcoming" | "special" | "all">("nowShowing");
     const [showMore, setShowMore] = useState(false);
     const [movies, setMovies] = useState<IMovie[]>([]);
+    const { isDarkMode } = useAppStore();
 
-    const navigate = useNavigate(); // Thêm dòng này
-
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchMovies = async () => {
             try {
-                const reponse = await getMovies();
-                setMovies(Array.isArray(reponse) ? reponse : []);
+                const response = await getMovies();
+                setMovies(Array.isArray(response) ? response : []);
             } catch (error) {
                 console.error("Lỗi khi lấy danh sách phim:", error);
             }
@@ -23,74 +23,60 @@ const MovieList: React.FC = () => {
         fetchMovies();
     }, []);
 
-
     const filteredMovies =
         activeTab === "all"
             ? movies
             : movies.filter((movie) => movie.status === activeTab);
 
-
-
-
-
-
-    // Hàm xử lý chuyển trang
     const handleView = (_id: string) => {
         navigate(`/movies/${_id}`);
     };
 
-
     return (
         <div className="w-full">
-
-            {/* Các nút Sắp chiếu */}
             <div className="flex justify-center gap-4 mb-8 pt-3 pb-3">
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition ${activeTab === "upcoming"
-                        ? "bg-[#2d3a5a] text-white"
-                        : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"
-                        }`}
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "upcoming"
+                        ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
+                        : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
+                    }`}
                     onClick={() => setActiveTab("upcoming")}
                 >
                     Phim sắp chiếu
                 </button>
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition ${activeTab === "nowShowing"
-                        ? "bg-[#2d3a5a] text-white"
-                        : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"
-                        }`}
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "nowShowing"
+                        ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
+                        : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
+                    }`}
                     onClick={() => setActiveTab("nowShowing")}
                 >
                     Phim đang chiếu
                 </button>
-
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition ${activeTab === "special"
-                        ? "bg-[#2d3a5a] text-white"
-                        : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"
-                        }`}
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "special"
+                        ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
+                        : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
+                    }`}
                     onClick={() => setActiveTab("special")}
                 >
                     Suất chiếu đặc biệt
                 </button>
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition ${activeTab === "all"
-                        ? "bg-[#2d3a5a] text-white"
-                        : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"
-                        }`}
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "all"
+                        ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
+                        : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
+                    }`}
                     onClick={() => setActiveTab("all")}
                 >
                     Tất cả các phim
                 </button>
             </div>
-
-
-            {/* Hiển Thị Tất Cả Phim */}
-            <div className=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5  px-4">
+            <div className=" grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-y-6 px-4">
                 {(showMore ? filteredMovies : filteredMovies.slice(0, 7)).map((movie) => (
                     <div
                         key={movie._id}
-                        className="bg-white rounded-xl shadow-md overflow-hidden w-[270px] mx-auto flex flex-col items-center border"
+                        className={`${isDarkMode ? "bg-[#282a36] text-gray-200 border-gray-700 shadow-lg" : "bg-white text-[#2d3a5a] border shadow-md"} rounded-xl overflow-hidden w-[270px] mx-auto flex flex-col items-center`}
                     >
                         <div className="rounded-xl pt-3">
                             <img
@@ -100,16 +86,16 @@ const MovieList: React.FC = () => {
                             />
                         </div>
                         <div className="p-4 w-full flex flex-col items-center flex-1">
-                            <h3 className="text-base font-semibold text-center text-[#2d3a5a] leading-tight mb-1">
+                            <h3 className={`${isDarkMode ? "text-white" : "text-[#2d3a5a]"} text-base font-semibold text-center leading-tight mb-1`}>
                                 {movie.title}
                             </h3>
                             {movie.actors && (
-                                <p className="text-gray-600 text-center text-sm mb-1 line-clamp-2 h-10">
+                                <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"} text-center text-sm mb-1 line-clamp-2 h-10`}>
                                     Diễn viên: {Array.isArray(movie.actors) ? movie.actors.join(", ") : movie.actors}
                                 </p>
                             )}
                             {movie.duration && (
-                                <p className="text-gray-600 text-center text-sm mb-1">
+                                <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"} text-center text-sm mb-1`}>
                                     Thời lượng: {movie.duration} phút
                                 </p>
                             )}
@@ -124,7 +110,7 @@ const MovieList: React.FC = () => {
                             </div>
                             <div className="flex-1" />
                             <button
-                                className="w-full mt-2 py-2 rounded bg-[#162d5a] text-white font-semibold hover:bg-[#1a376e] transition"
+                                className={`${isDarkMode ? "bg-blue-700 hover:bg-blue-800 text-white" : "bg-[#162d5a] hover:bg-[#1a376e] text-white"} w-full mt-2 py-2 rounded font-semibold transition cursor-pointer`}
                                 onClick={() => handleView(movie._id)}
                             >
                                 Xem chi tiết
@@ -136,7 +122,7 @@ const MovieList: React.FC = () => {
             {filteredMovies.length > 7 && (
                 <div className="flex justify-center mt-4">
                     <button
-                        className="px-6 h-8 border rounded bg-white text-[#2d3a5a] font-semibold hover:bg-[#2d3a5a] hover:text-white transition"
+                        className={`${isDarkMode ? "px-6 h-8 border rounded text-gray-200 border-gray-600 bg-[#3a3c4a] hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "px-6 h-8 border rounded bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"} transition cursor-pointer`}
                         onClick={() => setShowMore(!showMore)}
                     >
                         {showMore ? "Ẩn bớt" : "Xem thêm"}

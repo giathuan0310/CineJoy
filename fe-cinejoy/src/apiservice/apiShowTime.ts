@@ -52,3 +52,15 @@ export const getShowTimesByFilter = async (movieId: string, theaterId: string) =
         throw error;
     }
 };
+
+export const getShowTimesByTheater = async (theaterId: string) => {
+    try {
+        const response = await axiosClient.get<IShowtime[]>(
+            `/showtimes/theater/${theaterId}`
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching showtimes by theater:", error);
+        throw error;
+    }
+};

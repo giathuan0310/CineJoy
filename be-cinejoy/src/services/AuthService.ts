@@ -37,7 +37,7 @@ const register = async (body: any) => {
     }
 
     if (!avatar) {
-      avatar = "https://res.cloudinary.com/dijy8yams/image/upload/v1742894461/avatars/lgitn3wbciwcm515y0cb.jpg";
+      avatar = "https://res.cloudinary.com/dd1vwmybp/image/upload/v1752052447/cinejoy/izdwmlk2mca4hsdy3vgl.png";
     }
 
     if (!role) {
@@ -82,7 +82,7 @@ const login = async (email: string, password: string) => {
     return {
       status: false,
       error: 1,
-      message: "Tài khoản đã bị vô hiệu hóa",
+      message: "Tài khoản hoặc mật khẩu không chính xác",
       data: null,
     };
   }

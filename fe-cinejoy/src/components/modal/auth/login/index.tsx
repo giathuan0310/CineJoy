@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { FaFacebook } from 'react-icons/fa';
 import { FcGoogle } from 'react-icons/fc';
 import type { FormProps, InputRef } from 'antd';
-import ModalRegister from '../register';
-import ModalForgotPassword from '../forgotPassword';
+import ModalRegister from 'components/modal/auth/register';
+import ModalForgotPassword from 'components/modal/auth/forgotPassword';
 import { loginApi } from '@/services/api';
 import useAppStore from '@/store/app.store';
 import { useAlertContextApp } from '@/context/alert.context';
@@ -25,7 +25,7 @@ const ModalLogin = (props: IProps) => {
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
     const [isForgotPasswordModalOpen, setIsForgotPasswordOpen] = useState<boolean>(false);
     const [isSubmit, setIsSubmit] = useState<boolean>(false);
-    const { setUser, setIsAuthenticated } = useAppStore();
+    const { setUser, setIsAuthenticated, setIsDarkMode } = useAppStore();
     const { messageApi } = useAlertContextApp();
 
     const inputRef = useRef<InputRef>(null);
@@ -82,6 +82,7 @@ const ModalLogin = (props: IProps) => {
             localStorage.setItem("accessToken", res.data.accessToken);
             setUser(res.data.user);
             setIsAuthenticated(true);
+            setIsDarkMode(res.data.user.settings.darkMode);
             messageApi!.open({
                 type: "success",
                 content: "Đăng nhập thành công!",

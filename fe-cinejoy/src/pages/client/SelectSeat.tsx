@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-import MovieInfo from "../../components/movies/booking_seats/MovieInfo";
+import useAppStore from '@/store/app.store';
+import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
-
-
-
 
 export const SelectSeat = () => {
     const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -14,6 +11,7 @@ export const SelectSeat = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+    const { isDarkMode } = useAppStore();
     // const movie = {
     //     title: "Vây Hãm Tại Đài Bắc",
     //     poster: "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969147/50.Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_lr0jp4_wbdemr.jpg",
@@ -32,7 +30,6 @@ export const SelectSeat = () => {
         date = "",
         time = "",
         room = "",
-        seats = [],
     } = location.state || {};
 
     const handleSelectSeat = (seat: string) => {
@@ -44,7 +41,7 @@ export const SelectSeat = () => {
     };
 
     return (
-        <div className="bg-[#e7ede7] min-h-screen py-6 ">
+        <div className={`${isDarkMode ? 'bg-[#23272f]' : 'bg-[#e7ede7]'} min-h-screen py-6`}>
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-20">
                 <SeatLayout
                     selectedSeats={selectedSeats}
@@ -59,7 +56,18 @@ export const SelectSeat = () => {
                     time,
                     room,
                     seats: selectedSeats, // cập nhật ghế đã chọn
-                }} onContinue={() => navigate("/thanh-toan")} />
+                }} onContinue={() => navigate("/payment", {
+                    state: {
+                        movie: {
+                            ...movie,
+                        },
+                        seats: selectedSeats,
+                        cinema,
+                        date,
+                        time,
+                        room,
+                    }
+                })} />
             </div>
         </div>
     );

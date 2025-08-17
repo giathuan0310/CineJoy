@@ -1,22 +1,122 @@
-import { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { FaSearch } from 'react-icons/fa';
-import { Dropdown } from 'antd';
-import ModalLogin from '@/components/modal/auth/login';
-import useAppStore from '@/store/app.store';
-import { logoutApi } from '@/services/api';
-import { useAlertContextApp } from '@/context/alert.context';
-import Logo from 'assets/CineJoyLogo.png';
+import { useState, useEffect, useRef } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useDebounce } from "use-debounce";
+import { Dropdown } from "antd";
+import { MdDarkMode } from "react-icons/md";
+import ModalLogin from "@/components/modal/auth/login";
+import SearchDropdown from "@/components/header/SearchDropdown";
+import useAppStore from "@/store/app.store";
+import { useAlertContextApp } from "@/context/alert.context";
+import { logoutApi, updateUserApi, searchMoviesApi } from "@/services/api";
+import Logo from "assets/CineJoyLogo.png";
 
 const Header = () => {
+  const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
-  const { user, isAuthenticated, setIsAppLoading, setUser, setIsAuthenticated, isModalOpen } = useAppStore();
+  const [showSearch, setShowSearch] = useState<boolean>(false);
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<IMovie[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+  const [debouncedValue] = useDebounce(searchValue, 300);
+  const {
+    user,
+    isAuthenticated,
+    setIsAppLoading,
+    setUser,
+    setIsAuthenticated,
+    isModalOpen,
+    isDarkMode,
+    setIsDarkMode,
+  } = useAppStore();
   const { messageApi } = useAlertContextApp();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [debouncedDarkMode] = useDebounce(isDarkMode, 300);
+  const [previousDarkMode, setPreviousDarkMode] = useState<boolean | undefined>(
+    undefined
+  );
+
+  // Khởi tạo previousDarkMode khi component mount
+  useEffect(() => {
+    if (previousDarkMode === undefined) {
+      setPreviousDarkMode(isDarkMode);
+    }
+  }, [isDarkMode, previousDarkMode]);
+
+  useEffect(() => {
+    if (debouncedValue.trim()) {
+      setLoadingSearch(true);
+      searchMoviesApi(debouncedValue.trim())
+        .then((res) => {
+          setSearchResults(res.data || []);
+          setShowDropdown(true);
+        })
+        .finally(() => setLoadingSearch(false));
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+      setLoadingSearch(false);
+    }
+  }, [debouncedValue]);
+
+  useEffect(() => {
+    if (
+      debouncedDarkMode !== previousDarkMode &&
+      isAuthenticated &&
+      user?._id &&
+      debouncedDarkMode !== user.settings?.darkMode &&
+      previousDarkMode !== undefined
+    ) {
+      const updateDarkModeInDB = async () => {
+        try {
+          const res = await updateUserApi(user._id, {
+            settings: { darkMode: debouncedDarkMode },
+          });
+          if (res.data && res.status) {
+            setUser(res.data);
+            setPreviousDarkMode(debouncedDarkMode);
+          }
+        } catch (error) {
+          setIsDarkMode(previousDarkMode);
+          messageApi?.open({
+            type: "error",
+            content: "Cập nhật dark mode thất bại!",
+          });
+          console.log(error);
+        }
+      };
+      updateDarkModeInDB();
+    } else if (debouncedDarkMode !== previousDarkMode && !isAuthenticated) {
+      setPreviousDarkMode(debouncedDarkMode);
+    }
+  }, [
+    debouncedDarkMode,
+    previousDarkMode,
+    isAuthenticated,
+    user?._id,
+    user?.settings?.darkMode,
+    setUser,
+    setIsDarkMode,
+    messageApi,
+  ]);
+
+  const handleChangeSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchValue(e.target.value);
+    if (e.target.value.trim()) {
+      setLoadingSearch(true);
+    }
+  };
+  const handleSelectMovie = (id: string) => {
+    setShowSearch(false);
+    setShowDropdown(false);
+    setSearchValue("");
+    navigate(`/movies/${id}`);
+  };
 
   const handleOpenLoginModal = (value: boolean) => {
     setModalOpen(value);
-    setLoginModalOpen(true)
+    setLoginModalOpen(true);
   };
 
   const handleCloseLoginModal = (value: boolean) => {
@@ -48,105 +148,245 @@ const Header = () => {
     }
   };
 
+  const handleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
+  useEffect(() => {
+    // Chỉ áp dụng setting của user khi mới đăng nhập hoặc user thay đổi
+    if (
+      user &&
+      typeof user.settings?.darkMode === "boolean" &&
+      previousDarkMode !== user.settings.darkMode
+    ) {
+      setIsDarkMode(user.settings.darkMode);
+      setPreviousDarkMode(user.settings.darkMode);
+    }
+  }, [user, setIsDarkMode, previousDarkMode]);
+
   const items = [
     {
-      key: "profile",
-      label: "Thông tin cá nhân",
-    //   onClick: () => navigate("/profile"),
+      key: "members",
+      label: <div className="text-center">Thông tin cá nhân</div>,
+      onClick: () => navigate("/members"),
     },
     {
       key: "/history",
-      label: "Vé đã mua",
-    //   onClick: () => navigate("/history"),
+      label: <div className="text-center">Lịch sử đặt vé</div>,
+      //   onClick: () => navigate("/history"),
     },
     {
       key: "logout",
-      label: "Đăng xuất",
+      label: <div className="text-center">Đăng xuất</div>,
       onClick: handleLogout,
     },
   ];
-//   if (user?.role === 'ADMIN') {
-//     items.unshift({
-//         label: <Link to='/admin'>Trang quản trị</Link>,
-//         key: 'admin',
-//     })
-//   }
+  if (user?.role === "ADMIN") {
+    items.unshift({
+      label: (
+        <Link to="/admin">
+          <div className="text-center">Trang quản trị</div>
+        </Link>
+      ),
+      key: "admin",
+    });
+  }
 
+  const closeSearch = () => {
+    setShowSearch(false);
+    setSearchValue("");
+    setSearchResults([]);
+  };
 
-    return (
-        <>
-            <header className={`sticky top-0 ${loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"} bg-[#eee] shadow-sm border-b border-[#ccc]`}>
-                <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
-                    {/* Logo */}
-                    <div className='flex items-center gap-6'>
-                        <Link to="/" className="flex items-center">
-                            <img className='w-[90px] object-cover inline-block' src={Logo} alt="Logo" />
-                        </Link>
+  return (
+    <>
+      <header
+        className={`sticky top-0 ${
+          loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"
+        } ${
+          isDarkMode ? "bg-[#23272f]" : "bg-[#eee]"
+        } shadow-sm border-b border-[#ccc]`}
+      >
+        <div className="container mx-auto pl-12 pr-4 py-1.5 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center">
+              <img
+                className="w-[90px] object-cover inline-block"
+                src={Logo}
+                alt="Logo"
+              />
+            </Link>
+          </div>
 
-                        <div className="flex flex-col items-center text-sm select-none">
-                            <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">Đặt vé</p>
-                            <p className="text-[#0f1b4c] text-[15px] leading-4 font-normal">xem phim</p>
-                        </div>
-                    </div>
+          {/* Navigation */}
+          <nav className="hidden md:flex items-center gap-10 mx-4">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                isActive
+                  ? `${
+                      isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                  : `${
+                      isDarkMode ? "text-white" : "text-gray-800"
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+              }
+            >
+              Trang chủ
+            </NavLink>
+            <NavLink
+              to="/movies"
+              className={({ isActive }) =>
+                isActive
+                  ? `${
+                      isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                  : `${
+                      isDarkMode ? "text-white" : "text-gray-800"
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+              }
+            >
+              Phim
+            </NavLink>
+            <NavLink
+              to="/news"
+              className={({ isActive }) =>
+                isActive
+                  ? `${
+                      isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                  : `${
+                      isDarkMode ? "text-white" : "text-gray-800"
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+              }
+            >
+              Tin tức
+            </NavLink>
+            <NavLink
+              to="/members"
+              className={({ isActive }) =>
+                isActive
+                  ? `${
+                      isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                  : `${
+                      isDarkMode ? "text-white" : "text-gray-800"
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+              }
+            >
+              Thành viên
+            </NavLink>
+            <NavLink
+              to="/contact"
+              className={({ isActive }) =>
+                isActive
+                  ? `${
+                      isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                  : `${
+                      isDarkMode ? "text-white" : "text-gray-800"
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+              }
+            >
+              Liên hệ
+            </NavLink>
+          </nav>
 
-                    {/* Navigation */}
-                    <nav className="hidden md:flex items-center gap-10 mx-4">
-                        <NavLink to="/" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
-                            Trang chủ
-                        </NavLink>
-                        <NavLink to="/movies" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
-                            Phim
-                        </NavLink>
-                        <NavLink to="/news" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
-                            Tin tức
-                        </NavLink>
-                        <NavLink to="/members" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
-                            Thành viên
-                        </NavLink>
-                        <NavLink to="/contact" className={({ isActive }) => isActive ? "text-red-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]" : "text-gray-800 font-medium hover:text-red-600 transition-colors uppercase text-[18px]"}>
-                            Liên hệ
-                        </NavLink>
-                    </nav>
-
-                    {/* Right section */}
-                    {isAuthenticated ? (
-                        <>
-                            <Dropdown menu={{ items }} placement="bottom" overlayStyle={{ zIndex: 9999 }}>
-                                <div className="flex items-center space-x-2 cursor-pointer hover:text-red-500 transition-all duration-300 hover:opacity-80 mr-3">
-                                    <img
-                                        src={user?.avatar}
-                                        alt="User Avatar"
-                                        className="w-9 h-9 mr-3 rounded-full object-cover"
-                                    />
-                                    <span className="text-md font-medium">
-                                        {user?.fullName}
-                                    </span>
-                                </div>
-                            </Dropdown>
-                        </>
-                    ) : (
-                        <>
-                            <div className="flex items-center gap-6">
-                                <div className="relative">
-                                    <button className="text-gray-700 hover:text-gray-900 bg-white rounded-full p-2.5 border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250">
-                                        <FaSearch size={16} />
-                                    </button>
-                                </div>
-                                <button
-                                    className="bg-[#061b4b] text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer"
-                                    onClick={() => handleOpenLoginModal(false)}
-                                >
-                                    Đăng nhập
-                                </button>
-                            </div>
-                        </>
-                    )}
+          {/* Right section */}
+          {isAuthenticated ? (
+            <div className="flex items-center gap-6">
+              <SearchDropdown
+                showSearch={showSearch}
+                searchValue={searchValue}
+                searchResults={searchResults}
+                loadingSearch={loadingSearch}
+                showDropdown={showDropdown}
+                searchInputRef={searchInputRef}
+                handleChangeSearch={handleChangeSearch}
+                handleSelectMovie={handleSelectMovie}
+                closeSearch={closeSearch}
+                setShowDropdown={setShowDropdown}
+                setShowSearch={setShowSearch}
+              />
+              <div
+                className="cursor-pointer hover:scale-110 transition-all duration-200"
+                onClick={handleDarkMode}
+              >
+                {isDarkMode ? (
+                  <MdDarkMode color="white" size={35} />
+                ) : (
+                  <MdDarkMode size={35} />
+                )}
+              </div>
+              <Dropdown
+                menu={{ items }}
+                placement="bottom"
+                overlayStyle={{ zIndex: 9999 }}
+              >
+                <div className="flex items-center space-x-2 cursor-pointer hover:text-red-500 transition-all duration-300 hover:opacity-80 mr-3">
+                  <img
+                    src={user?.avatar}
+                    alt="User Avatar"
+                    className="w-9 h-9 mr-3 rounded-full object-cover"
+                  />
+                  <span
+                    className={`text-md font-medium ${
+                      isDarkMode ? "text-white" : ""
+                    }`}
+                  >
+                    {user?.fullName}
+                  </span>
                 </div>
-            </header>
+              </Dropdown>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-6">
+                <SearchDropdown
+                  showSearch={showSearch}
+                  searchValue={searchValue}
+                  searchResults={searchResults}
+                  loadingSearch={loadingSearch}
+                  showDropdown={showDropdown}
+                  searchInputRef={searchInputRef}
+                  handleChangeSearch={handleChangeSearch}
+                  handleSelectMovie={handleSelectMovie}
+                  closeSearch={closeSearch}
+                  setShowDropdown={setShowDropdown}
+                  setShowSearch={setShowSearch}
+                />
+                <div
+                  className="cursor-pointer hover:scale-110 transition-all duration-200"
+                  onClick={handleDarkMode}
+                >
+                  {isDarkMode ? (
+                    <MdDarkMode color="white" size={35} />
+                  ) : (
+                    <MdDarkMode size={35} />
+                  )}
+                </div>
+                <button
+                  className={`${
+                    isDarkMode ? "bg-blue-700" : "bg-[#061b4b]"
+                  } text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
+                  onClick={() => handleOpenLoginModal(false)}
+                >
+                  Đăng nhập
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
 
-            <ModalLogin isOpen={loginModalOpen} onOpen={handleOpenLoginModal} onClose={handleCloseLoginModal} />
-        </>
-    );
+      <ModalLogin
+        isOpen={loginModalOpen}
+        onOpen={handleOpenLoginModal}
+        onClose={handleCloseLoginModal}
+      />
+    </>
+  );
 };
 
 export default Header;

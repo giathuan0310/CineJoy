@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button, Typography, Row, Col } from "antd";
 import { validateVoucherApi } from "@/services/api";
+import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import useAppStore from "@/store/app.store";
 
 const { Title, Text } = Typography;
@@ -18,29 +19,6 @@ interface VoucherResponse {
   };
 }
 
-const combos = [
-  {
-    name: "VTI Combo",
-    desc: "Gồm 1 Bắp + 1 Nước có gaz + 1 Snack Oishi",
-    price: 49000,
-    key: "vti",
-  },
-  {
-    name: "Sweet Combo",
-    desc: "Gồm 2 Bắp + 2 Nước có gaz + 1 Snack Oishi",
-    price: 89000,
-    key: "sweet",
-  },
-  {
-    name: "Family Combo",
-    desc: "Gồm 2 Bắp + 4 Nước có gaz + 2 Snack Oishi",
-    price: 139000,
-    key: "family",
-  },
-] as const;
-
-type ComboKey = (typeof combos)[number]["key"];
-
 const PaymentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,29 +31,48 @@ const PaymentPage = () => {
     time = "",
     room = "",
   } = location.state || {};
-  const [comboCounts, setComboCounts] = useState<Record<ComboKey, number>>({
-    vti: 0,
-    sweet: 0,
-    family: 0,
-  });
+  const [combos, setCombos] = useState<IFoodCombo[]>([]);
+  const [combosLoading, setCombosLoading] = useState<boolean>(true);
+  const [comboCounts, setComboCounts] = useState<Record<string, number>>({});
   const [editableUserInfo, setEditableUserInfo] = useState({
     fullName: user?.fullName || "",
     phoneNumber: user?.phoneNumber || "",
     email: user?.email || "",
   });
-  const [timeLeft, setTimeLeft] = useState(600);
-  const [voucherCode, setVoucherCode] = useState("");
+  const [timeLeft, setTimeLeft] = useState<number>(600);
+  const [voucherCode, setVoucherCode] = useState<string>("");
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;
     discountPercent: number;
     discountAmount: number;
   } | null>(null);
-  const [voucherLoading, setVoucherLoading] = useState(false);
-  const [voucherError, setVoucherError] = useState("");
+  const [voucherLoading, setVoucherLoading] = useState<boolean>(false);
+  const [voucherError, setVoucherError] = useState<string>("");
+  const [isModalPaymentOpen, setIsModalPaymentOpen] = useState<boolean>(false);
+  const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
 
-  // Modal states
-  const [isModalPaymentOpen, setIsModalPaymentOpen] = useState(false);
-  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  useEffect(() => {
+    const loadFoodCombos = async () => {
+      try {
+        setCombosLoading(true);
+        const data = await getFoodCombos();
+        setCombos(data);
+        // Khởi tạo combo counts với ID từ database
+        const initialCounts: Record<string, number> = {};
+        data.forEach((combo) => {
+          initialCounts[combo._id] = 0;
+        });
+        setComboCounts(initialCounts);
+      } catch (error) {
+        console.error("Lỗi khi tải food combos:", error);
+        setCombos([]);
+      } finally {
+        setCombosLoading(false);
+      }
+    };
+
+    loadFoodCombos();
+  }, []);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -143,9 +140,7 @@ const PaymentPage = () => {
     setVoucherError("");
   };
 
-  // Modal handlers
   const handleOpenModal = () => {
-    // Validate required info
     if (!editableUserInfo.fullName.trim()) {
       alert("Vui lòng nhập họ tên");
       return;
@@ -200,7 +195,7 @@ const PaymentPage = () => {
 
   // Tính tổng tiền combo
   const comboTotal = combos.reduce(
-    (sum, c) => sum + comboCounts[c.key] * c.price,
+    (sum, c) => sum + comboCounts[c._id] * c.price,
     0
   );
 
@@ -232,7 +227,7 @@ const PaymentPage = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, navigate]);
 
   return (
     <>
@@ -336,64 +331,172 @@ const PaymentPage = () => {
             >
               Dịch vụ kèm
             </h3>
-            <table className="w-full mb-4">
-              <thead>
-                <tr className="text-left select-none">
-                  <th className="py-1 text-center">Tên combo</th>
-                  <th className="py-1 text-center">Mô tả</th>
-                  <th className="py-1 text-center">Số lượng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {combos.map((c) => (
-                  <tr key={c.key} className="select-none">
-                    <td className="py-1 font-semibold text-center">{c.name}</td>
-                    <td className="py-1 text-sm text-center">
-                      {c.desc} (
-                      <span className={isDarkMode ? "text-cyan-300" : ""}>
-                        {c.price.toLocaleString()}VNĐ
-                      </span>
-                      )
-                    </td>
-                    <td className="py-1 text-center">
-                      <button
-                        onClick={() =>
-                          setComboCounts((prev) => ({
-                            ...prev,
-                            [c.key]: Math.max(0, prev[c.key] - 1),
-                          }))
-                        }
-                        className={`px-2 rounded cursor-pointer ${
-                          isDarkMode
-                            ? "bg-[#232c3b] border border-[#3a3d46] text-cyan-300 hover:bg-[#1a1d23]"
-                            : "bg-gray-200 hover:bg-gray-300"
+            {combosLoading ? (
+              <div className="text-center py-4">
+                <span
+                  className={isDarkMode ? "text-gray-300" : "text-gray-600"}
+                >
+                  Đang tải combo...
+                </span>
+              </div>
+            ) : combos.length > 0 ? (
+              <div
+                className={`rounded-lg overflow-hidden mb-4 ${
+                  isDarkMode ? "bg-[#23272f]" : "bg-white"
+                } shadow-sm border ${
+                  isDarkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <table className={`w-full ${isDarkMode ? "" : "bg-[#e7ede7]"}`}>
+                  <thead>
+                    <tr
+                      className={`text-left select-none border-b ${
+                        isDarkMode ? "border-gray-600" : "border-gray-300"
+                      }`}
+                    >
+                      <th
+                        className={`py-3 text-center font-bold ${
+                          isDarkMode ? "text-white" : ""
                         }`}
                       >
-                        -
-                      </button>
-                      <span className="mx-2 font-bold">
-                        {comboCounts[c.key]}
-                      </span>
-                      <button
-                        onClick={() =>
-                          setComboCounts((prev) => ({
-                            ...prev,
-                            [c.key]: prev[c.key] + 1,
-                          }))
-                        }
-                        className={`px-2 rounded cursor-pointer ${
-                          isDarkMode
-                            ? "bg-[#232c3b] border border-[#3a3d46] text-orange-300 hover:bg-[#1a1d23]"
-                            : "bg-gray-200 hover:bg-gray-300"
+                        Tên combo
+                      </th>
+                      <th
+                        className={`py-3 text-center font-bold ${
+                          isDarkMode ? "text-white" : ""
                         }`}
                       >
-                        +
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        Mô tả & Giá
+                      </th>
+                      <th
+                        className={`py-3 text-center font-bold ${
+                          isDarkMode ? "text-white" : ""
+                        }`}
+                      >
+                        Chọn số lượng
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {combos.map((c) => (
+                      <tr
+                        key={c._id}
+                        className={`select-none transition-colors duration-200 ${
+                          c.quantity === 0 ? "opacity-60" : ""
+                        }`}
+                      >
+                        <td className="py-4 font-semibold text-center">
+                          <div
+                            className={`text-base ${
+                              c.quantity === 0 ? "text-gray-500" : ""
+                            }`}
+                          >
+                            {c.name}
+                          </div>
+                        </td>
+                        <td className="py-4 text-sm text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <span
+                              className={
+                                c.quantity === 0 ? "text-gray-500" : ""
+                              }
+                            >
+                              {c.description}
+                            </span>
+                            <span
+                              className={`font-bold text-base ${
+                                c.quantity === 0
+                                  ? "text-gray-500"
+                                  : isDarkMode
+                                  ? "text-green-400"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {c.price.toLocaleString()} VNĐ
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-1 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() =>
+                                setComboCounts((prev) => ({
+                                  ...prev,
+                                  [c._id]: Math.max(0, (prev[c._id] || 0) - 1),
+                                }))
+                              }
+                              disabled={(comboCounts[c._id] || 0) <= 0}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-200 ${
+                                (comboCounts[c._id] || 0) <= 0
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : isDarkMode
+                                  ? "bg-red-600 hover:bg-red-500 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                                  : "bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                              }`}
+                            >
+                              −
+                            </button>
+
+                            <div className="flex flex-col items-center min-w-[40px]">
+                              <span
+                                className={`text-lg font-bold ${
+                                  isDarkMode ? "text-white" : "text-gray-800"
+                                }`}
+                              >
+                                {comboCounts[c._id] || 0}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() =>
+                                setComboCounts((prev) => ({
+                                  ...prev,
+                                  [c._id]: Math.min(
+                                    c.quantity,
+                                    (prev[c._id] || 0) + 1
+                                  ),
+                                }))
+                              }
+                              disabled={(comboCounts[c._id] || 0) >= c.quantity}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-200 ${
+                                (comboCounts[c._id] || 0) >= c.quantity
+                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  : isDarkMode
+                                  ? "bg-green-600 hover:bg-green-500 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                                  : "bg-green-500 hover:bg-green-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                              }`}
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {(comboCounts[c._id] || 0) >= c.quantity &&
+                            c.quantity > 0 && (
+                              <div className="text-xs text-orange-500 mt-1 font-medium">
+                                Đã đạt giới hạn
+                              </div>
+                            )}
+
+                          {c.quantity === 0 && (
+                            <div className="text-xs text-red-500 mt-1 font-medium">
+                              Hết hàng
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <span
+                  className={isDarkMode ? "text-gray-300" : "text-gray-600"}
+                >
+                  Không có combo nào
+                </span>
+              </div>
+            )}
 
             {/* Voucher */}
             <h3
@@ -733,17 +836,17 @@ const PaymentPage = () => {
                 <div className="text-right mr-[10px]">
                   {Object.values(comboCounts).some((count) => count > 0) ? (
                     combos.map((combo) => {
-                      if (comboCounts[combo.key] > 0) {
+                      if (comboCounts[combo._id] > 0) {
                         return (
                           <Text
-                            key={combo.key}
+                            key={combo._id}
                             style={{
                               display: "block",
                               fontSize: "14px",
                               marginBottom: "4px",
                             }}
                           >
-                            {combo.name} - {comboCounts[combo.key]} x{" "}
+                            {combo.name} - {comboCounts[combo._id]} x{" "}
                             {new Intl.NumberFormat("vi-VN").format(combo.price)}{" "}
                             VNĐ
                           </Text>

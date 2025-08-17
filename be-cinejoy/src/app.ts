@@ -15,6 +15,8 @@ import RegionRouter from "./routes/RegionRouter";
 import chatbotRouter from "./routes/chatbotRoutes";
 import UserRouter from "./routes/UserRouter";
 import UploadRouter from "./routes/UploadRouter";
+import OrderRouter from "./routes/OrderRouter";
+import PaymentRouter from "./routes/PaymentRouter";
 dotenv.config();
 
 const app: Application = express();
@@ -55,6 +57,8 @@ app.use("/v1/api/auth", AuthRouter);
 app.use("/v1/api/user", UserRouter);
 app.use("/v1/api/upload", UploadRouter);
 app.use("/v1/user-vouchers", UserVoucherRouter);
+app.use("/v1/api/orders", OrderRouter);
+app.use("/v1/api/payments", PaymentRouter);
 app.use("/movies", moviesRouter);
 app.use("/theaters", theaterRouter);
 app.use("/showtimes", ShowtimeRouter);

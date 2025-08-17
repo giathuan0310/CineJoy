@@ -2,10 +2,10 @@ export {};
 
 declare global {
   interface IBackendResponse<T> {
-    status?: string | string[];
+    status: boolean;
+    error: number;
     message: string;
-    error: number | string;
-    data?: T;
+    data?: T | null;
   }
 
   interface IUser {
@@ -192,5 +192,94 @@ declare global {
     tongTien: number;
     trangThaiDonHang: string;
     trangThaiThanhToan: string;
+  }
+
+  // Order & Payment Types
+  interface IOrder {
+    _id: string;
+    orderCode: string;
+    userId: string;
+    movieId: string;
+    theaterId: string;
+    showtimeId: string;
+    seats: string[];
+    foodCombos: Array<{
+      comboId: string;
+      quantity: number;
+      price: number;
+    }>;
+    voucherId?: string;
+    voucherDiscount: number;
+    ticketPrice: number;
+    comboPrice: number;
+    totalAmount: number;
+    finalAmount: number;
+    paymentMethod: "MOMO" | "VNPAY";
+    paymentStatus: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
+    orderStatus: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    customerInfo: {
+      fullName: string;
+      phoneNumber: string;
+      email: string;
+    };
+    paymentInfo?: {
+      transactionId?: string;
+      paymentDate?: Date;
+      paymentGatewayResponse?: Record<string, unknown>;
+    };
+    createdAt: string;
+    updatedAt: string;
+    expiresAt: string;
+  }
+
+  interface IPayment {
+    _id: string;
+    orderId: string;
+    paymentMethod: "MOMO" | "VNPAY";
+    amount: number;
+    status: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED" | "REFUNDED";
+    transactionId?: string;
+    gatewayTransactionId?: string;
+    gatewayResponse?: Record<string, unknown>;
+    refundInfo?: {
+      refundAmount: number;
+      refundDate: Date;
+      refundTransactionId: string;
+      reason: string;
+    };
+    metadata?: {
+      returnUrl?: string;
+      cancelUrl?: string;
+      ipAddress?: string;
+      userAgent?: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  interface CreateOrderRequest {
+    userId: string;
+    movieId: string;
+    theaterId: string;
+    showtimeId: string;
+    seats: string[];
+    foodCombos: Array<{
+      comboId: string;
+      quantity: number;
+    }>;
+    voucherId?: string;
+    paymentMethod: "MOMO" | "VNPAY";
+    customerInfo: {
+      fullName: string;
+      phoneNumber: string;
+      email: string;
+    };
+    seatPrice: number;
+  }
+
+  interface CreatePaymentRequest {
+    paymentMethod: "MOMO" | "VNPAY";
+    returnUrl: string;
+    cancelUrl: string;
   }
 }

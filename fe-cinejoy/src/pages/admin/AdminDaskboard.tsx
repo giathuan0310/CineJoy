@@ -8,6 +8,7 @@ import { getTheaters } from "@/apiservice/apiTheater";
 import { deleteMovie, getMovies, createMovie, updateMovie } from "@/apiservice/apiMovies";
 import { getRegions, addRegion, deleteRegion, getRegionById, updateRegion } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
+import banner from "@/assets/banner.jpg";
 import { getShowTimes, updateShowtime, deleteShowtime } from "@/apiservice/apiShowTime";
 import MovieForm from "@/pages/admin/Form/MovieForm";
 import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
@@ -372,9 +373,11 @@ const Dashboard: React.FC = () => {
 
                 {/* Content */}
                 <main className="p-6">
+
                     {/* Movies Tab */}
                     {activeTab === "movies" && (
                         <div>
+
                             <h2 className="text-2xl font-semibold mb-6 text-black select-none">
                                 Quản lý phim
                             </h2>

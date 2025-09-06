@@ -17,10 +17,12 @@ import UserRouter from "./routes/UserRouter";
 import UploadRouter from "./routes/UploadRouter";
 import OrderRouter from "./routes/OrderRouter";
 import PaymentRouter from "./routes/PaymentRouter";
+import momoConfig from "./configs/momoConfig";
+
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 app.use(
   cors({
@@ -43,9 +45,6 @@ app.use(
     optionsSuccessStatus: 204,
   })
 );
-
-// Connect to MongoDB
-connectDB();
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
@@ -70,5 +69,21 @@ app.use("/chatbot", chatbotRouter);
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+
+  // Initialize database connection
+  connectDB();
+
+  // Check MoMo configuration on startup
+  console.log("\n📋 MoMo Payment Gateway Status:");
+  if (momoConfig.isConfigured()) {
+    console.log(`✅ MoMo is configured (${momoConfig.getEnvironment()} mode)`);
+  } else {
+    console.log(
+      "⚠️  MoMo configuration incomplete - Payment features may not work"
+    );
+    console.log("📝 Please check your .env file for required MoMo variables");
+  }
+
+  console.log("🎬 CineJoy Backend Ready!\n");
 });

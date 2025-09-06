@@ -2,6 +2,7 @@ import Payment, { IPayment } from "../models/Payment";
 import Order from "../models/Order";
 import crypto from "crypto";
 import axios from "axios";
+import momoConfig from "../configs/momoConfig";
 
 export interface CreatePaymentData {
   orderId: string;
@@ -41,18 +42,6 @@ export interface MoMoPaymentResponse {
 }
 
 class PaymentService {
-  private readonly momoConfig = {
-    partnerCode: process.env.MOMO_PARTNER_CODE || "MOMO",
-    accessKey: process.env.MOMO_ACCESS_KEY || "",
-    secretKey: process.env.MOMO_SECRET_KEY || "",
-    endpoint:
-      process.env.MOMO_ENDPOINT ||
-      "https://test-payment.momo.vn/v2/gateway/api/create",
-    ipnUrl:
-      process.env.MOMO_IPN_URL ||
-      "http://localhost:8000/api/payments/momo/callback",
-  };
-
   // Tạo payment record
   async createPayment(paymentData: CreatePaymentData): Promise<IPayment> {
     const payment = new Payment({
@@ -86,21 +75,23 @@ class PaymentService {
       const requestType = "captureWallet";
 
       // Tạo signature
-      const rawSignature = `accessKey=${this.momoConfig.accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${this.momoConfig.ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${this.momoConfig.partnerCode}&redirectUrl=${payment.metadata?.returnUrl}&requestId=${requestId}&requestType=${requestType}`;
+      const rawSignature = `accessKey=${momoConfig.getAccessKey()}&amount=${amount}&extraData=${extraData}&ipnUrl=${momoConfig.getIpnUrl()}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${momoConfig.getPartnerCode()}&redirectUrl=${
+        payment.metadata?.returnUrl
+      }&requestId=${requestId}&requestType=${requestType}`;
 
       const signature = crypto
-        .createHmac("sha256", this.momoConfig.secretKey)
+        .createHmac("sha256", momoConfig.getSecretKey())
         .update(rawSignature)
         .digest("hex");
 
       const requestBody: MoMoPaymentRequest = {
-        partnerCode: this.momoConfig.partnerCode,
+        partnerCode: momoConfig.getPartnerCode(),
         requestId,
         amount,
         orderId,
         orderInfo,
         redirectUrl: payment.metadata?.returnUrl || "",
-        ipnUrl: this.momoConfig.ipnUrl,
+        ipnUrl: momoConfig.getIpnUrl(),
         extraData,
         requestType,
         signature,
@@ -110,7 +101,7 @@ class PaymentService {
       console.log("MoMo Request:", JSON.stringify(requestBody, null, 2));
 
       const response = await axios.post<MoMoPaymentResponse>(
-        this.momoConfig.endpoint,
+        momoConfig.getEndpoint(),
         requestBody,
         {
           headers: {
@@ -177,10 +168,10 @@ class PaymentService {
       } = callbackData;
 
       // Verify signature
-      const rawSignature = `accessKey=${this.momoConfig.accessKey}&amount=${amount}&extraData=${extraData}&message=${message}&orderId=${orderId}&orderInfo=${orderInfo}&orderType=${orderType}&partnerCode=${partnerCode}&payType=${payType}&requestId=${requestId}&responseTime=${responseTime}&resultCode=${resultCode}&transId=${transId}`;
+      const rawSignature = `accessKey=${momoConfig.getAccessKey()}&amount=${amount}&extraData=${extraData}&message=${message}&orderId=${orderId}&orderInfo=${orderInfo}&orderType=${orderType}&partnerCode=${partnerCode}&payType=${payType}&requestId=${requestId}&responseTime=${responseTime}&resultCode=${resultCode}&transId=${transId}`;
 
       const expectedSignature = crypto
-        .createHmac("sha256", this.momoConfig.secretKey)
+        .createHmac("sha256", momoConfig.getSecretKey())
         .update(rawSignature)
         .digest("hex");
 

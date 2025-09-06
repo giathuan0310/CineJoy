@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import PaymentService from "../services/PaymentService";
+import momoConfig from "../configs/momoConfig";
+import MoMoConfigTest from "../utils/momoConfigTest";
 
 class PaymentController {
   // Lấy payment theo ID
@@ -246,6 +248,22 @@ class PaymentController {
   // Test MoMo connection
   async testMoMoConnection(req: Request, res: Response): Promise<void> {
     try {
+      // Check configuration first
+      if (!momoConfig.isConfigured()) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "MoMo chưa được cấu hình đầy đủ",
+          data: {
+            configured: false,
+            environment: momoConfig.getEnvironment(),
+            missingConfig:
+              "Vui lòng kiểm tra MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET_KEY trong .env",
+          },
+        });
+        return;
+      }
+
       // Tạo một test payment để kiểm tra kết nối
       const testPayment = await PaymentService.createPayment({
         orderId: "507f1f77bcf86cd799439011", // Dummy order ID
@@ -264,6 +282,8 @@ class PaymentController {
         data: {
           paymentUrl,
           testPaymentId: testPayment._id,
+          environment: momoConfig.getEnvironment(),
+          configured: true,
         },
       });
     } catch (error) {
@@ -272,6 +292,105 @@ class PaymentController {
         status: false,
         error: 500,
         message: error instanceof Error ? error.message : "Lỗi kết nối MoMo",
+        data: {
+          configured: momoConfig.isConfigured(),
+          environment: momoConfig.getEnvironment(),
+        },
+      });
+    }
+  }
+
+  // Mock payment page for testing
+  async mockPayment(req: Request, res: Response): Promise<void> {
+    try {
+      const { paymentId, amount } = req.query;
+
+      if (!paymentId || !amount) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "Thiếu thông tin paymentId hoặc amount",
+          data: null,
+        });
+        return;
+      }
+
+      // Tạo mock payment page HTML
+      const mockPaymentPage = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Mock Payment - CineJoy</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+            .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .amount { font-size: 24px; color: #e91e63; margin: 20px 0; }
+            button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+            .success { background: #4caf50; color: white; }
+            .cancel { background: #f44336; color: white; }
+            .pending { background: #ff9800; color: white; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h2>🎬 CineJoy - Mock Payment</h2>
+            <p><strong>Payment ID:</strong> ${paymentId}</p>
+            <p><strong>Số tiền:</strong> <span class="amount">${parseInt(
+              amount as string
+            ).toLocaleString()} VNĐ</span></p>
+            
+            <button class="success" onclick="simulatePayment('success')">✅ Thanh toán thành công</button>
+            <button class="cancel" onclick="simulatePayment('cancel')">❌ Hủy thanh toán</button>
+            <button class="pending" onclick="simulatePayment('pending')">⏳ Để pending (không làm gì)</button>
+          </div>
+
+          <script>
+            function simulatePayment(status) {
+              if (status === 'success') {
+                alert('Chuyển hướng đến trang thành công...');
+                window.location.href = 'http://localhost:3000/payment/success?paymentId=${paymentId}&status=success';
+              } else if (status === 'cancel') {
+                alert('Chuyển hướng đến trang hủy...');
+                window.location.href = 'http://localhost:3000/payment/cancel?paymentId=${paymentId}&status=cancel';
+              } else {
+                alert('Payment vẫn pending - có thể test callback sau');
+              }
+            }
+          </script>
+        </body>
+        </html>
+      `;
+
+      res.setHeader("Content-Type", "text/html");
+      res.status(200).send(mockPaymentPage);
+    } catch (error) {
+      console.error("Mock payment error:", error);
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: "Lỗi server",
+        data: null,
+      });
+    }
+  }
+
+  // Get MoMo configuration status
+  async getMoMoConfigStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const configSummary = MoMoConfigTest.getConfigSummary();
+
+      res.status(200).json({
+        status: true,
+        error: 0,
+        message: "Lấy trạng thái cấu hình MoMo thành công",
+        data: configSummary,
+      });
+    } catch (error) {
+      console.error("Get MoMo config status error:", error);
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: "Lỗi server",
         data: null,
       });
     }

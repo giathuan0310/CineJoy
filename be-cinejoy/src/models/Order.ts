@@ -7,7 +7,12 @@ export interface IOrder extends Document {
   movieId: string;
   theaterId: string;
   showtimeId: string;
-  seats: string[];
+  seats: Array<{
+    row: string;
+    number: number;
+    type: string;
+    price: number;
+  }>;
   foodCombos: Array<{
     comboId: string;
     quantity: number;
@@ -19,7 +24,7 @@ export interface IOrder extends Document {
   comboPrice: number;
   totalAmount: number;
   finalAmount: number;
-  paymentMethod: "MOMO" | "VNPAY";
+  paymentMethod: "MOMO" | "VNPAY"; // Required
   paymentStatus: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
   orderStatus: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   customerInfo: {
@@ -53,7 +58,7 @@ const OrderSchema: Schema = new Schema(
     },
     movieId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Movies",
+      ref: "Movie",
       required: true,
     },
     theaterId: {
@@ -68,8 +73,23 @@ const OrderSchema: Schema = new Schema(
     },
     seats: [
       {
-        type: String,
-        required: true,
+        row: {
+          type: String,
+          required: true,
+        },
+        number: {
+          type: Number,
+          required: true,
+        },
+        type: {
+          type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
     foodCombos: [
@@ -124,7 +144,7 @@ const OrderSchema: Schema = new Schema(
     paymentMethod: {
       type: String,
       enum: ["MOMO", "VNPAY"],
-      required: true,
+      required: true, // Required when creating order
     },
     paymentStatus: {
       type: String,
@@ -185,7 +205,7 @@ OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ paymentStatus: 1, orderStatus: 1 });
 OrderSchema.index({ expiresAt: 1 });
 
-// Generate unique order code before saving
+// Generate unique order code before saving (backup in case not provided)
 OrderSchema.pre("save", async function (next) {
   if (this.isNew && !this.orderCode) {
     const timestamp = Date.now().toString(36);

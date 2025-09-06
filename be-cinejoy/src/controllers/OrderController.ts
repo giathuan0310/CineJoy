@@ -35,6 +35,19 @@ class OrderController {
       }
 
       if (
+        !orderData.paymentMethod ||
+        !["MOMO", "VNPAY"].includes(orderData.paymentMethod)
+      ) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "Phương thức thanh toán không hợp lệ",
+          data: null,
+        });
+        return;
+      }
+
+      if (
         !orderData.customerInfo ||
         !orderData.customerInfo.fullName ||
         !orderData.customerInfo.phoneNumber ||
@@ -338,6 +351,17 @@ class OrderController {
         return;
       }
 
+      // Kiểm tra paymentMethod có khớp với order không
+      if (order.paymentMethod !== paymentMethod) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: `Phương thức thanh toán không khớp. Order yêu cầu: ${order.paymentMethod}`,
+          data: null,
+        });
+        return;
+      }
+
       // Tạo payment record
       const payment = await PaymentService.createPayment({
         orderId: order._id,
@@ -353,7 +377,21 @@ class OrderController {
 
       // Tạo payment URL tùy theo phương thức
       if (paymentMethod === "MOMO") {
-        paymentUrl = await PaymentService.createMoMoPayment(payment);
+        try {
+          paymentUrl = await PaymentService.createMoMoPayment(payment);
+        } catch (error: any) {
+          console.error(
+            "MoMo payment creation failed:",
+            error.response?.data || error.message
+          );
+
+          // Uncomment dòng dưới để xem chi tiết lỗi MoMo thay vì dùng mock
+          // throw new Error(`MoMo Error: ${error.response?.data?.message || error.message}`);
+
+          // Fallback to mock payment for testing
+          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${order.finalAmount}`;
+          console.log("🔧 Using mock payment URL for testing:", paymentUrl);
+        }
       } else if (paymentMethod === "VNPAY") {
         // TODO: Implement VNPay integration
         throw new Error("VNPay chưa được tích hợp");

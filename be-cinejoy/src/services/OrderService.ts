@@ -1,7 +1,6 @@
 import Order, { IOrder } from "../models/Order";
-import Payment from "../models/Payment";
 import { FoodCombo } from "../models/FoodCombo";
-import { Voucher } from "../models/Voucher";
+import { UserVoucher } from "../models/UserVoucher";
 import mongoose from "mongoose";
 
 export interface CreateOrderData {
@@ -9,29 +8,36 @@ export interface CreateOrderData {
   movieId: string;
   theaterId: string;
   showtimeId: string;
-  seats: string[];
+  seats: Array<{
+    row: string;
+    number: number;
+    type: string;
+    price: number;
+  }>;
   foodCombos: Array<{
     comboId: string;
     quantity: number;
+    price?: number; // Optional, sẽ được tính từ database
   }>;
   voucherId?: string;
-  paymentMethod: "MOMO" | "VNPAY";
+  paymentMethod: "MOMO" | "VNPAY"; // Required when creating order
   customerInfo: {
     fullName: string;
     phoneNumber: string;
     email: string;
   };
-  seatPrice: number;
 }
 
 export interface UpdateOrderData {
   paymentStatus?: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
   orderStatus?: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  paymentMethod?: "MOMO" | "VNPAY";
   paymentInfo?: {
     transactionId?: string;
     paymentDate?: Date;
     paymentGatewayResponse?: any;
   };
+  expiresAt?: Date;
 }
 
 class OrderService {
@@ -74,19 +80,31 @@ class OrderService {
         );
       }
 
-      // Tính toán giá vé
-      const ticketPrice = orderData.seats.length * orderData.seatPrice;
+      // Tính toán giá vé từ seats array
+      const ticketPrice = orderData.seats.reduce(
+        (total, seat) => total + seat.price,
+        0
+      );
       const totalAmount = ticketPrice + comboPrice;
 
       // Tính toán voucher discount
       let voucherDiscount = 0;
       if (orderData.voucherId) {
-        const voucher = await Voucher.findById(orderData.voucherId).session(
-          session
-        );
-        if (voucher && voucher.quantity > 0) {
+        // Kiểm tra xem user có sở hữu voucher này không và chưa sử dụng
+        const userVoucher = await UserVoucher.findOne({
+          userId: orderData.userId,
+          voucherId: orderData.voucherId,
+          status: "unused",
+        })
+          .populate("voucherId")
+          .session(session);
+
+        if (userVoucher && userVoucher.voucherId) {
+          const voucher = userVoucher.voucherId as any; // Populated voucher data
           const now = new Date();
+
           if (
+            voucher.quantity > 0 &&
             now >= voucher.validityPeriod.startDate &&
             now <= voucher.validityPeriod.endDate
           ) {
@@ -99,10 +117,39 @@ class OrderService {
 
       const finalAmount = totalAmount - voucherDiscount;
 
-      // Tạo order với thời gian hết hạn 10 phút
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      // Generate unique order code
+      let orderCode: string;
+      let isUnique = false;
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      while (!isUnique && attempts < maxAttempts) {
+        const timestamp = Date.now().toString(36);
+        const random = Math.random().toString(36).substring(2, 7);
+        orderCode = `CJ${timestamp}${random}`.toUpperCase();
+
+        // Check if orderCode already exists
+        const existingOrder = await Order.findOne({ orderCode }).session(
+          session
+        );
+        if (!existingOrder) {
+          isUnique = true;
+        } else {
+          attempts++;
+          // Small delay to ensure different timestamp
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+      }
+
+      if (!isUnique) {
+        throw new Error("Không thể tạo mã đơn hàng unique sau nhiều lần thử");
+      }
+
+      // Tạo order với thời gian hết hạn 1 giờ cho order chưa thanh toán
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       const newOrder = new Order({
+        orderCode: orderCode!,
         userId: orderData.userId,
         movieId: orderData.movieId,
         theaterId: orderData.theaterId,
@@ -121,6 +168,23 @@ class OrderService {
       });
 
       const savedOrder = await newOrder.save({ session });
+
+      // Mark voucher as used if applied
+      if (orderData.voucherId && voucherDiscount > 0) {
+        await UserVoucher.findOneAndUpdate(
+          {
+            userId: orderData.userId,
+            voucherId: orderData.voucherId,
+            status: "unused",
+          },
+          {
+            status: "used",
+            usedAt: new Date(),
+          },
+          { session }
+        );
+      }
+
       await session.commitTransaction();
 
       return savedOrder;
@@ -227,6 +291,11 @@ class OrderService {
     orderId: string,
     updateData: UpdateOrderData
   ): Promise<IOrder | null> {
+    // Nếu order được thanh toán thành công, extend expiresAt để không bị tự động xóa
+    if (updateData.paymentStatus === "PAID") {
+      updateData.expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+    }
+
     return await Order.findByIdAndUpdate(
       orderId,
       { $set: updateData },

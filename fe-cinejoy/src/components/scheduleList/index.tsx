@@ -17,6 +17,8 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 interface IFlattenedShowtime {
+  _id: string;
+  parentId: string; // Add parent document ID
   date: string;
   start: string;
   end: string;
@@ -77,7 +79,7 @@ const getDateRange = (start: string, end: string) => {
 };
 
 const formatVNTime = (iso: string) => {
-  return dayjs(iso).tz("Asia/Ho_Chi_Minh").format("hh:mm A");
+  return dayjs(iso).tz("Asia/Ho_Chi_Minh").format("HH:mm");
 };
 
 const ScheduleList: React.FC = () => {
@@ -111,6 +113,7 @@ const ScheduleList: React.FC = () => {
 
           return st.showTimes.map((innerSt) => ({
             ...innerSt,
+            parentId: st._id, // Add parent document ID
             movieId: movie._id,
             movieTitle: movie.title,
             ageRating: movie.ageRating,
@@ -557,12 +560,14 @@ const ScheduleList: React.FC = () => {
                                 navigate(`/selectSeat`, {
                                   state: {
                                     movie: {
+                                      ...movie,
                                       title: movie?.title,
                                       poster: movie?.image,
                                       format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                       genre: movie?.genre?.join(", "),
                                       duration: movie?.duration,
                                     },
+                                    showtimeId: showtime.parentId, // Use parent document ID
                                     cinema: filteredCinemas.find(
                                       (c) => c._id === selectedCinemaId
                                     )?.name,
@@ -574,8 +579,8 @@ const ScheduleList: React.FC = () => {
                                 });
                               }}
                             >
-                              {dayjs(showtime.start).format("HH:mm")} -{" "}
-                              {dayjs(showtime.end).format("HH:mm")}
+                              {formatVNTime(showtime.start)} -{" "}
+                              {formatVNTime(showtime.end)}
                             </span>
                           ))}
                         </div>

@@ -99,6 +99,7 @@ declare global {
       end: string;
     };
     showTimes: Array<{
+      _id: string;
       date: string;
       start: string;
       end: string;

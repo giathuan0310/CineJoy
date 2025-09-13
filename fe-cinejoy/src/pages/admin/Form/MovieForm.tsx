@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Modal } from 'antd';
 
 interface MovieFormProps {
     movie?: IMovie;
@@ -118,25 +119,16 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     };
 
     return (
-        <div
-            className="fixed inset-0 flex items-center justify-center z-50"
-            style={{
-                backgroundImage: 'url("/assets/banner.jpg")',
-                backgroundSize: '',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-            }}
+        <Modal
+            open
+            title={<div className="text-center text-xl md:text-xl font-semibold">{movie ? 'Sửa phim' : 'Thêm phim mới'}</div>}
+            onCancel={onCancel}
+            footer={null}
+            width={800}
+            centered
+            destroyOnClose
         >
-            <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            >
-                <h2 className="text-2xl font-semibold mb-6 text-black">
-                    {movie ? 'Sửa phim' : 'Thêm phim mới'}
-                </h2>
-
-                <form onSubmit={handleSubmit} method='post' className="space-y-4">
+            <form onSubmit={handleSubmit} method='post' className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -397,8 +389,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                         </motion.button>
                     </div>
                 </form>
-            </motion.div>
-        </div>
+        </Modal>
     );
 };
 

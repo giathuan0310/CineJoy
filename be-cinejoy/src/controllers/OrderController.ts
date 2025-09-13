@@ -62,13 +62,23 @@ class OrderController {
         return;
       }
 
-      const order = await OrderService.createOrder(orderData);
+      const result = await OrderService.createOrder(orderData);
+
+      if (!result.success) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: result.message,
+          data: null,
+        });
+        return;
+      }
 
       res.status(201).json({
         status: true,
         error: 0,
-        message: "Tạo đơn hàng thành công",
-        data: order,
+        message: result.message,
+        data: result.order,
       });
     } catch (error) {
       console.error("Create order error:", error);

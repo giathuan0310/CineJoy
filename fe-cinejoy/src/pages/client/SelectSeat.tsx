@@ -1,76 +1,97 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import useAppStore from '@/store/app.store';
+import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
 
 export const SelectSeat = () => {
-    const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
-    // Ghế đã bán (cứng mẫu, thực tế lấy từ API)
-    const soldSeats = ["C4", "D5", "F6"];
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [soldSeats, setSoldSeats] = useState<string[]>([]);
 
-    const navigate = useNavigate();
-    const location = useLocation();
-    const { isDarkMode } = useAppStore();
-    // const movie = {
-    //     title: "Vây Hãm Tại Đài Bắc",
-    //     poster: "https://res.cloudinary.com/ddia5yfia/image/upload/v1735969147/50.Va%CC%82y_Ha%CC%83m_Ta%CC%A3i_%C4%90a%CC%80i_Ba%CC%86%CC%81c_lr0jp4_wbdemr.jpg",
-    //     format: "2D, Phụ đề Tiếng Việt",
-    //     genre: "Gia đình, Phiêu lưu, Hoạt hình",
-    //     duration: 80,
-    //     cinema: "CGV Aeon Long Biên",
-    //     date: "2025-06-07",
-    //     time: "15:00",
-    //     room: "P1",
-    //     seats: selectedSeats,
-    // };
-    const {
-        movie = {},
-        cinema = "",
-        date = "",
-        time = "",
-        room = "",
-    } = location.state || {};
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isDarkMode } = useAppStore();
+  const { movie, cinema, date, time, room, showtimeId } = location.state || {};
 
-    const handleSelectSeat = (seat: string) => {
-        setSelectedSeats((prev) =>
-            prev.includes(seat)
-                ? prev.filter((s) => s !== seat)
-                : [...prev, seat]
-        );
-    };
+  const displayTime = time;
+  const getUtcTimeForApi = (vietnamTime: string) => {
+    if (!vietnamTime) return vietnamTime;
+    const [hour, minute] = vietnamTime.split(":").map(Number);
+    const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
+    return `${utcHour.toString().padStart(2, "0")}:${minute
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
-    return (
-        <div className={`${isDarkMode ? 'bg-[#23272f]' : 'bg-[#e7ede7]'} min-h-screen py-6`}>
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-20">
-                <SeatLayout
-                    selectedSeats={selectedSeats}
-                    soldSeats={soldSeats}
-                    onSelect={handleSelectSeat}
-                    selectedSeatPrice={90000}
-                />
-                <MovieInfo movie={{
-                    ...movie,
-                    cinema,
-                    date,
-                    time,
-                    room,
-                    seats: selectedSeats, // cập nhật ghế đã chọn
-                }} onContinue={() => navigate("/payment", {
-                    state: {
-                        movie: {
-                            ...movie,
-                        },
-                        seats: selectedSeats,
-                        cinema,
-                        date,
-                        time,
-                        room,
-                    }
-                })} />
-            </div>
-        </div>
+  const utcTimeForApi = getUtcTimeForApi(time);
+
+  const handleSelectSeat = (seat: string) => {
+    setSelectedSeats((prev) =>
+      prev.includes(seat) ? prev.filter((s) => s !== seat) : [...prev, seat]
     );
+  };
+
+  // Callback to update sold seats from API data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleSeatsLoaded = (seatData: any) => {
+    if (seatData?.seats) {
+      const occupiedSeats = seatData.seats
+        .filter(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (seat: any) =>
+            seat.status === "occupied" || seat.status === "reserved"
+        )
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((seat: any) => seat.seatId);
+      setSoldSeats(occupiedSeats);
+    }
+  };
+
+  return (
+    <div
+      className={`${
+        isDarkMode ? "bg-[#23272f]" : "bg-[#e7ede7]"
+      } min-h-screen py-6`}
+    >
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-20">
+        <SeatLayout
+          selectedSeats={selectedSeats}
+          soldSeats={soldSeats}
+          onSelect={handleSelectSeat}
+          selectedSeatPrice={90000}
+          showtimeId={showtimeId}
+          date={date}
+          startTime={utcTimeForApi}
+          room={room}
+          onSeatsLoaded={handleSeatsLoaded}
+        />
+        <MovieInfo
+          movie={{
+            ...movie,
+            cinema,
+            date: date,
+            time: displayTime,
+            room: room,
+            seats: selectedSeats,
+          }}
+          onContinue={() =>
+            navigate("/payment", {
+              state: {
+                movie: {
+                  ...movie,
+                },
+                seats: selectedSeats,
+                cinema,
+                date: date,
+                time: utcTimeForApi,
+                room: room,
+              },
+            })
+          }
+        />
+      </div>
+    </div>
+  );
 };
 
 export default SelectSeat;

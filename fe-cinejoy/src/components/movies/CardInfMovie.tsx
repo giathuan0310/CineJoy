@@ -71,7 +71,15 @@ const CardInfMovie = () => {
   );
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const { isDarkMode } = useAppStore();
-  const allShowTimes = showtimes.flatMap((st) => st.showTimes || []);
+
+  // Flatten showtimes but keep reference to parent document ID
+  const allShowTimes = showtimes.flatMap((st) =>
+    (st.showTimes || []).map((showTime) => ({
+      ...showTime,
+      parentId: st._id, // Keep the document ID
+    }))
+  );
+
   const showTimesOfSelectedDate = allShowTimes.filter(
     (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
   );
@@ -584,12 +592,14 @@ const CardInfMovie = () => {
                               navigate(`/selectSeat`, {
                                 state: {
                                   movie: {
+                                    ...movie,
                                     title: movie?.title,
                                     poster: movie?.image,
                                     format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                     genre: movie?.genre?.join(", "),
                                     duration: movie?.duration,
                                   },
+                                  showtimeId: showtime.parentId, // Use parent document ID
                                   cinema: filteredCinemas.find(
                                     (c) => c._id === selectedCinemaId
                                   )?.name,

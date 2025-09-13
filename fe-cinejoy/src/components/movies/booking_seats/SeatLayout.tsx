@@ -8,6 +8,12 @@ interface SeatLayoutProps {
   soldSeats: string[];
   onSelect: (seat: string) => void;
   selectedSeatPrice: number;
+  showtimeId?: string;
+  date?: string;
+  startTime?: string;
+  room?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onSeatsLoaded?: (seatData: any) => void;
 }
 
 const SeatLayout: React.FC<SeatLayoutProps> = ({
@@ -15,10 +21,45 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
   soldSeats,
   onSelect,
   selectedSeatPrice,
+  showtimeId,
+  date,
+  startTime,
+  room,
+  onSeatsLoaded,
 }) => {
   const { isDarkMode } = useAppStore();
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<number>(600);
+  const [seatPricing, setSeatPricing] = useState<Record<string, number>>({});
+
+  // Handle seat data loading
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleSeatsLoaded = (seatData: any) => {
+    // Update seat pricing based on API data
+    const pricing: Record<string, number> = {};
+    if (seatData.seats) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      seatData.seats.forEach((seat: any) => {
+        pricing[seat.seatId] = seat.price;
+      });
+      setSeatPricing(pricing);
+    }
+
+    // Forward to parent component
+    if (onSeatsLoaded) {
+      onSeatsLoaded(seatData);
+    }
+  };
+
+  // Calculate total price based on individual seat prices
+  const calculateTotalPrice = () => {
+    if (Object.keys(seatPricing).length > 0) {
+      return selectedSeats.reduce((total, seatId) => {
+        return total + (seatPricing[seatId] || selectedSeatPrice);
+      }, 0);
+    }
+    return selectedSeatPrice * selectedSeats.length;
+  };
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -76,6 +117,11 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
           selectedSeats={selectedSeats}
           soldSeats={soldSeats}
           onSelect={onSelect}
+          showtimeId={showtimeId}
+          date={date}
+          startTime={startTime}
+          room={room}
+          onSeatsLoaded={handleSeatsLoaded}
         />
       </div>
       {/* Trạng thái ghế */}
@@ -150,7 +196,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
             className="text-xl font-bold"
             style={{ color: isDarkMode ? "#f9ca24" : "#b55210" }}
           >
-            {(selectedSeatPrice * selectedSeats.length).toLocaleString()} VNĐ
+            {calculateTotalPrice().toLocaleString()} VNĐ
           </div>
           <p
             className={`text-xs mt-1 ${

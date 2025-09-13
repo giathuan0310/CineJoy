@@ -1,16 +1,21 @@
 import Order, { IOrder } from "../models/Order";
 import { FoodCombo } from "../models/FoodCombo";
 import { UserVoucher } from "../models/UserVoucher";
+import ShowtimeService from "./ShowtimeService";
 import mongoose from "mongoose";
+
+const showtimeService = new ShowtimeService();
 
 export interface CreateOrderData {
   userId: string;
   movieId: string;
   theaterId: string;
   showtimeId: string;
+  showDate: string;
+  showTime: string;
+  room: string;
   seats: Array<{
-    row: string;
-    number: number;
+    seatId: string;
     type: string;
     price: number;
   }>;
@@ -20,7 +25,7 @@ export interface CreateOrderData {
     price?: number; // Optional, sẽ được tính từ database
   }>;
   voucherId?: string;
-  paymentMethod: "MOMO" | "VNPAY"; // Required when creating order
+  paymentMethod: "MOMO" | "VNPAY";
   customerInfo: {
     fullName: string;
     phoneNumber: string;
@@ -42,7 +47,11 @@ export interface UpdateOrderData {
 
 class OrderService {
   // Tạo order mới
-  async createOrder(orderData: CreateOrderData): Promise<IOrder> {
+  async createOrder(orderData: CreateOrderData): Promise<{
+    success: boolean;
+    order?: IOrder;
+    message?: string;
+  }> {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -56,11 +65,19 @@ class OrderService {
           session
         );
         if (!foodCombo) {
-          throw new Error(`Combo không tồn tại: ${combo.comboId}`);
+          await session.abortTransaction();
+          return {
+            success: false,
+            message: `Combo không tồn tại: ${combo.comboId}`,
+          };
         }
 
         if (foodCombo.quantity < combo.quantity) {
-          throw new Error(`Combo ${foodCombo.name} không đủ số lượng`);
+          await session.abortTransaction();
+          return {
+            success: false,
+            message: `Combo ${foodCombo.name} không đủ số lượng`,
+          };
         }
 
         const comboTotal = foodCombo.price * combo.quantity;
@@ -142,11 +159,48 @@ class OrderService {
       }
 
       if (!isUnique) {
-        throw new Error("Không thể tạo mã đơn hàng unique sau nhiều lần thử");
+        await session.abortTransaction();
+        return {
+          success: false,
+          message: "Không thể tạo mã đơn hàng unique sau nhiều lần thử",
+        };
       }
 
       // Tạo order với thời gian hết hạn 1 giờ cho order chưa thanh toán
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // **KIỂM TRA GHẾ TRƯỚC KHI TẠO ORDER**
+      const seatIds = orderData.seats.map((seat) => seat.seatId);
+
+      // Convert Vietnam time to UTC for API call
+      const convertVietnamToUTC = (vietnamTime: string) => {
+        const [hour, minute] = vietnamTime.split(":").map(Number);
+        const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
+        return `${utcHour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
+      };
+
+      const utcShowTime = convertVietnamToUTC(orderData.showTime);
+
+      // Kiểm tra trạng thái ghế trước khi tạo order
+      try {
+        await showtimeService.bookSeats(
+          orderData.showtimeId,
+          orderData.showDate,
+          utcShowTime,
+          orderData.room,
+          seatIds,
+          "reserved"
+        );
+      } catch (seatError: any) {
+        // Nếu ghế không available, return error response
+        await session.abortTransaction();
+        return {
+          success: false,
+          message: `Không thể đặt ghế: ${seatError.message}`,
+        };
+      }
 
       const newOrder = new Order({
         orderCode: orderCode!,
@@ -154,6 +208,9 @@ class OrderService {
         movieId: orderData.movieId,
         theaterId: orderData.theaterId,
         showtimeId: orderData.showtimeId,
+        showDate: orderData.showDate,
+        showTime: orderData.showTime,
+        room: orderData.room,
         seats: orderData.seats,
         foodCombos: combosWithPrice,
         voucherId: orderData.voucherId,
@@ -168,6 +225,11 @@ class OrderService {
       });
 
       const savedOrder = await newOrder.save({ session });
+
+      console.log(
+        "Order created and seats reserved successfully:",
+        savedOrder.orderCode
+      );
 
       // Mark voucher as used if applied
       if (orderData.voucherId && voucherDiscount > 0) {
@@ -187,10 +249,19 @@ class OrderService {
 
       await session.commitTransaction();
 
-      return savedOrder;
+      return {
+        success: true,
+        order: savedOrder,
+        message: "Tạo đơn hàng thành công",
+      };
     } catch (error) {
       await session.abortTransaction();
-      throw error;
+      return {
+        success: false,
+        message: `Lỗi tạo đơn hàng: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      };
     } finally {
       session.endSession();
     }
@@ -291,22 +362,85 @@ class OrderService {
     orderId: string,
     updateData: UpdateOrderData
   ): Promise<IOrder | null> {
-    // Nếu order được thanh toán thành công, extend expiresAt để không bị tự động xóa
-    if (updateData.paymentStatus === "PAID") {
-      updateData.expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    return await Order.findByIdAndUpdate(
-      orderId,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    )
-      .populate("userId", "fullName email phoneNumber")
-      .populate("movieId", "title poster duration")
-      .populate("theaterId", "name location")
-      .populate("showtimeId", "startTime date")
-      .populate("foodCombos.comboId", "name price")
-      .populate("voucherId", "code discountPercent");
+    try {
+      // Lấy thông tin order hiện tại
+      const currentOrder = await Order.findById(orderId).session(session);
+      if (!currentOrder) {
+        throw new Error("Order không tồn tại");
+      }
+
+      // Nếu order được thanh toán thành công, extend expiresAt để không bị tự động xóa
+      if (updateData.paymentStatus === "PAID") {
+        updateData.expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+        updateData.orderStatus = "CONFIRMED";
+
+        // Đảm bảo ghế được book trong showtime khi thanh toán thành công
+        try {
+          const seatIds = currentOrder.seats.map((seat) => seat.seatId);
+
+          // Convert Vietnam time to UTC for API call
+          const convertVietnamToUTC = (vietnamTime: string) => {
+            const [hour, minute] = vietnamTime.split(":").map(Number);
+            const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
+            return `${utcHour.toString().padStart(2, "0")}:${minute
+              .toString()
+              .padStart(2, "0")}`;
+          };
+
+          const utcShowTime = convertVietnamToUTC(currentOrder.showTime);
+
+          console.log("Attempting to confirm seats for paid order:", {
+            orderId: currentOrder._id,
+            orderCode: currentOrder.orderCode,
+            showtimeId: currentOrder.showtimeId.toString(),
+            showDate: currentOrder.showDate,
+            showTime: currentOrder.showTime,
+            utcShowTime: utcShowTime,
+            room: currentOrder.room,
+            seatIds: seatIds,
+          });
+
+          await showtimeService.bookSeats(
+            currentOrder.showtimeId.toString(),
+            currentOrder.showDate,
+            utcShowTime, // Use UTC time instead of Vietnam time
+            currentOrder.room,
+            seatIds,
+            "occupied" // Xác nhận ghế đã được đặt khi thanh toán thành công
+          );
+          console.log(
+            "Seats confirmed for paid order:",
+            currentOrder.orderCode
+          );
+        } catch (seatError) {
+          console.error("Error confirming seats for paid order:", seatError);
+          // Log error nhưng không fail transaction vì payment đã thành công
+        }
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        orderId,
+        { $set: updateData },
+        { new: true, runValidators: true, session }
+      )
+        .populate("userId", "fullName email phoneNumber")
+        .populate("movieId", "title poster duration")
+        .populate("theaterId", "name location")
+        .populate("showtimeId", "startTime date")
+        .populate("foodCombos.comboId", "name price")
+        .populate("voucherId", "code discountPercent");
+
+      await session.commitTransaction();
+      return updatedOrder;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   // Hủy order
@@ -335,6 +469,23 @@ class OrderService {
           { $inc: { quantity: combo.quantity } },
           { session }
         );
+      }
+
+      // Release ghế trong showtime khi hủy order
+      try {
+        const seatIds = order.seats.map((seat) => seat.seatId);
+        // Cập nhật trạng thái ghế về available
+        await showtimeService.releaseSeats(
+          order.showtimeId.toString(),
+          order.showDate,
+          order.showTime,
+          order.room,
+          seatIds
+        );
+        console.log("Seats released for cancelled order:", order.orderCode);
+      } catch (seatError) {
+        console.error("Error releasing seats for cancelled order:", seatError);
+        // Log error nhưng vẫn tiếp tục cancel order
       }
 
       // Cập nhật trạng thái order

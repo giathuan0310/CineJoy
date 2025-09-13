@@ -7,10 +7,12 @@ export interface IOrder extends Document {
   movieId: string;
   theaterId: string;
   showtimeId: string;
+  showDate: string; // Format: "2025-09-07"
+  showTime: string; // Format: "08:00"
+  room: string; // "Room 1"
   seats: Array<{
-    row: string;
-    number: number;
-    type: string;
+    seatId: string; // "A1", "B2", etc.
+    type: string; // "standard", "vip", "couple"
     price: number;
   }>;
   foodCombos: Array<{
@@ -71,19 +73,27 @@ const OrderSchema: Schema = new Schema(
       ref: "Showtime",
       required: true,
     },
+    showDate: {
+      type: String,
+      required: true, // Format: "2025-09-07"
+    },
+    showTime: {
+      type: String,
+      required: true, // Format: "08:00"
+    },
+    room: {
+      type: String,
+      required: true, // "Room 1", "Room 2", etc.
+    },
     seats: [
       {
-        row: {
+        seatId: {
           type: String,
-          required: true,
-        },
-        number: {
-          type: Number,
-          required: true,
+          required: true, // "A1", "B2", etc.
         },
         type: {
           type: String,
-          required: true,
+          required: true, // "standard", "vip", "couple"
         },
         price: {
           type: Number,

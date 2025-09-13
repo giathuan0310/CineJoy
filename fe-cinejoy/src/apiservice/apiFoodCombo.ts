@@ -12,16 +12,16 @@ export const getFoodComboById = async (id: string): Promise<IFoodCombo> => {
 };
 
 export const addFoodCombo = async (combo: IFoodCombo): Promise<IFoodCombo> => {
-    const res = await axiosClient.post<IFoodCombo>("/foodcombos", combo);
+    const res = await axiosClient.post<IFoodCombo>("/foodcombos/add", combo);
     return res.data;
 };
 
 export const updateFoodCombo = async (id: string, combo: IFoodCombo): Promise<IFoodCombo> => {
-    const res = await axiosClient.put<IFoodCombo>(`/foodcombos/${id}`, combo);
+    const res = await axiosClient.put<IFoodCombo>(`/foodcombos/update/${id}`, combo);
     return res.data;
 };
 
 export const deleteFoodCombo = async (id: string): Promise<{ message: string }> => {
-    const res = await axiosClient.delete<{ message: string }>(`/foodcombos/${id}`);
+    const res = await axiosClient.delete<{ message: string }>(`/foodcombos/delete/${id}`);
     return res.data;
 };

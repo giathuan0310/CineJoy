@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, DatePicker, Upload } from 'antd';
+import type { InputRef } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 
 interface MovieFormProps {
     movie?: IMovie;
@@ -9,49 +12,43 @@ interface MovieFormProps {
 }
 
 const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
-    const [formData, setFormData] = useState<Partial<IMovie>>({
-        title: '',
-        image: '',
-        posterImage: '',
-        releaseDate: '',
-        duration: 0,
-        actors: [],
-        genre: [],
-        director: '',
-        status: '',
-        language: [],
-        description: '',
-        trailer: '',
-        ageRating: ''
-    });
-
-    // Hàm chuyển đổi ngày sang format YYYY-MM-DD cho input date
-    const formatDateForInput = (dateString: string): string => {
-        if (!dateString) return '';
-
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return '';
-
-            // Chuyển sang format YYYY-MM-DD
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-
-            return `${year}-${month}-${day}`;
-        } catch (error) {
-            console.error('Error formatting date:', error);
-            return '';
-        }
-    };
+    const titleInputRef = useRef<InputRef>(null);
+    const [form] = Form.useForm();
+    const [imagePreview, setImagePreview] = useState<string>('');
+    const [posterPreview, setPosterPreview] = useState<string>('');
 
     useEffect(() => {
         if (movie) {
-            setFormData({
-                ...movie,
-                // Chuyển đổi ngày sang format phù hợp cho input date
-                releaseDate: formatDateForInput(movie.releaseDate || '')
+            form.setFieldsValue({
+                title: movie.title,
+                image: movie.image,
+                posterImage: movie.posterImage,
+                releaseDate: movie.releaseDate ? dayjs(movie.releaseDate) : undefined,
+                duration: movie.duration,
+                actors: movie.actors?.join(', '),
+                genre: movie.genre?.[0],
+                director: movie.director,
+                status: movie.status,
+                language: movie.language?.[0],
+                description: movie.description,
+                trailer: movie.trailer,
+                ageRating: movie.ageRating,
             });
+            // Set image previews
+            setImagePreview(movie.image || '');
+            setPosterPreview(movie.posterImage || '');
+        }
+    }, [movie, form]);
+
+    useEffect(() => {
+        if (!movie) {
+            const timer = setTimeout(() => {
+                if (titleInputRef.current) {
+                    titleInputRef.current.focus();
+                }
+            }, 100);
+
+            return () => clearTimeout(timer);
         }
     }, [movie]);
 
@@ -82,40 +79,62 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
 
     const ageRestrictions = ['T13+', 'T16+', 'T18+', 'P'];
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+    const handleSubmit = async (values: {
+        title: string;
+        image: string;
+        posterImage: string;
+        releaseDate: dayjs.Dayjs;
+        duration: number;
+        actors: string;
+        genre: string;
+        director: string;
+        status: string;
+        language: string;
+        description: string;
+        trailer: string;
+        ageRating: string;
+    }) => {
+        try {
+            const submitData = {
+                title: values.title,
+                image: values.image,
+                posterImage: values.posterImage,
+                releaseDate: values.releaseDate ? values.releaseDate.toISOString() : '',
+                duration: values.duration,
+                actors: values.actors ? values.actors.split(',').map((item: string) => item.trim()) : [],
+                genre: values.genre ? [values.genre] : [],
+                director: values.director,
+                status: values.status,
+                language: values.language ? [values.language] : [],
+                description: values.description,
+                trailer: values.trailer,
+                ageRating: values.ageRating,
+            };
+            
+            onSubmit(submitData);
+        } catch (error) {
+            console.error('Error submitting form:', error);
+        }
     };
 
-    const handleArrayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value.split(',').map(item => item.trim())
-        }));
-    };
-
-    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: [value]
-        }));
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Chuyển đổi ngày về format ISO khi submit (nếu cần)
-        const submitData = {
-            ...formData,
-            releaseDate: formData.releaseDate ? new Date(formData.releaseDate).toISOString() : ''
-        };
-
-        onSubmit(submitData);
+    const handleImageChange = (fieldName: string) => (info: { file: { originFileObj?: File; }; }) => {
+        const file = info.file.originFileObj;
+        if (file instanceof File) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const imageUrl = reader.result as string;
+                form.setFieldsValue({
+                    [fieldName]: imageUrl
+                });
+                // Update preview state
+                if (fieldName === 'image') {
+                    setImagePreview(imageUrl);
+                } else if (fieldName === 'posterImage') {
+                    setPosterPreview(imageUrl);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     return (
@@ -124,271 +143,275 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
             title={<div className="text-center text-xl md:text-xl font-semibold">{movie ? 'Sửa phim' : 'Thêm phim mới'}</div>}
             onCancel={onCancel}
             footer={null}
-            width={800}
+            width={900}
             centered
             destroyOnClose
         >
-            <form onSubmit={handleSubmit} method='post' className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Tên phim
-                            </label>
-                            <input
-                                type="text"
-                                name="title"
-                                value={formData.title}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Ảnh thumbnail
-                            </label>
-                            <div className="flex items-center space-x-4">
-                                {formData.image && (
-                                    <img
-                                        src={formData.image}
-                                        alt="Thumbnail preview"
-                                        className="w-20 h-20 object-cover rounded"
-                                    />
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    image: reader.result as string
-                                                }));
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                    required={!formData.image}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Ảnh poster
-                            </label>
-                            <div className="flex items-center space-x-4">
-                                {formData.posterImage && (
-                                    <img
-                                        src={formData.posterImage}
-                                        alt="Poster preview"
-                                        className="w-20 h-20 object-cover rounded"
-                                    />
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    posterImage: reader.result as string
-                                                }));
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                    required={!formData.posterImage}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Ngày phát hành
-                            </label>
-                            <input
-                                type="date"
-                                name="releaseDate"
-                                value={formData.releaseDate}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Thời lượng (phút)
-                            </label>
-                            <input
-                                type="number"
-                                name="duration"
-                                value={formData.duration}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Diễn viên (phân cách bằng dấu phẩy)
-                            </label>
-                            <input
-                                type="text"
-                                name="actors"
-                                value={formData.actors?.join(', ')}
-                                onChange={handleArrayChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Thể loại
-                            </label>
-                            <select
-                                name="genre"
-                                value={formData.genre?.[0] || ''}
-                                onChange={handleSelectChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            >
-                                <option value="">Chọn Thể Loại</option>
-                                {genres.map(genre => (
-                                    <option key={genre} value={genre}>{genre}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Đạo diễn
-                            </label>
-                            <input
-                                type="text"
-                                name="director"
-                                value={formData.director}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Trạng Thái
-                            </label>
-                            <select
-                                name="status"
-                                value={formData.status}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            >
-                                <option value="">Select status</option>
-                                <option value="nowShowing">Now Showing</option>
-                                <option value="upcoming">Upcoming</option>
-                                <option value="special">Special</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Ngôn ngữ
-                            </label>
-                            <select
-                                name="language"
-                                value={formData.language?.[0] || ''}
-                                onChange={handleSelectChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            >
-                                <option value="">Chọn ngôn ngữ</option>
-                                {languages.map(lang => (
-                                    <option key={lang} value={lang}>{lang}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Độ tuổi
-                            </label>
-                            <select
-                                name="ageRating"
-                                value={formData.ageRating}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            >
-                                <option value="">Chọn độ tuổi</option>
-                                {ageRestrictions.map(age => (
-                                    <option key={age} value={age}>{age}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Link trailer
-                            </label>
-                            <input
-                                type="text"
-                                name="trailer"
-                                value={formData.trailer}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Mô tả
-                        </label>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            rows={4}
-                            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-black"
-                            required
+            <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSubmit}
+                autoComplete="off"
+            >
+                <div className="grid grid-cols-2 gap-4">
+                    <Form.Item
+                        name="title"
+                        label="Tên phim"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập tên phim!' },
+                            { min: 2, message: 'Tên phim phải có ít nhất 2 ký tự!' },
+                            { max: 200, message: 'Tên phim không được quá 200 ký tự!' }
+                        ]}
+                    >
+                        <Input
+                            ref={titleInputRef}
+                            placeholder="Nhập tên phim"
+                            size="large"
                         />
-                    </div>
+                    </Form.Item>
 
-                    <div className="flex justify-end gap-4 mt-6">
-                        <motion.button
-                            type="button"
-                            onClick={onCancel}
-                            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            Hủy
-                        </motion.button>
-                        <motion.button
-                            type="submit"
-                            className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            {movie ? 'Cập nhật' : 'Thêm mới'}
-                        </motion.button>
-                    </div>
-                </form>
+                    <Form.Item
+                        name="director"
+                        label="Đạo diễn"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập tên đạo diễn!' },
+                            { min: 2, message: 'Tên đạo diễn phải có ít nhất 2 ký tự!' }
+                        ]}
+                    >
+                        <Input
+                            placeholder="Nhập tên đạo diễn"
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="duration"
+                        label="Thời lượng (phút)"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập thời lượng!' },
+                            { type: 'number', min: 30, max: 300, message: 'Thời lượng phải từ 30-300 phút!' }
+                        ]}
+                    >
+                        <InputNumber
+                            placeholder="Nhập thời lượng"
+                            size="large"
+                            min={30}
+                            max={300}
+                            style={{ width: '100%' }}
+                            addonAfter="phút"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="releaseDate"
+                        label="Ngày phát hành"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngày phát hành!' }
+                        ]}
+                    >
+                        <DatePicker
+                            placeholder="Chọn ngày phát hành"
+                            size="large"
+                            style={{ width: '100%' }}
+                            format="DD/MM/YYYY"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="genre"
+                        label="Thể loại"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn thể loại!' }
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn thể loại"
+                            size="large"
+                            options={genres.map(genre => ({ value: genre, label: genre }))}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="language"
+                        label="Ngôn ngữ"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngôn ngữ!' }
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn ngôn ngữ"
+                            size="large"
+                            options={languages.map(lang => ({ value: lang, label: lang }))}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="status"
+                        label="Trạng thái"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn trạng thái!' }
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn trạng thái"
+                            size="large"
+                            options={[
+                                { value: 'nowShowing', label: 'Now Showing' },
+                                { value: 'upcoming', label: 'Upcoming' },
+                                { value: 'special', label: 'Special' }
+                            ]}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="ageRating"
+                        label="Độ tuổi"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn độ tuổi!' }
+                        ]}
+                    >
+                        <Select
+                            placeholder="Chọn độ tuổi"
+                            size="large"
+                            options={ageRestrictions.map(age => ({ value: age, label: age }))}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="actors"
+                        label="Diễn viên (phân cách bằng dấu phẩy)"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập diễn viên!' },
+                            { min: 2, message: 'Danh sách diễn viên quá ngắn!' }
+                        ]}
+                    >
+                        <Input
+                            placeholder="Ví dụ: Tom Hanks, Leonardo DiCaprio"
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="trailer"
+                        label="Link trailer"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập link trailer!' },
+                            { type: 'url', message: 'Link trailer không hợp lệ!' }
+                        ]}
+                    >
+                        <Input
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="image"
+                        label="Ảnh thumbnail"
+                        rules={[
+                            { required: !movie?.image, message: 'Vui lòng tải lên ảnh thumbnail!' }
+                        ]}
+                    >
+                        <div className="space-y-2">
+                            {imagePreview && (
+                                <div className="flex items-center space-x-4">
+                                    <img
+                                        src={imagePreview}
+                                        alt="Thumbnail preview"
+                                        className="w-20 h-20 object-cover rounded border"
+                                    />
+                                    <span className="text-sm text-gray-600">Ảnh hiện tại</span>
+                                </div>
+                            )}
+                            <Upload
+                                beforeUpload={() => false}
+                                onChange={handleImageChange('image')}
+                                showUploadList={false}
+                                accept="image/*"
+                            >
+                                <Input
+                                    placeholder={imagePreview ? "Chọn ảnh mới" : "Chọn ảnh thumbnail"}
+                                    size="large"
+                                    suffix={<UploadOutlined />}
+                                    readOnly
+                                />
+                            </Upload>
+                        </div>
+                    </Form.Item>
+
+                    <Form.Item
+                        name="posterImage"
+                        label="Ảnh poster"
+                        rules={[
+                            { required: !movie?.posterImage, message: 'Vui lòng tải lên ảnh poster!' }
+                        ]}
+                    >
+                        <div className="space-y-2">
+                            {posterPreview && (
+                                <div className="flex items-center space-x-4">
+                                    <img
+                                        src={posterPreview}
+                                        alt="Poster preview"
+                                        className="w-20 h-20 object-cover rounded border"
+                                    />
+                                    <span className="text-sm text-gray-600">Ảnh hiện tại</span>
+                                </div>
+                            )}
+                            <Upload
+                                beforeUpload={() => false}
+                                onChange={handleImageChange('posterImage')}
+                                showUploadList={false}
+                                accept="image/*"
+                            >
+                                <Input
+                                    placeholder={posterPreview ? "Chọn ảnh mới" : "Chọn ảnh poster"}
+                                    size="large"
+                                    suffix={<UploadOutlined />}
+                                    readOnly
+                                />
+                            </Upload>
+                        </div>
+                    </Form.Item>
+                </div>
+
+                <Form.Item
+                    name="description"
+                    label="Mô tả"
+                    rules={[
+                        { required: true, message: 'Vui lòng nhập mô tả phim!' },
+                        { min: 20, message: 'Mô tả phải có ít nhất 20 ký tự!' },
+                        { max: 1000, message: 'Mô tả không được quá 1000 ký tự!' }
+                    ]}
+                >
+                    <Input.TextArea
+                        placeholder="Nhập mô tả phim..."
+                        rows={4}
+                        size="large"
+                        showCount
+                        maxLength={1000}
+                    />
+                </Form.Item>
+
+                <div className="flex justify-end gap-4 mt-6">
+                    <motion.button
+                        type="button"
+                        onClick={onCancel}
+                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        Hủy
+                    </motion.button>
+                    <motion.button
+                        type="submit"
+                        className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        {movie ? 'Cập nhật' : 'Thêm mới'}
+                    </motion.button>
+                </div>
+            </Form>
         </Modal>
     );
 };

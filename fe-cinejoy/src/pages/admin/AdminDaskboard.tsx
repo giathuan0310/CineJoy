@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
-import { Popconfirm } from "antd";
-import { getVouchers } from "@/apiservice/apiVoucher";
-import { getFoodCombos } from "@/apiservice/apiFoodCombo";
-import { getTheaters } from "@/apiservice/apiTheater";
+import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
+import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
+import { getFoodCombos, addFoodCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
+import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
 import {
   deleteMovie,
   getMovies,
@@ -20,14 +20,16 @@ import {
   updateRegion,
 } from "@/apiservice/apiRegion";
 import { getBlogs } from "@/apiservice/apiBlog";
-import banner from "@/assets/banner.jpg";
 import {
   getShowTimes,
-  updateShowtime,
   deleteShowtime,
 } from "@/apiservice/apiShowTime";
 import MovieForm from "@/pages/admin/Form/MovieForm";
 import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
+import FoodComboForm from "@/pages/admin/Form/FoodComboForm";
+import VoucherForm from "@/pages/admin/Form/VoucherForm";
+import RegionForm from "@/pages/admin/Form/RegionForm";
+import TheaterForm from "@/pages/admin/Form/TheaterForm";
 import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
@@ -41,12 +43,10 @@ const Dashboard: React.FC = () => {
   const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
   const [blogs, setBlogs] = useState<IBlog[]>([]);
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-  const [newRegionName, setNewRegionName] = useState<string>("");
   const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
   const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(
     undefined
   );
-  const [editingRegion, setEditingRegion] = useState<IRegion | null>(null);
   const [showTimeForm, setShowTimeForm] = useState<boolean>(false);
   const [selectedShowtime, setSelectedShowtime] = useState<IShowtime | null>(
     null
@@ -54,6 +54,22 @@ const Dashboard: React.FC = () => {
   const [showShowtimeForm, setShowShowtimeForm] = useState<boolean>(false);
   const [editingShowtime, setEditingShowtime] = useState<IShowtime | null>(
     null
+  );
+  const [showFoodComboForm, setShowFoodComboForm] = useState<boolean>(false);
+  const [selectedFoodCombo, setSelectedFoodCombo] = useState<IFoodCombo | undefined>(
+    undefined
+  );
+  const [showVoucherForm, setShowVoucherForm] = useState<boolean>(false);
+  const [selectedVoucher, setSelectedVoucher] = useState<IVoucher | undefined>(
+    undefined
+  );
+  const [showRegionForm, setShowRegionForm] = useState<boolean>(false);
+  const [selectedRegion, setSelectedRegion] = useState<IRegion | undefined>(
+    undefined
+  );
+  const [showTheaterForm, setShowTheaterForm] = useState<boolean>(false);
+  const [selectedTheater, setSelectedTheater] = useState<ITheater | undefined>(
+    undefined
   );
   const { user } = useAppStore();
 
@@ -165,37 +181,28 @@ const Dashboard: React.FC = () => {
   }, [activeTab, searchTerm]);
 
   ////////////////////////Xử lý CRUD khu vực////////////////////////
-  const handleRegionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const regionName = newRegionName.trim();
-    if (!regionName) {
-      toast.error("Tên khu vực không được để trống!");
-      return;
-    }
-    if (editingRegion) {
-      // Cập nhật
-      try {
-        const updated = await updateRegion(editingRegion._id, {
-          ...editingRegion,
-          name: regionName,
+  const handleRegionSubmit = async (regionData: Partial<IRegion>) => {
+    try {
+      if (selectedRegion) {
+        // Cập nhật
+        const updated = await updateRegion(selectedRegion._id, {
+          ...selectedRegion,
+          ...regionData,
         });
         setRegions(regions.map((r) => (r._id === updated._id ? updated : r)));
-        setEditingRegion(null);
-        setNewRegionName("");
         toast.success("Cập nhật khu vực thành công!");
-      } catch {
-        toast.success("Cập nhật thất bại!");
-      }
-    } else {
-      // Thêm mới
-      try {
-        const newRegion: IRegion = await addRegion({ name: regionName });
+      } else {
+        // Thêm mới
+        const newRegion: IRegion = await addRegion(regionData as IRegion);
         setRegions([...regions, newRegion]);
-        setNewRegionName("");
         toast.success("Thêm khu vực thành công!");
-      } catch {
-        toast.error("Thêm khu vực thất bại!");
       }
+      
+      // Đóng modal và reset
+      setShowRegionForm(false);
+      setSelectedRegion(undefined);
+    } catch {
+      toast.error(selectedRegion ? "Cập nhật khu vực thất bại!" : "Thêm khu vực thất bại!");
     }
   };
 
@@ -214,12 +221,185 @@ const Dashboard: React.FC = () => {
   const handleEditRegion = async (regionId: string) => {
     try {
       const region = await getRegionById(regionId);
-      setEditingRegion(region);
-      setNewRegionName(region.name);
+      setSelectedRegion(region);
+      setShowRegionForm(true);
     } catch (error) {
       console.log(error);
       toast.error("Không lấy được thông tin khu vực!");
     }
+  };
+
+  const handleAddRegion = () => {
+    setSelectedRegion(undefined);
+    setShowRegionForm(true);
+  };
+  /////////////////////////////////////////////////////////////////
+
+  ////////////////////////Xử lý CRUD Theater////////////////////////
+  const loadTheaters = async () => {
+    try {
+      const data = await getTheaters();
+      setTheaters(data);
+    } catch (error) {
+      console.error("Error loading theaters:", error);
+      setTheaters([]);
+    }
+  };
+
+  const handleTheaterSubmit = async (theaterData: Partial<ITheater>) => {
+    try {
+      if (selectedTheater) {
+        // Cập nhật
+        await updateTheater(selectedTheater._id, {
+          ...selectedTheater,
+          ...theaterData,
+        } as ITheater);
+        toast.success("Cập nhật rạp thành công!");
+      } else {
+        // Thêm mới
+        await addTheater(theaterData as ITheater);
+        toast.success("Thêm rạp thành công!");
+      }
+      
+      // Reload dữ liệu sau khi thêm/sửa
+      await loadTheaters();
+      setShowTheaterForm(false);
+      setSelectedTheater(undefined);
+    } catch {
+      toast.error(selectedTheater ? "Cập nhật rạp thất bại!" : "Thêm rạp thất bại!");
+    }
+  };
+
+  const handleDeleteTheater = async (theaterId: string) => {
+    try {
+      await deleteTheater(theaterId);
+      // Reload dữ liệu sau khi xóa
+      await loadTheaters();
+      toast.success("Xóa rạp thành công!");
+    } catch (error) {
+      console.error("Error deleting theater:", error);
+      toast.error("Xóa rạp thất bại!");
+    }
+  };
+
+  const handleEditTheater = (theater: ITheater) => {
+    setSelectedTheater(theater);
+    setShowTheaterForm(true);
+  };
+
+  const handleAddTheater = () => {
+    setSelectedTheater(undefined);
+    setShowTheaterForm(true);
+  };
+  /////////////////////////////////////////////////////////////////
+
+  ////////////////////////Xử lý CRUD Food Combo////////////////////////
+  const loadFoodCombos = async () => {
+    try {
+      const data = await getFoodCombos();
+      setFoodCombos(data);
+    } catch (error) {
+      console.error("Error loading food combos:", error);
+      setFoodCombos([]);
+    }
+  };
+
+  const handleFoodComboSubmit = async (comboData: Partial<IFoodCombo>) => {
+    try {
+      if (selectedFoodCombo) {
+        // Cập nhật
+        await updateFoodCombo(selectedFoodCombo._id!, comboData as IFoodCombo);
+        toast.success("Cập nhật combo thành công!");
+      } else {
+        // Thêm mới
+        await addFoodCombo(comboData as IFoodCombo);
+        toast.success("Thêm combo thành công!");
+      }
+      // Reload dữ liệu sau khi thêm/sửa
+      await loadFoodCombos();
+      setShowFoodComboForm(false);
+      setSelectedFoodCombo(undefined);
+    } catch (error) {
+      console.error("Error submitting combo:", error);
+      toast.error(selectedFoodCombo ? "Cập nhật combo thất bại!" : "Thêm combo thất bại!");
+    }
+  };
+
+  const handleDeleteFoodCombo = async (comboId: string) => {
+    try {
+      await deleteFoodCombo(comboId);
+      // Reload dữ liệu sau khi xóa
+      await loadFoodCombos();
+      toast.success("Xóa combo thành công!");
+    } catch (error) {
+      console.error("Error deleting combo:", error);
+      toast.error("Xóa combo thất bại!");
+    }
+  };
+
+  const handleEditFoodCombo = (combo: IFoodCombo) => {
+    setSelectedFoodCombo(combo);
+    setShowFoodComboForm(true);
+  };
+
+  const handleAddFoodCombo = () => {
+    setSelectedFoodCombo(undefined);
+    setShowFoodComboForm(true);
+  };
+  /////////////////////////////////////////////////////////////////
+
+  ////////////////////////Xử lý CRUD Voucher////////////////////////
+  const loadVouchers = async () => {
+    try {
+      const data = await getVouchers();
+      setVouchers(data);
+    } catch (error) {
+      console.error("Error loading vouchers:", error);
+      setVouchers([]);
+    }
+  };
+
+  const handleVoucherSubmit = async (voucherData: Partial<IVoucher>) => {
+    try {
+      if (selectedVoucher) {
+        // Cập nhật
+        await updateVoucher(selectedVoucher._id!, voucherData as IVoucher);
+        toast.success("Cập nhật voucher thành công!");
+      } else {
+        // Thêm mới
+        await addVoucher(voucherData as IVoucher);
+        toast.success("Thêm voucher thành công!");
+      }
+      // Reload dữ liệu sau khi thêm/sửa
+      await loadVouchers();
+      setShowVoucherForm(false);
+      setSelectedVoucher(undefined);
+    } catch (error) {
+      console.error("Error submitting voucher:", error);
+      toast.error(selectedVoucher ? "Cập nhật voucher thất bại!" : "Thêm voucher thất bại!");
+    }
+  };
+
+  const handleDeleteVoucher = async (voucherId: string) => {
+    try {
+      await deleteVoucher(voucherId);
+      // Reload dữ liệu sau khi xóa
+      await loadVouchers();
+      toast.success("Xóa voucher thành công!");
+    } catch (error) {
+      console.error("Error deleting voucher:", error);
+      toast.error("Xóa voucher thất bại!");
+    }
+  };
+
+  const handleEditVoucher = (voucher: IVoucher) => {
+    setSelectedVoucher(voucher);
+    setShowVoucherForm(true);
+  };
+
+  const handleAddVoucher = () => {
+    setSelectedVoucher(undefined);
+    setShowVoucherForm(true);
   };
   /////////////////////////////////////////////////////////////////
 
@@ -294,17 +474,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const fetchShowtimes = async () => {
-    try {
-      const response = await getShowTimes();
-      if (response && response.data) {
-        setShowtimes(response.data);
-      }
-    } catch (error) {
-      console.error("Error fetching showtimes:", error);
-      toast.error("Không thể tải danh sách suất chiếu");
-    }
-  };
 
   const handleEditShowtime = (showtime: IShowtime) => {
     setEditingShowtime(showtime);
@@ -396,7 +565,7 @@ const Dashboard: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <motion.button
-                  className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 cursor-pointer"
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
@@ -404,7 +573,7 @@ const Dashboard: React.FC = () => {
                     setShowMovieForm(true);
                   }}
                 >
-                  Thêm phim mới
+                  Thêm phim
                 </motion.button>
                 <div>
                   <span>
@@ -491,7 +660,7 @@ const Dashboard: React.FC = () => {
                             </motion.button>
                             <Popconfirm
                               title="Xóa phim"
-                              description={`Bạn có chắc chắn muốn xóa phim \"${movie.title}\"?`}
+                              description={`Bạn có chắc chắn muốn xóa phim "${movie.title}"?`}
                               okText="Xóa"
                               cancelText="Hủy"
                               onConfirm={() => handleDeleteMovies(movie._id)}
@@ -597,24 +766,34 @@ const Dashboard: React.FC = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div>
-                  <span>
-                    Trang {currentPage} / {totalComboPages}
-                  </span>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddFoodCombo}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    Trước
-                  </button>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === totalComboPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                  >
-                    Sau
-                  </button>
+                    Thêm combo
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalComboPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalComboPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -624,6 +803,9 @@ const Dashboard: React.FC = () => {
                       <th className="p-3 text-left">STT</th>
                       <th className="p-3 text-left">Tên Combo</th>
                       <th className="p-3 text-left">Giá</th>
+                      <th className="p-3 text-left">Mô tả</th>
+                      <th className="p-3 text-left">Số lượng</th>
+                      <th className="p-3 text-left">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -635,9 +817,48 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
-                        <td className="p-3">{combo.name}</td>
-                        <td className="p-3">
+                        <td className="p-3 font-medium">{combo.name}</td>
+                        <td className="p-3 text-green-600 font-semibold">
                           {combo.price.toLocaleString("vi-VN")} đ
+                        </td>
+                        <td className="p-3 max-w-xs truncate" title={combo.description}>
+                          {combo.description}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`px-2 py-1 rounded-full text-sm ${
+                            combo.quantity > 100 ? 'bg-green-100 text-green-800' :
+                            combo.quantity > 50 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {combo.quantity}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              onClick={() => handleEditFoodCombo(combo)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xóa combo"
+                              description="Bạn có chắc chắn muốn xóa combo này?"
+                              onConfirm={() => handleDeleteFoodCombo(combo._id!)}
+                              okText="Có"
+                              cancelText="Không"
+                            >
+                              <motion.button
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -654,60 +875,41 @@ const Dashboard: React.FC = () => {
                 Quản lý Khu vực
               </h2>
               <div className="flex justify-between items-center mb-4">
-                <form onSubmit={handleRegionSubmit}>
-                  <div className="flex flex-col md:flex-row gap-6 ">
-                    <motion.input
-                      type="text"
-                      placeholder="Tìm kiếm khu vực..."
-                      className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-
-                    <motion.input
-                      type="text"
-                      value={newRegionName}
-                      onChange={(e) => setNewRegionName(e.target.value)}
-                      placeholder="Nhập tên Khu vực"
-                      className="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-black"
-                      whileFocus={{
-                        scale: 1.02,
-                        transition: { duration: 0.2 },
-                      }}
-                    />
-                    <motion.button
-                      type="submit"
-                      className={
-                        editingRegion
-                          ? "bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 cursor-pointer"
-                          : "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
-                      }
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm khu vực..."
+                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddRegion}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Thêm khu vực
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalRegionPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
                     >
-                      {editingRegion ? "Sửa" : "Thêm"}
-                    </motion.button>
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalRegionPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
                   </div>
-                </form>
-
-                <div>
-                  <span>
-                    Trang {currentPage} / {totalRegionPages}
-                  </span>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
-                  >
-                    Trước
-                  </button>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === totalRegionPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                  >
-                    Sau
-                  </button>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -776,24 +978,34 @@ const Dashboard: React.FC = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div>
-                  <span>
-                    Trang {currentPage} / {totalTheaterPages}
-                  </span>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddTheater}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    Trước
-                  </button>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === totalTheaterPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                  >
-                    Sau
-                  </button>
+                    Thêm rạp
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalTheaterPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalTheaterPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -804,6 +1016,7 @@ const Dashboard: React.FC = () => {
                       <th className="p-3 text-left">Tên rạp</th>
                       <th className="p-3 text-left">Thành phố</th>
                       <th className="p-3 text-left">Địa chỉ</th>
+                      <th className="p-3 text-left">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -815,9 +1028,42 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
-                        <td className="p-3">{theater.name}</td>
-                        <td className="p-3">{theater.location.city}</td>
-                        <td className="p-3">{theater.location.address}</td>
+                        <td className="p-3 font-medium">{theater.name}</td>
+                        <td className="p-3">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
+                            {theater.location.city}
+                          </span>
+                        </td>
+                        <td className="p-3 max-w-xs truncate" title={theater.location.address}>
+                          {theater.location.address}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              onClick={() => handleEditTheater(theater)}
+                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xóa rạp"
+                              description="Bạn có chắc chắn muốn xóa rạp này?"
+                              onConfirm={() => handleDeleteTheater(theater._id!)}
+                              okText="Có"
+                              cancelText="Không"
+                            >
+                              <motion.button
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -840,24 +1086,34 @@ const Dashboard: React.FC = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div>
-                  <span>
-                    Trang {currentPage} / {totalVoucherPages}
-                  </span>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddVoucher}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    Trước
-                  </button>
-                  <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                    disabled={currentPage === totalVoucherPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                  >
-                    Sau
-                  </button>
+                    Thêm voucher
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalVoucherPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalVoucherPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -866,9 +1122,12 @@ const Dashboard: React.FC = () => {
                     <tr>
                       <th className="p-3 text-left">STT</th>
                       <th className="p-3 text-left">Tên Voucher</th>
+                      <th className="p-3 text-left">Giảm giá</th>
+                      <th className="p-3 text-left">Điểm đổi</th>
                       <th className="p-3 text-left">Ngày bắt đầu</th>
                       <th className="p-3 text-left">Ngày kết thúc</th>
                       <th className="p-3 text-left">Số lượng</th>
+                      <th className="p-3 text-left">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -880,14 +1139,59 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
-                        <td className="p-3">{voucher.name}</td>
+                        <td className="p-3 font-medium">{voucher.name}</td>
                         <td className="p-3">
-                          {voucher.validityPeriod.startDate}
+                          <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-semibold">
+                            -{voucher.discountPercent}%
+                          </span>
                         </td>
                         <td className="p-3">
-                          {voucher.validityPeriod.endDate}
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
+                            {voucher.pointToRedeem} điểm
+                          </span>
                         </td>
-                        <td className="p-3">{voucher.quantity}</td>
+                        <td className="p-3">
+                          {new Date(voucher.validityPeriod.startDate).toLocaleDateString("vi-VN")}
+                        </td>
+                        <td className="p-3">
+                          {new Date(voucher.validityPeriod.endDate).toLocaleDateString("vi-VN")}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className={`px-2 py-1 rounded-full text-sm ${
+                            voucher.quantity > 100 ? 'bg-green-100 text-green-800' :
+                            voucher.quantity > 50 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {voucher.quantity}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              onClick={() => handleEditVoucher(voucher)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xóa voucher"
+                              description="Bạn có chắc chắn muốn xóa voucher này?"
+                              onConfirm={() => handleDeleteVoucher(voucher._id!)}
+                              okText="Có"
+                              cancelText="Không"
+                            >
+                              <motion.button
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -911,12 +1215,12 @@ const Dashboard: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
                 <motion.button
-                  className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 cursor-pointer"
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowShowtimeForm(true)}
                 >
-                  Thêm suất chiếu mới
+                  Thêm suất chiếu
                 </motion.button>
                 <div>
                   <span>
@@ -977,7 +1281,7 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           <motion.button
                             onClick={() => handleShowtimeDetail(showtime)}
-                            className="text-indigo-600 hover:text-indigo-900 mr-4"
+                            className="text-indigo-600 hover:text-indigo-900 mr-4 cursor-pointer"
                           >
                             Xem chi tiết
                           </motion.button>
@@ -1031,86 +1335,189 @@ const Dashboard: React.FC = () => {
         />
       )}
 
+      {/* Food Combo Form Modal */}
+      {showFoodComboForm && (
+        <FoodComboForm
+          combo={selectedFoodCombo}
+          onSubmit={handleFoodComboSubmit}
+          onCancel={() => {
+            setShowFoodComboForm(false);
+            setSelectedFoodCombo(undefined);
+          }}
+        />
+      )}
+
+      {/* Voucher Form Modal */}
+      {showVoucherForm && (
+        <VoucherForm
+          voucher={selectedVoucher}
+          onSubmit={handleVoucherSubmit}
+          onCancel={() => {
+            setShowVoucherForm(false);
+            setSelectedVoucher(undefined);
+          }}
+        />
+      )}
+
       {/* Showtime Detail Modal */}
       {showTimeForm && selectedShowtime && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">
-                Chi tiết suất chiếu - {selectedShowtime.movieId.title}
+        <Modal
+          open={showTimeForm}
+          title={
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-gray-800">
+                Chi tiết suất chiếu
               </h3>
-              <button
-                onClick={() => {
-                  setShowTimeForm(false);
-                  setSelectedShowtime(null);
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-semibold">Rạp chiếu:</p>
-                  <p>{selectedShowtime.theaterId.name}</p>
-                </div>
-                <div>
-                  <p className="font-semibold">Thời gian chiếu:</p>
-                  <p>
-                    {new Date(
-                      selectedShowtime.showDate.start
-                    ).toLocaleDateString("vi-VN")}{" "}
-                    -
-                    {new Date(selectedShowtime.showDate.end).toLocaleDateString(
-                      "vi-VN"
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Danh sách suất chiếu:</h4>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="p-2 text-left">Ngày</th>
-                        <th className="p-2 text-left">Giờ bắt đầu</th>
-                        <th className="p-2 text-left">Giờ kết thúc</th>
-                        <th className="p-2 text-left">Phòng chiếu</th>
-                        <th className="p-2 text-left">Số ghế trống</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedShowtime.showTimes.map((time, index) => (
-                        <tr key={index} className="border-b hover:bg-gray-50">
-                          <td className="p-2">
-                            {new Date(time.date).toLocaleDateString("vi-VN")}
-                          </td>
-                          <td className="p-2">
-                            {new Date(time.start).toLocaleTimeString("vi-VN")}
-                          </td>
-                          <td className="p-2">
-                            {new Date(time.end).toLocaleTimeString("vi-VN")}
-                          </td>
-                          <td className="p-2">{time.room}</td>
-                          <td className="p-2">
-                            {
-                              time.seats.filter(
-                                (seat) => seat.status === "available"
-                              ).length
-                            }{" "}
-                            / {time.seats.length}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+          }
+          onCancel={() => {
+            setShowTimeForm(false);
+            setSelectedShowtime(null);
+          }}
+          footer={null}
+          width={900}
+          centered
+          destroyOnClose
+        >
+          <div className="space-y-6">
+            {/* Thông tin cơ bản */}
+            <Descriptions
+              bordered
+              column={2}
+              size="middle"
+              labelStyle={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}
+            >
+              <Descriptions.Item label="🎬 Phim" span={2}>
+                <span className="text-lg font-medium text-blue-600">
+                  {selectedShowtime.movieId.title}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="🏢 Rạp chiếu">
+                <Tag color="blue" className="text-sm">
+                  {selectedShowtime.theaterId.name}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="📅 Khoảng thời gian">
+                <Space direction="vertical" size="small">
+                  <span>
+                    <Tag color="green">
+                      Từ: {new Date(selectedShowtime.showDate.start).toLocaleDateString("vi-VN")}
+                    </Tag>
+                  </span>
+                  <span>
+                    <Tag color="orange">
+                      Đến: {new Date(selectedShowtime.showDate.end).toLocaleDateString("vi-VN")}
+                    </Tag>
+                  </span>
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="🎪 Tổng số suất chiếu">
+                <Tag color="purple" className="text-base font-semibold">
+                  {selectedShowtime.showTimes.length} suất
+                </Tag>
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* Danh sách suất chiếu */}
+            <div className="mt-5">
+              <h4 className="text-lg font-semibold mb-3 text-gray-700">
+                📋 Danh sách suất chiếu chi tiết
+              </h4>
+              <Table
+                dataSource={selectedShowtime.showTimes.map((time, index) => ({
+                  key: index,
+                  index: index + 1,
+                  date: time.date,
+                  start: time.start,
+                  end: time.end,
+                  room: time.room,
+                  availableSeats: time.seats.filter(seat => seat.status === "available").length,
+                  totalSeats: time.seats.length,
+                  seats: time.seats
+                }))}
+                columns={[
+                  {
+                    title: 'STT',
+                    dataIndex: 'index',
+                    key: 'index',
+                    width: 60,
+                    align: 'center',
+                    render: (text) => <span className="font-medium">{text}</span>
+                  },
+                  {
+                    title: '📅 Ngày chiếu',
+                    dataIndex: 'date',
+                    key: 'date',
+                    render: (date) => (
+                      <Tag color="blue" className="text-sm">
+                        {new Date(date).toLocaleDateString("vi-VN")}
+                      </Tag>
+                    )
+                  },
+                  {
+                    title: '⏰ Thời gian',
+                    key: 'time',
+                    render: (_, record) => (
+                      <Space direction="vertical" size="small">
+                        <Tag color="green">
+                          Bắt đầu: {new Date(record.start).toLocaleTimeString("vi-VN", { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </Tag>
+                        <Tag color="orange">
+                          Kết thúc: {new Date(record.end).toLocaleTimeString("vi-VN", { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </Tag>
+                      </Space>
+                    )
+                  },
+                  {
+                    title: '🏠 Phòng chiếu',
+                    dataIndex: 'room',
+                    key: 'room',
+                    render: (room) => (
+                      <Tag color="purple" className="font-medium">
+                        {room}
+                      </Tag>
+                    )
+                  },
+                  {
+                    title: '💺 Tình trạng ghế',
+                    key: 'seats',
+                    render: (_, record) => {
+                      const availableRatio = (record.availableSeats / record.totalSeats) * 100;
+                      const color = availableRatio > 70 ? 'green' : availableRatio > 30 ? 'orange' : 'red';
+                      
+                      return (
+                        <Space direction="vertical" size="small">
+                          <Tag color={color} className="font-medium">
+                            Trống: {record.availableSeats}/{record.totalSeats}
+                          </Tag>
+                          <div className="text-xs text-gray-500">
+                            {Math.round(availableRatio)}% còn trống
+                          </div>
+                        </Space>
+                      );
+                    }
+                  }
+                ]}
+                pagination={{
+                  pageSize: 5,
+                  showSizeChanger: false,
+                  showQuickJumper: true,
+                  showTotal: (total, range) => 
+                    `${range[0]}-${range[1]} của ${total} suất chiếu`
+                }}
+                size="middle"
+                scroll={{ x: 800 }}
+                className="border rounded-lg"
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Showtime Form Modal */}
@@ -1135,6 +1542,30 @@ const Dashboard: React.FC = () => {
               });
           }}
           editData={editingShowtime || undefined}
+        />
+      )}
+
+      {/* Region Form Modal */}
+      {showRegionForm && (
+        <RegionForm
+          region={selectedRegion}
+          onSubmit={handleRegionSubmit}
+          onCancel={() => {
+            setShowRegionForm(false);
+            setSelectedRegion(undefined);
+          }}
+        />
+      )}
+
+      {/* Theater Form Modal */}
+      {showTheaterForm && (
+        <TheaterForm
+          theater={selectedTheater}
+          onSubmit={handleTheaterSubmit}
+          onCancel={() => {
+            setShowTheaterForm(false);
+            setSelectedTheater(undefined);
+          }}
         />
       )}
     </div>

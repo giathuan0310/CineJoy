@@ -6,6 +6,7 @@ import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addFoodCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
+import { getAllUsersApi, createUserApi, updateUserApi, deleteUserApi } from "@/services/api";
 import {
   deleteMovie,
   getMovies,
@@ -30,6 +31,7 @@ import FoodComboForm from "@/pages/admin/Form/FoodComboForm";
 import VoucherForm from "@/pages/admin/Form/VoucherForm";
 import RegionForm from "@/pages/admin/Form/RegionForm";
 import TheaterForm from "@/pages/admin/Form/TheaterForm";
+import UserForm from "@/pages/admin/Form/UserForm";
 import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
@@ -43,6 +45,7 @@ const Dashboard: React.FC = () => {
   const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
   const [blogs, setBlogs] = useState<IBlog[]>([]);
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
+  const [users, setUsers] = useState<IUser[]>([]);
   const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
   const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(
     undefined
@@ -69,6 +72,10 @@ const Dashboard: React.FC = () => {
   );
   const [showTheaterForm, setShowTheaterForm] = useState<boolean>(false);
   const [selectedTheater, setSelectedTheater] = useState<ITheater | undefined>(
+    undefined
+  );
+  const [showUserForm, setShowUserForm] = useState<boolean>(false);
+  const [selectedUser, setSelectedUser] = useState<IUser | undefined>(
     undefined
   );
   const { user } = useAppStore();
@@ -102,6 +109,15 @@ const Dashboard: React.FC = () => {
       .catch((error) => {
         console.error("Error fetching showtimes:", error);
         setShowtimes([]);
+      });
+    getAllUsersApi()
+      .then((response) => {
+        console.log("Users API response:", response);
+        setUsers(response.data && Array.isArray(response.data) ? response.data : []);
+      })
+      .catch((error) => {
+        console.error("Error fetching users:", error);
+        setUsers([]);
       });
   }, []);
 
@@ -152,6 +168,22 @@ const Dashboard: React.FC = () => {
           searchTerm.toLowerCase()
         ) ||
         (theater.location?.city?.toLowerCase() ?? "").includes(
+          searchTerm.toLowerCase()
+        )
+    );
+
+  // Users
+  const { paginated: paginatedUsers, totalPages: totalUserPages } =
+    filterAndPaginate<IUser>(
+      users,
+      (user) =>
+        (user.fullName?.toLowerCase() ?? "").includes(
+          searchTerm.toLowerCase()
+        ) ||
+        (user.email?.toLowerCase() ?? "").includes(
+          searchTerm.toLowerCase()
+        ) ||
+        (user.phoneNumber?.toLowerCase() ?? "").includes(
           searchTerm.toLowerCase()
         )
     );
@@ -290,6 +322,67 @@ const Dashboard: React.FC = () => {
   const handleAddTheater = () => {
     setSelectedTheater(undefined);
     setShowTheaterForm(true);
+  };
+  /////////////////////////////////////////////////////////////////
+
+  ////////////////////////Xử lý CRUD User////////////////////////
+  const loadUsers = async () => {
+    try {
+      const response = await getAllUsersApi();
+      setUsers(response.data && Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      setUsers([]);
+    }
+  };
+
+  const handleUserSubmit = async (userData: Partial<IUser>) => {
+    try {
+      if (selectedUser) {
+        // Cập nhật
+        await updateUserApi(selectedUser._id!, userData);
+        toast.success("Cập nhật người dùng thành công!");
+      } else {
+        // Thêm mới
+        await createUserApi(userData as Parameters<typeof createUserApi>[0]);
+        toast.success("Thêm người dùng thành công!");
+      }
+      
+      // Reload dữ liệu sau khi thêm/sửa
+      await loadUsers();
+      setShowUserForm(false);
+      setSelectedUser(undefined);
+    } catch (error: unknown) {
+      console.error("Error with user:", error);
+      const errorObj = error as { error?: number };
+      if (errorObj?.error === 400) {
+        toast.error("Email đã tồn tại!");
+      } else {
+        toast.error(selectedUser ? "Cập nhật người dùng thất bại!" : "Thêm người dùng thất bại!");
+      }
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await deleteUserApi(userId);
+      // Reload dữ liệu sau khi xóa
+      await loadUsers();
+      toast.success("Xóa người dùng thành công!");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Xóa người dùng thất bại!");
+    }
+  };
+
+  const handleEditUser = (user: IUser) => {
+    setSelectedUser(user);
+    setShowUserForm(true);
+  };
+
+  const handleAddUser = () => {
+    setSelectedUser(undefined);
+    setShowUserForm(true);
   };
   /////////////////////////////////////////////////////////////////
 
@@ -503,13 +596,12 @@ const Dashboard: React.FC = () => {
           <ul>
             {[
               { label: "Phim", value: "movies", icon: "🎬" },
-              // { label: "Đơn hàng", value: "orders", icon: "📦" },
-              // { label: "Người dùng", value: "users", icon: "👥" },
               { label: "Blog", value: "blogs", icon: "📰" },
               { label: "Combo", value: "foodCombos", icon: "🍿" },
               { label: "Khu vực", value: "regions", icon: "🌏" },
               { label: "Rạp", value: "theaters", icon: "🏢" },
               { label: "Voucher", value: "vouchers", icon: "🎟️" },
+              { label: "Người dùng", value: "users", icon: "👥" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
             ].map((tab) => (
               <li
@@ -1200,6 +1292,144 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
+          {/* Users Tab */}
+          {activeTab === "users" && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                Quản lý Người dùng
+              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm người dùng..."
+                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddUser}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Thêm người dùng
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalUserPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalUserPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-black text-white">
+                    <tr>
+                      <th className="p-3 text-left">STT</th>
+                      <th className="p-3 text-left">Avatar</th>
+                      <th className="p-3 text-left">Họ tên</th>
+                      <th className="p-3 text-left">Email</th>
+                      <th className="p-3 text-left">SĐT</th>
+                      <th className="p-3 text-left">Vai trò</th>
+                      <th className="p-3 text-left">Trạng thái</th>
+                      <th className="p-3 text-left">Điểm</th>
+                      <th className="p-3 text-left">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUsers.map((user, idx) => (
+                      <tr
+                        key={user._id}
+                        className="border-b hover:bg-gray-100"
+                      >
+                        <td className="p-3">
+                          {(currentPage - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="p-3">
+                          <img 
+                            src={user.avatar} 
+                            alt={user.fullName} 
+                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-300"
+                          />
+                        </td>
+                        <td className="p-3 font-medium">{user.fullName}</td>
+                        <td className="p-3 text-sm text-gray-600">{user.email}</td>
+                        <td className="p-3">{user.phoneNumber}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            user.role === 'ADMIN' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {user.role === 'ADMIN' ? '👑 Admin' : '👤 User'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            user.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {user.isActive ? '✅ Hoạt động' : '❌ Khóa'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-medium">
+                            🎯 {user.point}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              onClick={() => handleEditUser(user)}
+                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            {user.role !== 'ADMIN' && (
+                              <Popconfirm
+                                title="Xóa người dùng"
+                                description="Bạn có chắc chắn muốn xóa người dùng này?"
+                                onConfirm={() => handleDeleteUser(user._id!)}
+                                okText="Có"
+                                cancelText="Không"
+                              >
+                                <motion.button
+                                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  Xóa
+                                </motion.button>
+                              </Popconfirm>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Showtimes Tab */}
           {activeTab === "showtimes" && (
             <div>
@@ -1565,6 +1795,18 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setShowTheaterForm(false);
             setSelectedTheater(undefined);
+          }}
+        />
+      )}
+
+      {/* User Form Modal */}
+      {showUserForm && (
+        <UserForm
+          user={selectedUser}
+          onSubmit={handleUserSubmit}
+          onCancel={() => {
+            setShowUserForm(false);
+            setSelectedUser(undefined);
           }}
         />
       )}

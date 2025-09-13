@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Input, InputNumber, Select, DatePicker, Upload } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd';
 import type { InputRef } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -16,6 +16,8 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     const [form] = Form.useForm();
     const [imagePreview, setImagePreview] = useState<string>('');
     const [posterPreview, setPosterPreview] = useState<string>('');
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
+    const [posterPreviewUrl, setPosterPreviewUrl] = useState<string>('');
 
     useEffect(() => {
         if (movie) {
@@ -51,6 +53,18 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
             return () => clearTimeout(timer);
         }
     }, [movie]);
+
+    // Cleanup effect for preview URLs
+    useEffect(() => {
+        return () => {
+            if (imagePreviewUrl) {
+                URL.revokeObjectURL(imagePreviewUrl);
+            }
+            if (posterPreviewUrl) {
+                URL.revokeObjectURL(posterPreviewUrl);
+            }
+        };
+    }, [imagePreviewUrl, posterPreviewUrl]);
 
     const languages = [
         'Vietnamese',
@@ -120,17 +134,42 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     const handleImageChange = (fieldName: string) => (info: { file: { originFileObj?: File; }; }) => {
         const file = info.file.originFileObj;
         if (file instanceof File) {
+            // Cleanup previous preview URL if exists
+            if (fieldName === 'image' && imagePreviewUrl) {
+                URL.revokeObjectURL(imagePreviewUrl);
+            } else if (fieldName === 'posterImage' && posterPreviewUrl) {
+                URL.revokeObjectURL(posterPreviewUrl);
+            }
+            
+            // Create preview URL immediately
+            const previewUrl = URL.createObjectURL(file);
+            
+            // Update preview state immediately
+            if (fieldName === 'image') {
+                setImagePreviewUrl(previewUrl);
+                setImagePreview(previewUrl);
+            } else if (fieldName === 'posterImage') {
+                setPosterPreviewUrl(previewUrl);
+                setPosterPreview(previewUrl);
+            }
+            
+            // Convert to base64 for form data
             const reader = new FileReader();
             reader.onloadend = () => {
                 const imageUrl = reader.result as string;
                 form.setFieldsValue({
                     [fieldName]: imageUrl
                 });
-                // Update preview state
+                
+                // Update preview to base64 URL and cleanup object URL
                 if (fieldName === 'image') {
                     setImagePreview(imageUrl);
+                    URL.revokeObjectURL(previewUrl);
+                    setImagePreviewUrl('');
                 } else if (fieldName === 'posterImage') {
                     setPosterPreview(imageUrl);
+                    URL.revokeObjectURL(previewUrl);
+                    setPosterPreviewUrl('');
                 }
             };
             reader.readAsDataURL(file);
@@ -323,19 +362,31 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     <span className="text-sm text-gray-600">Ảnh hiện tại</span>
                                 </div>
                             )}
-                            <Upload
-                                beforeUpload={() => false}
-                                onChange={handleImageChange('image')}
-                                showUploadList={false}
-                                accept="image/*"
-                            >
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            handleImageChange('image')({ file: { originFileObj: file } });
+                                        }
+                                    }}
+                                    style={{ display: 'none' }}
+                                    id="image-input"
+                                />
                                 <Input
                                     placeholder={imagePreview ? "Chọn ảnh mới" : "Chọn ảnh thumbnail"}
                                     size="large"
                                     suffix={<UploadOutlined />}
                                     readOnly
+                                    onClick={() => {
+                                        const input = document.getElementById('image-input') as HTMLInputElement;
+                                        input?.click();
+                                    }}
+                                    style={{ cursor: 'pointer' }}
                                 />
-                            </Upload>
+                            </div>
                         </div>
                     </Form.Item>
 
@@ -357,19 +408,31 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     <span className="text-sm text-gray-600">Ảnh hiện tại</span>
                                 </div>
                             )}
-                            <Upload
-                                beforeUpload={() => false}
-                                onChange={handleImageChange('posterImage')}
-                                showUploadList={false}
-                                accept="image/*"
-                            >
+                            <div className="relative">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            handleImageChange('posterImage')({ file: { originFileObj: file } });
+                                        }
+                                    }}
+                                    style={{ display: 'none' }}
+                                    id="poster-input"
+                                />
                                 <Input
                                     placeholder={posterPreview ? "Chọn ảnh mới" : "Chọn ảnh poster"}
                                     size="large"
                                     suffix={<UploadOutlined />}
                                     readOnly
+                                    onClick={() => {
+                                        const input = document.getElementById('poster-input') as HTMLInputElement;
+                                        input?.click();
+                                    }}
+                                    style={{ cursor: 'pointer' }}
                                 />
-                            </Upload>
+                            </div>
                         </div>
                     </Form.Item>
                 </div>

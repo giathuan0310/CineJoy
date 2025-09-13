@@ -78,6 +78,38 @@ export const fetchAccountApi = async () => {
   return response.data;
 };
 
+export const getAllUsersApi = async () => {
+  const response = await axios.get<IBackendResponse<IUser[]>>(
+    "/v1/api/user"
+  );
+  return response.data;
+};
+
+export const getUserByIdApi = async (id: string) => {
+  const response = await axios.get<IBackendResponse<IUser>>(
+    `/v1/api/user/${id}`
+  );
+  return response.data;
+};
+
+export const createUserApi = async (data: {
+  fullName: string;
+  email: string;
+  password: string;
+  phoneNumber: string;
+  gender: string;
+  avatar: string;
+  dateOfBirth: string;
+  role: string;
+  isActive?: boolean;
+}) => {
+  const response = await axios.post<IBackendResponse<IUser>>(
+    "/v1/api/user",
+    data
+  );
+  return response.data;
+};
+
 export const updateUserApi = async (
   id: string,
   data: {
@@ -94,6 +126,13 @@ export const updateUserApi = async (
   const response = await axios.put<IBackendResponse<IUser>>(
     `/v1/api/user/${id}`,
     data
+  );
+  return response.data;
+};
+
+export const deleteUserApi = async (id: string) => {
+  const response = await axios.delete<IBackendResponse<null>>(
+    `/v1/api/user/${id}`
   );
   return response.data;
 };

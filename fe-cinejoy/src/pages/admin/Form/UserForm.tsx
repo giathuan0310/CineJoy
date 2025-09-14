@@ -19,8 +19,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
     const [uploading, setUploading] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
     const [isActiveState, setIsActiveState] = useState<boolean>(true);
-    const [previewUrl, setPreviewUrl] = useState<string>(''); // Track preview URL for cleanup
-
+    const [previewUrl, setPreviewUrl] = useState<string>('');
 
     useEffect(() => {
         if (user) {
@@ -161,6 +160,18 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
             destroyOnClose
             closable={!submitting}
             maskClosable={!submitting}
+            style={{ 
+                marginTop: '2vh',
+                marginBottom: '2vh',
+                maxHeight: '96vh'
+            }}
+            bodyStyle={{
+                maxHeight: 'calc(96vh - 110px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                msOverflowStyle: 'none', // IE và Edge
+            }}
+            className="hide-scrollbar"
         >
             <Form
                 form={form}

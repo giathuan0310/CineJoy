@@ -210,6 +210,18 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             width={900}
             centered
             destroyOnClose
+            style={{ 
+                marginTop: '2vh',
+                marginBottom: '2vh',
+                maxHeight: '96vh'
+            }}
+            bodyStyle={{
+                maxHeight: 'calc(96vh - 110px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                msOverflowStyle: 'none', // IE và Edge
+            }}
+            className="hide-scrollbar"
         >
             <Form
                 form={form}
@@ -286,7 +298,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                             notFoundContent={selectedRegionId ? "Không có rạp nào trong khu vực này" : "Vui lòng chọn khu vực trước"}
                         />
                     </Form.Item>
-                </div>
+                        </div>
 
                 <Form.Item
                     name="showDate"
@@ -397,10 +409,10 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                         ]}
                                                     />
                                                 </Form.Item>
-                                            </div>
-                                        </Card>
                                     </div>
-                                ))}
+                                        </Card>
+                            </div>
+                        ))}
                                 
                                 <Form.Item className="mt-4">
                                     <Button
@@ -417,30 +429,30 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                             </>
                         )}
                     </Form.List>
-                </div>
+                    </div>
 
-                <div className="flex justify-end gap-4 mt-6">
-                    <motion.button
-                        type="button"
-                        onClick={onCancel}
+                    <div className="flex justify-end gap-4 mt-6">
+                        <motion.button
+                            type="button"
+                            onClick={onCancel}
                         className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        Hủy
-                    </motion.button>
-                    <motion.button
-                        type="submit"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            Hủy
+                        </motion.button>
+                        <motion.button
+                            type="submit"
                         className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        {editData ? 'Cập nhật' : 'Thêm suất chiếu'}
-                    </motion.button>
-                </div>
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            {editData ? 'Cập nhật' : 'Thêm suất chiếu'}
+                        </motion.button>
+                    </div>
             </Form>
         </Modal>
     );
 };
 
-export default ShowtimeForm;
+export default ShowtimeForm; 

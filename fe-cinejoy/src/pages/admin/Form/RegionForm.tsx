@@ -51,6 +51,18 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
             width={500}
             centered
             destroyOnClose
+            style={{ 
+                marginTop: '2vh',
+                marginBottom: '2vh',
+                maxHeight: '96vh'
+            }}
+            bodyStyle={{
+                maxHeight: 'calc(96vh - 110px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                msOverflowStyle: 'none', // IE và Edge
+            }}
+            className="hide-scrollbar"
         >
             <Form
                 form={form}

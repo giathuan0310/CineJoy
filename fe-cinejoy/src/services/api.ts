@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import createInstanceAxios from "services/axios.customize";
 
 const axios = createInstanceAxios(import.meta.env.VITE_BACKEND_URL);
@@ -216,4 +217,88 @@ export const markVoucherAsUsedApi = async (
     }
   );
   return response.data;
+};
+
+// Room APIs
+export const getAllRoomsApi = async () => {
+  const response = await axios.get('/rooms');
+  return response.data;
+};
+
+export const getRoomsByTheaterApi = async (theaterId: string) => {
+  const response = await axios.get(`/rooms/theater/${theaterId}`);
+  return response.data;
+};
+
+export const getActiveRoomsByTheaterApi = async (theaterId: string) => {
+  const response = await axios.get(`/rooms/theater/${theaterId}/active`);
+  return response.data;
+};
+
+export const getRoomByIdApi = async (roomId: string) => {
+  const response = await axios.get(`/rooms/${roomId}`);
+  return response.data;
+};
+
+export const createRoomApi = async (roomData: any) => {
+  const response = await axios.post('/rooms', roomData);
+  return response.data;
+};
+
+export const updateRoomApi = async (roomId: string, roomData: any) => {
+  const response = await axios.put(`/rooms/${roomId}`, roomData);
+  return response.data;
+};
+
+export const deleteRoomApi = async (roomId: string) => {
+  await axios.delete(`/rooms/${roomId}`);
+};
+
+// Seat APIs
+export const getAllSeatsApi = async () => {
+  const response = await axios.get('/seats');
+  return response.data;
+};
+
+export const getSeatsByRoomApi = async (roomId: string) => {
+  const response = await axios.get(`/seats/room/${roomId}`);
+  return response.data;
+};
+
+export const getSeatStatisticsApi = async (roomId: string) => {
+  const response = await axios.get(`/seats/room/${roomId}/statistics`);
+  return response.data;
+};
+
+export const getSeatByIdApi = async (seatId: string) => {
+  const response = await axios.get(`/seats/${seatId}`);
+  return response.data;
+};
+
+export const createSeatApi = async (seatData: any) => {
+  const response = await axios.post('/seats', seatData);
+  return response.data;
+};
+
+export const createMultipleSeatsApi = async (seats: any[]) => {
+  const response = await axios.post('/seats/bulk', { seats });
+  return response.data;
+};
+
+export const generateSeatLayoutApi = async (roomId: string, layoutData: any) => {
+  const response = await axios.post(`/seats/room/${roomId}/generate-layout`, layoutData);
+  return response.data;
+};
+
+export const updateSeatApi = async (seatId: string, seatData: any) => {
+  const response = await axios.put(`/seats/${seatId}`, seatData);
+  return response.data;
+};
+
+export const deleteSeatApi = async (seatId: string) => {
+  await axios.delete(`/seats/${seatId}`);
+};
+
+export const deleteAllSeatsInRoomApi = async (roomId: string) => {
+  await axios.delete(`/seats/room/${roomId}/all`);
 };

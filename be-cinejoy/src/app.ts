@@ -17,6 +17,8 @@ import UserRouter from "./routes/UserRouter";
 import UploadRouter from "./routes/UploadRouter";
 import OrderRouter from "./routes/OrderRouter";
 import PaymentRouter from "./routes/PaymentRouter";
+import RoomRouter from "./routes/RoomRouter";
+import SeatRouter from "./routes/SeatRouter";
 import momoConfig from "./configs/momoConfig";
 
 dotenv.config();
@@ -65,6 +67,8 @@ app.use("/foodcombos", FoodComboRouter);
 app.use("/blogs", BlogRouter);
 app.use("/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
+app.use("/rooms", RoomRouter);
+app.use("/seats", SeatRouter);
 app.use("/chatbot", chatbotRouter);
 
 // Start the server

@@ -1,10 +1,9 @@
 import { Schema, model, Document } from "mongoose";
 
-export interface ISeat {
-    seatId: string;
-    status: string;
-    type: string;
-    price: number;
+export interface IShowtimeSeat {
+    seat: Schema.Types.ObjectId; // Reference to Seat model
+    status: 'available' | 'selected' | 'booked' | 'maintenance';
+    reservedUntil?: Date; // Temporary reservation
 }
 
 export interface IShowtime extends Document {
@@ -18,8 +17,8 @@ export interface IShowtime extends Document {
         date: Date; // ngày chiếu cụ thể (YYYY-MM-DD)
         start: Date; // giờ bắt đầu
         end: Date;   // giờ kết thúc
-        room: string;
-        seats: ISeat[];
+        room: Schema.Types.ObjectId; // Reference to Room model
+        seats: IShowtimeSeat[];
     }>;
 }
 
@@ -35,13 +34,17 @@ const ShowtimeSchema = new Schema<IShowtime>({
             date: { type: Date, required: true },
             start: { type: Date, required: true },
             end: { type: Date, required: true },
-            room: { type: String, required: true },
+            room: { type: Schema.Types.ObjectId, required: true, ref: "Room" },
             seats: [
                 {
-                    seatId: { type: String, required: true },
-                    status: { type: String, required: true },
-                    type: { type: String, required: true },
-                    price: { type: Number, required: true },
+                    seat: { type: Schema.Types.ObjectId, required: true, ref: "Seat" },
+                    status: { 
+                        type: String, 
+                        enum: ['available', 'selected', 'booked', 'maintenance'],
+                        default: 'available',
+                        required: true 
+                    },
+                    reservedUntil: { type: Date }
                 },
             ],
         },

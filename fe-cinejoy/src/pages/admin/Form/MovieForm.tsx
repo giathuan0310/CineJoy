@@ -185,6 +185,18 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
             width={900}
             centered
             destroyOnClose
+            style={{ 
+                marginTop: '2vh',
+                marginBottom: '2vh',
+                maxHeight: '96vh'
+            }}
+            bodyStyle={{
+                maxHeight: 'calc(96vh - 110px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                msOverflowStyle: 'none', // IE và Edge
+            }}
+            className="hide-scrollbar"
         >
             <Form
                 form={form}
@@ -192,9 +204,9 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                 onFinish={handleSubmit}
                 autoComplete="off"
             >
-                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                     <Form.Item
-                        name="title"
+                                name="title"
                         label="Tên phim"
                         rules={[
                             { required: true, message: 'Vui lòng nhập tên phim!' },
@@ -353,7 +365,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                     >
                         <div className="space-y-2">
                             {imagePreview && (
-                                <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-4">
                                     <img
                                         src={imagePreview}
                                         alt="Thumbnail preview"
@@ -361,7 +373,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     />
                                     <span className="text-sm text-gray-600">Ảnh hiện tại</span>
                                 </div>
-                            )}
+                                )}
                             <div className="relative">
                                 <input
                                     type="file"
@@ -399,7 +411,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                     >
                         <div className="space-y-2">
                             {posterPreview && (
-                                <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-4">
                                     <img
                                         src={posterPreview}
                                         alt="Poster preview"
@@ -407,7 +419,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     />
                                     <span className="text-sm text-gray-600">Ảnh hiện tại</span>
                                 </div>
-                            )}
+                                )}
                             <div className="relative">
                                 <input
                                     type="file"
@@ -435,7 +447,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                             </div>
                         </div>
                     </Form.Item>
-                </div>
+                        </div>
 
                 <Form.Item
                     name="description"
@@ -448,32 +460,32 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                 >
                     <Input.TextArea
                         placeholder="Nhập mô tả phim..."
-                        rows={4}
+                            rows={4}
                         size="large"
                         showCount
                         maxLength={1000}
-                    />
+                        />
                 </Form.Item>
 
-                <div className="flex justify-end gap-4 mt-6">
-                    <motion.button
-                        type="button"
-                        onClick={onCancel}
-                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        Hủy
-                    </motion.button>
-                    <motion.button
-                        type="submit"
-                        className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                    >
-                        {movie ? 'Cập nhật' : 'Thêm mới'}
-                    </motion.button>
-                </div>
+                    <div className="flex justify-end gap-4 mt-6">
+                        <motion.button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            Hủy
+                        </motion.button>
+                        <motion.button
+                            type="submit"
+                            className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            {movie ? 'Cập nhật' : 'Thêm mới'}
+                        </motion.button>
+                    </div>
             </Form>
         </Modal>
     );

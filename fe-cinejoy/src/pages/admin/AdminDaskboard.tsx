@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -6,7 +7,7 @@ import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addFoodCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
-import { getAllUsersApi, createUserApi, updateUserApi, deleteUserApi } from "@/services/api";
+import { getAllUsersApi, createUserApi, updateUserApi, deleteUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, getAllSeatsApi, createSeatApi, updateSeatApi, deleteSeatApi } from "@/services/api";
 import {
   deleteMovie,
   getMovies,
@@ -32,6 +33,8 @@ import VoucherForm from "@/pages/admin/Form/VoucherForm";
 import RegionForm from "@/pages/admin/Form/RegionForm";
 import TheaterForm from "@/pages/admin/Form/TheaterForm";
 import UserForm from "@/pages/admin/Form/UserForm";
+import RoomForm from "./Form/RoomForm";
+import SeatForm from "./Form/SeatForm";
 import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
@@ -46,6 +49,8 @@ const Dashboard: React.FC = () => {
   const [blogs, setBlogs] = useState<IBlog[]>([]);
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [seats, setSeats] = useState<any[]>([]);
   const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
   const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(
     undefined
@@ -76,6 +81,14 @@ const Dashboard: React.FC = () => {
   );
   const [showUserForm, setShowUserForm] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<IUser | undefined>(
+    undefined
+  );
+  const [showRoomForm, setShowRoomForm] = useState<boolean>(false);
+  const [selectedRoom, setSelectedRoom] = useState<any | undefined>(
+    undefined
+  );
+  const [showSeatForm, setShowSeatForm] = useState<boolean>(false);
+  const [selectedSeat, setSelectedSeat] = useState<any | undefined>(
     undefined
   );
   const { user } = useAppStore();
@@ -119,6 +132,8 @@ const Dashboard: React.FC = () => {
         console.error("Error fetching users:", error);
         setUsers([]);
       });
+    loadRooms();
+    loadSeats();
   }, []);
 
   // Lọc và phân trang cho từng tab
@@ -265,6 +280,108 @@ const Dashboard: React.FC = () => {
     setSelectedRegion(undefined);
     setShowRegionForm(true);
   };
+
+  // Load functions
+  const loadRooms = async () => {
+    try {
+      const response = await getAllRoomsApi() as any;
+      setRooms(response.data && Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error loading rooms:", error);
+      setRooms([]);
+    }
+  };
+
+  const loadSeats = async () => {
+    try {
+      const response = await getAllSeatsApi() as any;
+      setSeats(response.data && Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error loading seats:", error);
+      setSeats([]);
+    }
+  };
+
+  // Room handlers
+  const handleRoomSubmit = async (roomData: any) => {
+    try {
+      if (selectedRoom) {
+        await updateRoomApi(selectedRoom._id, roomData);
+        toast.success("Cập nhật phòng chiếu thành công!");
+      } else {
+        await createRoomApi(roomData);
+        toast.success("Thêm phòng chiếu thành công!");
+      }
+      setShowRoomForm(false);
+      setSelectedRoom(undefined);
+      loadRooms();
+    } catch (error) {
+      console.error("Error submitting room:", error);
+      toast.error(selectedRoom ? "Cập nhật phòng chiếu thất bại!" : "Thêm phòng chiếu thất bại!");
+    }
+  };
+
+  const handleEditRoom = (room: any) => {
+    setSelectedRoom(room);
+    setShowRoomForm(true);
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    try {
+      await deleteRoomApi(roomId);
+      toast.success("Xóa phòng chiếu thành công!");
+      loadRooms();
+    } catch (error) {
+      console.error("Error deleting room:", error);
+      toast.error("Xóa phòng chiếu thất bại!");
+    }
+  };
+
+  const handleAddRoom = () => {
+    setSelectedRoom(undefined);
+    setShowRoomForm(true);
+  };
+
+  // Seat handlers
+  const handleSeatSubmit = async (seatData: any) => {
+    try {
+      if (selectedSeat) {
+        await updateSeatApi(selectedSeat._id, seatData);
+        toast.success("Cập nhật ghế ngồi thành công!");
+      } else {
+        await createSeatApi(seatData);
+        toast.success("Thêm ghế ngồi thành công!");
+      }
+      setShowSeatForm(false);
+      setSelectedSeat(undefined);
+      loadSeats();
+    } catch (error) {
+      console.error("Error submitting seat:", error);
+      toast.error(selectedSeat ? "Cập nhật ghế ngồi thất bại!" : "Thêm ghế ngồi thất bại!");
+    }
+  };
+
+  const handleEditSeat = (seat: any) => {
+    setSelectedSeat(seat);
+    setShowSeatForm(true);
+  };
+
+  const handleDeleteSeat = async (seatId: string) => {
+    try {
+      await deleteSeatApi(seatId);
+      toast.success("Xóa ghế ngồi thành công!");
+      loadSeats();
+    } catch (error) {
+      console.error("Error deleting seat:", error);
+      toast.error("Xóa ghế ngồi thất bại!");
+    }
+  };
+
+  const handleAddSeat = () => {
+    setSelectedSeat(undefined);
+    setShowSeatForm(true);
+  };
+
   /////////////////////////////////////////////////////////////////
 
   ////////////////////////Xử lý CRUD Theater////////////////////////
@@ -602,6 +719,7 @@ const Dashboard: React.FC = () => {
               { label: "Rạp", value: "theaters", icon: "🏢" },
               { label: "Voucher", value: "vouchers", icon: "🎟️" },
               { label: "Người dùng", value: "users", icon: "👥" },
+              { label: "Phòng chiếu", value: "rooms", icon: "🏬" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
             ].map((tab) => (
               <li
@@ -1430,6 +1548,143 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
+          {/* Rooms Tab */}
+          {activeTab === "rooms" && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                Quản lý Phòng chiếu
+              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm phòng chiếu..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border border-gray-300 px-4 py-2 rounded-lg"
+                />
+                <motion.button
+                  onClick={handleAddRoom}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Thêm phòng mới
+                </motion.button>
+              </div>
+
+              {/* Room Cards */}
+              {filterAndPaginate(
+                rooms,
+                (room: any) =>
+                  room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  room.theater?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  room.roomType?.toLowerCase().includes(searchTerm.toLowerCase())
+              ).paginated.map((room: any) => (
+                <motion.div
+                  key={room._id}
+                  className="bg-white rounded-lg shadow-md p-6 mb-4 hover:shadow-lg transition-shadow"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-4 mb-2">
+                        <h3 className="text-xl font-semibold text-gray-800">
+                          {room.name}
+                        </h3>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          room.roomType === 'VIP' ? 'bg-yellow-100 text-yellow-800' :
+                          room.roomType === 'IMAX' ? 'bg-blue-100 text-blue-800' :
+                          room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {room.roomType}
+                        </span>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          room.status === 'active' ? 'bg-green-100 text-green-800' :
+                          room.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {room.status === 'active' ? 'Hoạt động' : 
+                           room.status === 'maintenance' ? 'Bảo trì' : 'Không hoạt động'}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 mb-2">
+                        <span className="font-medium">Rạp:</span> {room.theater?.name} - {room.theater?.address}
+                      </p>
+                      <p className="text-gray-600 mb-2">
+                        <span className="font-medium">Sức chứa:</span> {room.capacity} ghế
+                      </p>
+                      {room.description && (
+                        <p className="text-gray-600 mb-2">
+                          <span className="font-medium">Mô tả:</span> {room.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-3">
+                        <span className="text-sm text-gray-500">
+                          Số ghế hiện có: {room.seats?.length || 0}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          Được tạo: {new Date(room.createdAt).toLocaleDateString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <motion.button
+                        onClick={() => handleEditRoom(room)}
+                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors text-sm"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        Sửa
+                      </motion.button>
+                      <Popconfirm
+                        title="Xác nhận xóa"
+                        description="Bạn có chắc chắn muốn xóa phòng chiếu này không? Tất cả ghế trong phòng cũng sẽ bị xóa."
+                        onConfirm={() => handleDeleteRoom(room._id)}
+                        okText="Xóa"
+                        cancelText="Hủy"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <motion.button
+                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors text-sm"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Xóa
+                        </motion.button>
+                      </Popconfirm>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {/* Pagination */}
+              {filterAndPaginate(rooms, () => true).totalPages > 1 && (
+                <div className="flex justify-center mt-6">
+                  <div className="flex gap-2">
+                    {Array.from(
+                      { length: filterAndPaginate(rooms, () => true).totalPages },
+                      (_, i) => i + 1
+                    ).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded ${
+                          currentPage === page
+                            ? "bg-black text-white"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        } transition-colors`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+
           {/* Showtimes Tab */}
           {activeTab === "showtimes" && (
             <div>
@@ -1607,6 +1862,18 @@ const Dashboard: React.FC = () => {
           footer={null}
           width={900}
           centered
+          style={{ 
+            marginTop: '2vh',
+            marginBottom: '2vh',
+            maxHeight: '96vh'
+          }}
+          bodyStyle={{
+            maxHeight: 'calc(96vh - 110px)',
+            overflowY: 'auto',
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // IE và Edge
+          }}
+          className="hide-scrollbar"
           destroyOnClose
         >
           <div className="space-y-6">
@@ -1807,6 +2074,34 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setShowUserForm(false);
             setSelectedUser(undefined);
+          }}
+        />
+      )}
+
+      {/* Room Form Modal */}
+      {showRoomForm && (
+        <RoomForm
+          room={selectedRoom}
+          theaters={theaters.map(t => ({ _id: t._id, name: t.name, address: t.location?.address || '', location: { city: t.location?.city || '' }, regionId: t.regionId }))}
+          regions={regions}
+          onSubmit={handleRoomSubmit}
+          onCancel={() => {
+            setShowRoomForm(false);
+            setSelectedRoom(undefined);
+          }}
+        />
+      )}
+
+      {/* Seat Form Modal */}
+      {showSeatForm && (
+        <SeatForm
+          seat={selectedSeat}
+          rooms={rooms}
+          regions={regions}
+          onSubmit={handleSeatSubmit}
+          onCancel={() => {
+            setShowSeatForm(false);
+            setSelectedSeat(undefined);
           }}
         />
       )}

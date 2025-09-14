@@ -155,7 +155,7 @@ class ShowtimeService {
         }
 
         // So sánh phòng
-        const roomMatch = room ? st.room === room : true;
+        const roomMatch = room ? st.room.toString() === room : true;
 
         console.log("Comparing showtime:", {
           showDate: showDate.toDateString(),
@@ -217,7 +217,7 @@ class ShowtimeService {
               showTimeHour === targetHour && showTimeMin === targetMin;
           }
 
-          const roomMatch = room ? st.room === room : true;
+          const roomMatch = room ? st.room.toString() === room : true;
           return dateMatch && timeMatch && roomMatch;
         });
 
@@ -365,7 +365,7 @@ class ShowtimeService {
           timeMatch = showTimeHour === targetHour && showTimeMin === targetMin;
         }
 
-        const roomMatch = st.room === room;
+        const roomMatch = st.room.toString() === room;
 
         return dateMatch && timeMatch && roomMatch;
       });
@@ -379,7 +379,7 @@ class ShowtimeService {
       const unavailableSeats: string[] = [];
 
       seatIds.forEach((seatId) => {
-        const seat = specificShowtime.seats.find((s) => s.seatId === seatId);
+        const seat = specificShowtime.seats.find((s) => s.seat.toString() === seatId);
         if (!seat) {
           unavailableSeats.push(seatId + " (không tồn tại)");
         } else if (seat.status !== "available") {
@@ -394,10 +394,10 @@ class ShowtimeService {
       // Cập nhật trạng thái ghế thành 'reserved' (tạm giữ) hoặc 'occupied' (đã đặt)
       seatIds.forEach((seatId) => {
         const seatIndex = specificShowtime.seats.findIndex(
-          (s) => s.seatId === seatId
+          (s) => s.seat.toString() === seatId
         );
         if (seatIndex !== -1) {
-          showtime.showTimes[showtimeIndex].seats[seatIndex].status = status;
+          showtime.showTimes[showtimeIndex].seats[seatIndex].status = status as any;
         }
       });
 
@@ -442,7 +442,7 @@ class ShowtimeService {
 
         const dateMatch = showDate === targetDateStr;
         const timeMatch = Math.abs(showStartTime - targetTimeMs) < 60000;
-        const roomMatch = st.room === room;
+        const roomMatch = st.room.toString() === room;
 
         return dateMatch && timeMatch && roomMatch;
       });
@@ -455,7 +455,7 @@ class ShowtimeService {
       const specificShowtime = showtime.showTimes[showtimeIndex];
       seatIds.forEach((seatId) => {
         const seatIndex = specificShowtime.seats.findIndex(
-          (s) => s.seatId === seatId
+          (s) => s.seat.toString() === seatId
         );
         if (seatIndex !== -1) {
           showtime.showTimes[showtimeIndex].seats[seatIndex].status =
@@ -553,7 +553,7 @@ class ShowtimeService {
           timeMatch = showTimeHour === targetHour && showTimeMin === targetMin;
         }
 
-        const roomMatch = room ? st.room === room : true;
+        const roomMatch = room ? st.room.toString() === room : true;
         return dateMatch && timeMatch && roomMatch;
       });
 

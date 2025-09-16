@@ -9,9 +9,10 @@ interface TheaterFormProps {
     theater?: ITheater;
     onSubmit: (theaterData: Partial<ITheater>) => void;
     onCancel: () => void;
+    loading?: boolean;
 }
 
-const TheaterForm: React.FC<TheaterFormProps> = ({ theater, onSubmit, onCancel }) => {
+const TheaterForm: React.FC<TheaterFormProps> = ({ theater, onSubmit, onCancel, loading = false }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
     const [regions, setRegions] = useState<IRegion[]>([]);
@@ -160,19 +161,28 @@ const TheaterForm: React.FC<TheaterFormProps> = ({ theater, onSubmit, onCancel }
                     <motion.button
                         type="button"
                         onClick={onCancel}
-                        className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 cursor-pointer transition-colors"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={loading}
+                        className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        whileHover={!loading ? { scale: 1.05 } : {}}
+                        whileTap={!loading ? { scale: 0.95 } : {}}
                     >
                         Hủy
                     </motion.button>
                     <motion.button
                         type="submit"
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={loading}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        whileHover={!loading ? { scale: 1.05 } : {}}
+                        whileTap={!loading ? { scale: 0.95 } : {}}
                     >
-                        {theater ? '✏️ Cập nhật' : '➕ Thêm rạp'}
+                        {loading ? (
+                            <div className="flex items-center gap-2">
+                                <div className="animate-spin">⏳</div>
+                                {theater ? 'Đang cập nhật...' : 'Đang thêm...'}
+                            </div>
+                        ) : (
+                            theater ? '✏️ Cập nhật' : '➕ Thêm rạp'
+                        )}
                     </motion.button>
                 </div>
             </Form>

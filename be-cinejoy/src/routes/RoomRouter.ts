@@ -11,7 +11,7 @@ router.get('/', verifyToken, RoomController.getAllRooms);
 router.get('/theater/:theaterId', verifyToken, RoomController.getRoomsByTheater);
 
 // Get active rooms by theater (for dropdown selections)
-router.get('/theater/:theaterId/active', verifyToken, RoomController.getActiveRoomsByTheater);
+router.get('/theater/:theaterId/active', RoomController.getActiveRoomsByTheater);
 
 // Get room by ID
 router.get('/:id', verifyToken, RoomController.getRoomById);

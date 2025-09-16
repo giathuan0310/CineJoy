@@ -20,6 +20,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
     const [submitting, setSubmitting] = useState<boolean>(false);
     const [isActiveState, setIsActiveState] = useState<boolean>(true);
     const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -37,6 +38,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                 point: user.point
             });
             setAvatarPreview(user.avatar || '');
+            setSelectedFile(null);
         } else {
             setIsActiveState(true);
             form.resetFields();
@@ -46,6 +48,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                 point: 50
             });
             setAvatarPreview('');
+            setSelectedFile(null);
         }
     }, [user, form]);
 
@@ -67,7 +70,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
         };
     }, [previewUrl]);
 
-    const handleAvatarChange = async (info: { file: { originFileObj?: File; }; }) => {
+    const handleAvatarChange = (info: { file: { originFileObj?: File; }; }) => {
         const file = info.file.originFileObj;
         
         if (file instanceof File) {
@@ -76,40 +79,13 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                 URL.revokeObjectURL(previewUrl);
             }
             
-            // Hiển thị preview ngay lập tức
+            // Chỉ hiển thị preview, không gọi API upload
             const newPreviewUrl = URL.createObjectURL(file);
             setPreviewUrl(newPreviewUrl);
             setAvatarPreview(newPreviewUrl);
+            setSelectedFile(file);
             
-            setUploading(true);
-            try {
-                const uploadResult = await uploadAvatarApi(file);
-                if (uploadResult.status && uploadResult.data) {
-                    const avatarUrl = uploadResult.data.url;
-                    form.setFieldsValue({ avatar: avatarUrl });
-                    setAvatarPreview(avatarUrl); // Cập nhật với URL từ server
-                    toast.success('Tải ảnh đại diện thành công!');
-                    
-                    // Cleanup preview URL
-                    URL.revokeObjectURL(newPreviewUrl);
-                    setPreviewUrl('');
-                } else {
-                    toast.error('Tải ảnh thất bại!');
-                    // Revert preview on failure
-                    setAvatarPreview(user?.avatar || '');
-                    URL.revokeObjectURL(newPreviewUrl);
-                    setPreviewUrl('');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                toast.error('Lỗi khi tải ảnh!');
-                // Revert preview on error
-                setAvatarPreview(user?.avatar || '');
-                URL.revokeObjectURL(newPreviewUrl);
-                setPreviewUrl('');
-            } finally {
-                setUploading(false);
-            }
+            toast.success('Ảnh đã được chọn! Sẽ được tải lên khi bấm "Cập nhật".');
         }
     };
 
@@ -126,9 +102,32 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
         point: number;
     }) => {
         setSubmitting(true);
+        setUploading(true);
+        
         try {
+            let avatarUrl = values.avatar;
+            
+            // Nếu có file ảnh mới được chọn, upload trước
+            if (selectedFile) {
+                try {
+                    const uploadResult = await uploadAvatarApi(selectedFile);
+                    if (uploadResult.status && uploadResult.data) {
+                        avatarUrl = uploadResult.data.url;
+                        toast.success('Tải ảnh đại diện thành công!');
+                    } else {
+                        toast.error('Tải ảnh thất bại!');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    toast.error('Lỗi khi tải ảnh!');
+                    return;
+                }
+            }
+
             const formattedData = {
                 ...values,
+                avatar: avatarUrl,
                 dateOfBirth: values.dateOfBirth.toISOString(),
             };
 
@@ -140,6 +139,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
             await onSubmit(formattedData);
         } finally {
             setSubmitting(false);
+            setUploading(false);
         }
     };
 
@@ -327,7 +327,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                                         alt="Avatar preview" 
                                         className="w-16 h-16 object-cover rounded-full border-2 border-gray-300"
                                     />
-                                        {uploading && (
+                                        {submitting && selectedFile && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
                                                 <div className="animate-spin text-white text-lg">⏳</div>
                                             </div>
@@ -335,11 +335,8 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-sm text-gray-600">
-                                            {uploading ? 'Đang tải lên...' : (user ? 'Ảnh hiện tại' : 'Ảnh đã chọn')}
+                                            {selectedFile ? 'Ảnh đã chọn' : (user ? 'Ảnh hiện tại' : 'Chưa chọn ảnh')}
                                         </span>
-                                        {uploading && (
-                                            <span className="text-xs text-blue-600">Vui lòng đợi...</span>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -366,17 +363,16 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                                         const input = document.getElementById('avatar-input') as HTMLInputElement;
                                         input?.click();
                                     }}
-                                    disabled={uploading}
+                                    disabled={submitting}
                                     className="w-full px-4 py-3 text-base bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
-                                    {uploading ? (
+                                    {selectedFile ? (
                                         <>
-                                            <div className="animate-spin">⏳</div>
-                                            Đang tải ảnh...
+                                            ✅ Ảnh đã chọn
                                         </>
                                     ) : (
                                         <>
-                                            Chọn ảnh từ máy tính
+                                            📷 Chọn ảnh từ máy tính
                                         </>
                                     )}
                                 </button>
@@ -386,7 +382,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
 
                     <Form.Item
                         name="isActive"
-                        label="Trạng thái hoạt động"
+                        label="Trạng thái tài khoản"
                         valuePropName="checked"
                     >
                         <Switch 
@@ -413,15 +409,15 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSubmit, onCancel }) => {
                     </motion.button>
                     <motion.button
                         type="submit"
-                        disabled={submitting || uploading}
+                        disabled={submitting}
                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        whileHover={!submitting && !uploading ? { scale: 1.05 } : {}}
-                        whileTap={!submitting && !uploading ? { scale: 0.95 } : {}}
+                        whileHover={!submitting ? { scale: 1.05 } : {}}
+                        whileTap={!submitting ? { scale: 0.95 } : {}}
                     >
                         {submitting ? (
                             <div className="flex items-center gap-2">
                                 <div className="animate-spin">⏳</div>
-                                {user ? 'Đang cập nhật...' : 'Đang thêm...'}
+                                {selectedFile ? 'Đang tải ảnh và cập nhật...' : (user ? 'Đang cập nhật...' : 'Đang thêm...')}
                             </div>
                         ) : (
                             user ? 'Cập nhật' : 'Thêm người dùng'

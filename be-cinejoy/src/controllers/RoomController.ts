@@ -55,7 +55,7 @@ class RoomController {
     // Create new room
     async createRoom(req: Request, res: Response) {
         try {
-            const { name, theater, capacity, roomType, status, description } = req.body;
+            const { name, theater, capacity, roomType, status, description, seatLayout } = req.body;
 
             // Validate required fields
             if (!name || !theater || !capacity) {
@@ -74,19 +74,29 @@ class RoomController {
                 capacity,
                 roomType: roomType || 'Standard',
                 status: status || 'active',
-                description
+                description,
+                seatLayout // ✅ Include seatLayout in roomData
             };
 
+            console.log('🎬 Creating room with data:', roomData);
+            console.log('🎯 SeatLayout received:', seatLayout);
+            console.log('🎯 SeatLayout type:', typeof seatLayout);
+            console.log('🎯 SeatLayout details:', seatLayout ? {
+                rows: seatLayout.rows,
+                cols: seatLayout.cols,
+                seatsCount: Object.keys(seatLayout.seats || {}).length
+            } : 'null/undefined');
             const newRoom = await RoomService.createRoom(roomData);
+            console.log('Room created successfully:', newRoom._id);
  successResponse(res, 201, 'Tạo phòng chiếu thành công', newRoom);
         } catch (error: unknown) {
             console.error('Lỗi khi tạo phòng chiếu:', error);
             
             if (error instanceof Error && error.message.includes('validation')) {
- errorResponse(res, 400, 'Dữ liệu phòng chiếu không hợp lệ');
+                return errorResponse(res, 400, 'Dữ liệu phòng chiếu không hợp lệ');
             }
             
- errorResponse(res, 500, 'Lỗi server khi tạo phòng chiếu');
+            return errorResponse(res, 500, 'Lỗi server khi tạo phòng chiếu');
         }
     }
 
@@ -140,19 +150,19 @@ class RoomController {
             // Check if room exists
             const existingRoom = await RoomService.getRoomById(id);
             if (!existingRoom) {
- errorResponse(res, 404, 'Không tìm thấy phòng chiếu');
+                return errorResponse(res, 404, 'Không tìm thấy phòng chiếu');
             }
 
             const isDeleted = await RoomService.deleteRoom(id);
             
             if (isDeleted) {
- successResponse(res, 200, 'Xóa phòng chiếu thành công');
+                return successResponse(res, 200, 'Xóa phòng chiếu thành công');
             } else {
- errorResponse(res, 500, 'Không thể xóa phòng chiếu');
+                return errorResponse(res, 500, 'Không thể xóa phòng chiếu');
             }
         } catch (error: unknown) {
             console.error('Lỗi khi xóa phòng chiếu:', error);
- errorResponse(res, 500, 'Lỗi server khi xóa phòng chiếu');
+            return errorResponse(res, 500, 'Lỗi server khi xóa phòng chiếu');
         }
     }
 

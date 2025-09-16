@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import useAppStore from "@/store/app.store";
 
 const MovieList: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<"nowShowing" | "upcoming" | "special" | "all">("nowShowing");
+    const [activeTab, setActiveTab] = useState<"Phim đang chiếu" | "Phim sắp chiếu" | "Suất chiếu đặc biệt" | "Đã kết thúc" | "all">("Phim đang chiếu");
     const [showMore, setShowMore] = useState(false);
     const [movies, setMovies] = useState<IMovie[]>([]);
     const { isDarkMode } = useAppStore();
@@ -26,6 +26,8 @@ const MovieList: React.FC = () => {
     const filteredMovies =
         activeTab === "all"
             ? movies
+            : activeTab === "Phim đang chiếu"
+            ? movies.filter((movie) => movie.status === "Phim đang chiếu" || movie.status === "Suất chiếu đặc biệt")
             : movies.filter((movie) => movie.status === activeTab);
 
     const handleView = (_id: string) => {
@@ -36,29 +38,29 @@ const MovieList: React.FC = () => {
         <div className="w-full">
             <div className="flex justify-center gap-4 mb-8 pt-3 pb-3">
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "upcoming"
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "Phim sắp chiếu"
                         ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
                         : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
                     }`}
-                    onClick={() => setActiveTab("upcoming")}
+                    onClick={() => setActiveTab("Phim sắp chiếu")}
                 >
                     Phim sắp chiếu
                 </button>
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "nowShowing"
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "Phim đang chiếu"
                         ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
                         : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
                     }`}
-                    onClick={() => setActiveTab("nowShowing")}
+                    onClick={() => setActiveTab("Phim đang chiếu")}
                 >
                     Phim đang chiếu
                 </button>
                 <button
-                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "special"
+                    className={`px-6 h-10 border rounded font-semibold transition cursor-pointer ${activeTab === "Suất chiếu đặc biệt"
                         ? `${isDarkMode ? "bg-blue-700 text-white border-blue-700" : "bg-[#2d3a5a] text-white"}`
                         : `${isDarkMode ? "bg-[#3a3c4a] text-gray-200 border-gray-600 hover:bg-blue-700 hover:border-blue-700 hover:text-white" : "bg-white text-[#2d3a5a] hover:bg-[#2d3a5a] hover:text-white"}`
                     }`}
-                    onClick={() => setActiveTab("special")}
+                    onClick={() => setActiveTab("Suất chiếu đặc biệt")}
                 >
                     Suất chiếu đặc biệt
                 </button>

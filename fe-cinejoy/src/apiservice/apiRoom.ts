@@ -31,6 +31,11 @@ export interface ICreateRoomData {
     roomType: '2D' | '4DX';
     status: 'active' | 'maintenance' | 'inactive';
     description?: string;
+    seatLayout?: {
+        rows: number;
+        cols: number;
+        seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } };
+    };
 }
 
 // Get all rooms
@@ -59,6 +64,7 @@ export const getRoomByIdApi = async (roomId: string): Promise<IRoom> => {
 
 // Create room
 export const createRoomApi = async (roomData: ICreateRoomData): Promise<IRoom> => {
+    console.log('🚀 createRoomApi called with:', roomData);
     const response = await axiosClient.post('/rooms', roomData);
     return (response.data as any).data;
 };

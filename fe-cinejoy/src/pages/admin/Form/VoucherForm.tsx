@@ -1,18 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Input, InputNumber, DatePicker } from 'antd';
+import { Modal, Form, Input, InputNumber, DatePicker, Spin } from 'antd';
 import type { InputRef } from 'antd';
 import dayjs from 'dayjs';
 
 interface VoucherFormProps {
     voucher?: IVoucher;
-    onSubmit: (voucherData: Partial<IVoucher>) => void;
+    onSubmit: (voucherData: Partial<IVoucher>) => Promise<void>;
     onCancel: () => void;
 }
 
 const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
         if (voucher) {
@@ -49,6 +50,7 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
         endDate: dayjs.Dayjs;
     }) => {
         try {
+            setIsLoading(true);
             const submitData = {
                 name: values.name,
                 quantity: values.quantity,
@@ -60,9 +62,11 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                 }
             };
             
-            onSubmit(submitData);
+            await onSubmit(submitData);
         } catch (error) {
             console.error('Error submitting form:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -224,11 +228,20 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                     </motion.button>
                     <motion.button
                         type="submit"
-                        className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={isLoading}
+                        className={`px-4 py-2 text-white rounded cursor-pointer flex items-center gap-2 ${
+                            isLoading 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-black hover:bg-gray-800'
+                        }`}
+                        whileHover={!isLoading ? { scale: 1.05 } : {}}
+                        whileTap={!isLoading ? { scale: 0.95 } : {}}
                     >
-                        {voucher ? 'Cập nhật' : 'Thêm mới'}
+                        {isLoading && <Spin size="small" />}
+                        {isLoading 
+                            ? (voucher ? 'Đang cập nhật...' : 'Đang thêm...') 
+                            : (voucher ? 'Cập nhật' : 'Thêm mới')
+                        }
                     </motion.button>
                 </div>
             </Form>

@@ -12,6 +12,11 @@ router.get(
   "/theater/:theaterId",
   showtimeController.getShowtimesByTheater.bind(showtimeController)
 );
+// New: showtimes by room and date
+router.get(
+  "/by-room-date",
+  showtimeController.getShowtimesByRoomAndDate.bind(showtimeController)
+);
 // Đặt các route cụ thể trước route /:id để tránh conflict
 router.get(
   "/:id/seats",

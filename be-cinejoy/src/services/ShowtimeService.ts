@@ -1,11 +1,20 @@
 import { IShowtime, Showtime } from "../models/Showtime";
+import SeatModel from "../models/Seat";
 
 class ShowtimeService {
   async getShowtimes(): Promise<IShowtime[]> {
     try {
       const showtimes = await Showtime.find()
         .populate("movieId", "title")
-        .populate("theaterId", "name");
+        .populate("theaterId", "name")
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.showSessionId",
+          select: "name startTime endTime"
+        });
       return showtimes;
     } catch (error) {
       throw error;
@@ -16,7 +25,15 @@ class ShowtimeService {
     try {
       const showtime = await Showtime.findById(id)
         .populate("movieId", "title")
-        .populate("theaterId", "name");
+        .populate("theaterId", "name")
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.showSessionId",
+          select: "name startTime endTime"
+        });
       return showtime;
     } catch (error) {
       throw error;
@@ -25,6 +42,21 @@ class ShowtimeService {
 
   async addShowtime(showtimeData: Partial<IShowtime>): Promise<IShowtime> {
     try {
+      // Clone room seat template into each showTimes[i].seats
+      if (Array.isArray(showtimeData.showTimes)) {
+        const populated = await Promise.all(
+          showtimeData.showTimes.map(async (st: any) => {
+            // If seats not provided, copy from Seat collection of that room
+            if (!st.seats || st.seats.length === 0) {
+              const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
+              st.seats = roomSeats.map((s) => ({ seat: s._id, status: "available" }));
+            }
+            return st;
+          })
+        );
+        showtimeData.showTimes = populated as any;
+      }
+
       const newShowtime = new Showtime(showtimeData);
       await newShowtime.save();
       return newShowtime;
@@ -38,6 +70,20 @@ class ShowtimeService {
     showtimeData: Partial<IShowtime>
   ): Promise<IShowtime | null> {
     try {
+      // If showTimes updated, ensure seats are present for each new item
+      if (Array.isArray((showtimeData as any).showTimes)) {
+        const updatedList = await Promise.all(
+          (showtimeData as any).showTimes.map(async (st: any) => {
+            if (!st.seats || st.seats.length === 0) {
+              const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
+              st.seats = roomSeats.map((s) => ({ seat: s._id, status: "available" }));
+            }
+            return st;
+          })
+        );
+        (showtimeData as any).showTimes = updatedList;
+      }
+
       const updatedShowtime = await Showtime.findByIdAndUpdate(
         id,
         showtimeData,
@@ -68,11 +114,51 @@ class ShowtimeService {
         movieId,
       })
         .populate("movieId", "title")
-        .populate("theaterId", "name");
+        .populate("theaterId", "name")
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.showSessionId",
+          select: "name startTime endTime"
+        });
       return showtimes;
     } catch (error) {
       throw error;
     }
+  }
+
+  // Lấy các suất chiếu theo phòng và ngày (lọc trong mảng showTimes)
+  async getShowtimesByRoomAndDate(roomId: string, date: string): Promise<{
+    showtimeId: string;
+    room: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    movieId: string;
+  }[]> {
+    const items = await Showtime.aggregate([
+      { $unwind: "$showTimes" },
+      {
+        $match: {
+          "showTimes.room": roomId,
+          "showTimes.date": date,
+        },
+      },
+      {
+        $project: {
+          showtimeId: "$_id",
+          room: "$showTimes.room",
+          date: "$showTimes.date",
+          startTime: "$showTimes.startTime",
+          endTime: "$showTimes.endTime",
+          movieId: "$movieId",
+        },
+      },
+      { $sort: { startTime: 1 } },
+    ]);
+    return items as any;
   }
 
   async getShowtimesByTheater(theaterId: string): Promise<IShowtime[]> {
@@ -81,7 +167,15 @@ class ShowtimeService {
         theaterId,
       })
         .populate("movieId", "title ageRating genre")
-        .populate("theaterId", "name");
+        .populate("theaterId", "name")
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.showSessionId",
+          select: "name startTime endTime"
+        });
       return showtimes;
     } catch (error) {
       throw error;
@@ -98,7 +192,15 @@ class ShowtimeService {
     try {
       const showtime = await Showtime.findById(showtimeId)
         .populate("movieId", "title duration")
-        .populate("theaterId", "name location");
+        .populate("theaterId", "name location")
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.showSessionId",
+          select: "name startTime endTime"
+        });
 
       if (!showtime) {
         return null;
@@ -267,7 +369,7 @@ class ShowtimeService {
       layout[row].push({
         seatId: seat.seatId,
         number: seatNumber,
-        status: seat.status, // available, occupied, selected, reserved
+        status: seat.status, // available, maintenance
         type: seat.type, // standard, vip, couple
         price: seat.price,
       });
@@ -405,7 +507,7 @@ class ShowtimeService {
 
       return {
         message: "Đặt ghế thành công",
-        bookedSeats: seatIds,
+        reservedSeats: seatIds,
         showtimeId: showtimeId,
         reservationTime: new Date(),
         // Reservation expires after 10 minutes
@@ -502,7 +604,7 @@ class ShowtimeService {
 
         seats.push({
           seatId,
-          status: "available", // available,  , selected, reserved
+          status: "available", // available, maintenance
           type: seatType,
           price,
         });

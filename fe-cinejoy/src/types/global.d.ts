@@ -51,6 +51,8 @@ declare global {
     _id: string;
     title: string;
     releaseDate: string; // dạng ISO string, ví dụ "2025-06-07"
+    startDate: string; // ngày khởi chiếu
+    endDate: string; // ngày kết thúc chiếu
     duration: number;
     genre: string[];
     director: string;
@@ -58,7 +60,7 @@ declare global {
     language: string[];
     description: string;
     trailer: string;
-    status: string;
+    status: 'Phim đang chiếu' | 'Phim sắp chiếu' | 'Suất chiếu đặc biệt' | 'Đã kết thúc';
     image: string;
     posterImage: string;
     ageRating: string;
@@ -90,20 +92,26 @@ declare global {
     name: string; // Tên vùng
   }
 
+  interface IShowSession {
+    _id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+    createdAt: string;
+    updatedAt: string;
+  }
+
   interface IShowtime {
     _id: string;
     movieId: IMovie;
     theaterId: ITheater;
-    showDate: {
-      start: string;
-      end: string;
-    };
     showTimes: Array<{
       _id: string;
       date: string;
       start: string;
       end: string;
       room: string;
+      showSessionId?: string;
       seats: Array<{
         seatId: string;
         status: string;

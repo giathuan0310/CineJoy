@@ -60,8 +60,8 @@ const formatVNTime = (iso: string) => {
 const CardInfMovie = () => {
   const [showMoreDes, setShowMoreDes] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<
-    "nowShowing" | "upcoming" | "special" | "all"
-  >("nowShowing");
+    "Phim đang chiếu" | "Phim sắp chiếu" | "Suất chiếu đặc biệt" | "Đã kết thúc"
+  >("Phim đang chiếu");
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
@@ -146,9 +146,9 @@ const CardInfMovie = () => {
   }, [id]);
 
   const filteredMovies =
-    activeTab === "nowShowing"
+    activeTab === "Phim đang chiếu"
       ? movies.filter(
-          (movie) => movie.status === "nowShowing" || movie.status === "special"
+          (movie) => movie.status === "Phim đang chiếu" || movie.status === "Suất chiếu đặc biệt"
         )
       : movies.filter((movie) => movie.status === activeTab);
 
@@ -222,22 +222,22 @@ const CardInfMovie = () => {
             <button
               className={`mt-6 w-full py-3 rounded-md text-white font-semibold text-xl transition
                             ${
-                              movie?.status === "nowShowing" ||
-                              movie?.status === "special"
+                              movie?.status === "Phim đang chiếu" ||
+                              movie?.status === "Suất chiếu đặc biệt"
                                 ? "bg-[#162d5a] hover:bg-[#1a376e] cursor-pointer"
                                 : "bg-[#ff642e] opacity-80 cursor-not-allowed"
                             }
                         `}
               disabled={
-                movie?.status !== "nowShowing" && movie?.status !== "special"
+                movie?.status !== "Phim đang chiếu" && movie?.status !== "Suất chiếu đặc biệt"
               }
               onClick={() => setOpenModal(true)}
             >
-              {movie?.status === "nowShowing" || movie?.status === "special"
+              {movie?.status === "Phim đang chiếu" || movie?.status === "Suất chiếu đặc biệt"
                 ? "Đặt vé ngay"
-                : movie?.status === "close"
-                ? "Đã đóng"
-                : movie?.status === "upcoming"
+                : movie?.status === "Đã kết thúc"
+                ? "Đã kết thúc"
+                : movie?.status === "Phim sắp chiếu"
                 ? "Sắp chiếu"
                 : "Đặt vé ngay"}
             </button>
@@ -323,28 +323,41 @@ const CardInfMovie = () => {
             <div className="flex justify-center gap-4 mb-8 pt-3 pb-3 pl-3 pr-3">
               <button
                 className={`w-50 h-8 border rounded font-semibold transition cursor-pointer ${
-                  activeTab === "nowShowing"
+                  activeTab === "Phim đang chiếu"
                     ? "bg-[#b55210] text-white text-sm"
                     : isDarkMode
                     ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
                     : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
                 }`}
-                onClick={() => setActiveTab("nowShowing")}
+                onClick={() => setActiveTab("Phim đang chiếu")}
               >
                 Phim đang chiếu
               </button>
 
               <button
                 className={` w-50 h-8 border rounded font-semibold transition cursor-pointer ${
-                  activeTab === "upcoming"
+                  activeTab === "Phim sắp chiếu"
                     ? "bg-[#dd6c0f] text-white"
                     : isDarkMode
                     ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
                     : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
                 }`}
-                onClick={() => setActiveTab("upcoming")}
+                onClick={() => setActiveTab("Phim sắp chiếu")}
               >
                 Phim sắp chiếu
+              </button>
+
+              <button
+                className={` w-50 h-8 border rounded font-semibold transition cursor-pointer ${
+                  activeTab === "Đã kết thúc"
+                    ? "bg-[#6b7280] text-white"
+                    : isDarkMode
+                    ? "bg-gray-700 text-white hover:bg-[#6b7280]"
+                    : "bg-white text-[#2d3a5a] hover:bg-[#6b7280] hover:text-white"
+                }`}
+                onClick={() => setActiveTab("Đã kết thúc")}
+              >
+                Đã kết thúc
               </button>
             </div>
             <ul className="space-y-4">

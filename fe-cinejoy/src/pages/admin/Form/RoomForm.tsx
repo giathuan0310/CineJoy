@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Form, Input, InputNumber, Select, Button, message } from 'antd';
 import type { InputRef } from 'antd';
 import type { IRoom, ICreateRoomData } from '../../../apiservice/apiRoom';
+import { getSeatsByRoomApi } from '@/services/api';
 
 interface RoomFormProps {
     room?: IRoom;
@@ -16,7 +17,7 @@ interface RoomFormProps {
 interface SeatLayout {
     rows: number;
     cols: number;
-    seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'booked' | 'selected' | 'maintenance' } }; // "A1": {type: "vip", status: "available"}
+    seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } }; // "A1": {type: "vip", status: "available"}
 }
 
 // Helper function to generate seat ID
@@ -27,7 +28,7 @@ const generateSeatId = (row: number, col: number): string => {
 
 // Create default seat template for 2D rooms
 const createDefaultSeatTemplate = (rows: number, cols: number) => {
-    const seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'booked' | 'selected' | 'maintenance' } } = {};
+    const seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } = {};
     
     for (let row = 0; row < rows; row++) {
         // Determine how many columns for this row
@@ -69,7 +70,7 @@ const createDefaultSeatTemplate = (rows: number, cols: number) => {
 
 // Create seat template for 4DX rooms (all 4DX seats)
 const create4DXSeatTemplate = (rows: number, cols: number) => {
-    const seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'booked' | 'selected' | 'maintenance' } } = {};
+    const seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } = {};
     
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
@@ -91,8 +92,12 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         visible: false, x: 0, y: 0, seatId: ''
     });
     const [selectedRoomType, setSelectedRoomType] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     useEffect(() => {
+        // Reset submitting state when room changes
+        setIsSubmitting(false);
+        
         if (room) {
             // Find region for the theater when editing
             const theater = theaters.find(t => t._id === room.theater._id);
@@ -114,6 +119,9 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
             });
             
             setSelectedRoomType(room.roomType);
+            
+            // Load existing seat layout when editing
+            loadRoomSeats(room._id);
         } else {
             form.resetFields();
             setSelectedRegion('');
@@ -176,6 +184,70 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         setSelectedRegion(regionId);
         // Reset theater selection when region changes
         form.setFieldValue('theater', undefined);
+    };
+
+    // Load seats for a room
+    const loadRoomSeats = async (roomId: string) => {
+        try {
+            console.log('Loading seats for room:', roomId);
+            console.log('Full room object:', room);
+            const response = await getSeatsByRoomApi(roomId);
+            console.log('API Response:', response);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const seats = (response as any).data || [];
+            console.log('Parsed seats:', seats);
+            
+            if (seats.length > 0) {
+                console.log('Found existing seats:', seats.length);
+                
+                // Convert seats array to seat layout format
+                const existingSeats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } = {};
+                
+                seats.forEach((seat: {seatId: string; type: string; status: string}) => {
+                    existingSeats[seat.seatId] = {
+                        type: seat.type as 'normal' | 'vip' | 'couple' | '4dx',
+                        status: seat.status as 'available' | 'maintenance'
+                    };
+                });
+                
+                // Calculate rows and cols from existing seats
+                let maxRow = 0;
+                let maxCol = 0;
+                
+                Object.keys(existingSeats).forEach(seatId => {
+                    const row = seatId.charCodeAt(0) - 65; // A=0, B=1, etc.
+                    const col = parseInt(seatId.substring(1)) - 1; // 1=0, 2=1, etc.
+                    maxRow = Math.max(maxRow, row);
+                    maxCol = Math.max(maxCol, col);
+                });
+                
+                setSeatLayout({
+                    rows: maxRow + 1,
+                    cols: maxCol + 1,
+                    seats: existingSeats
+                });
+                
+                console.log('Loaded seat layout:', maxRow + 1, 'rows,', maxCol + 1, 'cols,', Object.keys(existingSeats).length, 'seats');
+            } else {
+                // No existing seats, create default layout
+                console.log('No existing seats found, creating default layout');
+                const defaultSeats = createDefaultSeatTemplate(8, 10);
+                setSeatLayout({ 
+                    rows: 8, 
+                    cols: 10, 
+                    seats: defaultSeats 
+                });
+            }
+        } catch (error) {
+            console.error('Error loading room seats:', error);
+            // Fallback to default layout
+            const defaultSeats = createDefaultSeatTemplate(8, 10);
+            setSeatLayout({ 
+                rows: 8, 
+                cols: 10, 
+                seats: defaultSeats 
+            });
+        }
     };
 
     // Seat layout handlers
@@ -376,7 +448,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         setContextMenu({ visible: false, x: 0, y: 0, seatId: '' });
     };
 
-    const handleSeatStatusChange = (seatId: string, status: 'available' | 'booked' | 'selected' | 'maintenance') => {
+    const handleSeatStatusChange = (seatId: string, status: 'available' | 'maintenance') => {
         // Only change status of the specific seat (not the whole row)
         const newSeats = { ...seatLayout.seats };
         
@@ -397,7 +469,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         return seat.type;
     };
 
-    const getSeatStatus = (seatId: string): 'available' | 'booked' | 'selected' | 'maintenance' => {
+    const getSeatStatus = (seatId: string): 'available' | 'maintenance' => {
         const seat = seatLayout.seats[seatId];
         if (!seat) {
             return 'available';
@@ -410,8 +482,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         const status = getSeatStatus(seatId);
         
         // Status colors take priority
-        if (status === 'booked') return 'bg-red-400 border-red-600';
-        if (status === 'selected') return 'bg-blue-400 border-blue-600';
         if (status === 'maintenance') return 'bg-gray-600 border-gray-800';
         
         // Default type colors for available seats
@@ -471,7 +541,16 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         status: 'active' | 'maintenance' | 'inactive';
         description?: string;
     }) => {
+        // Prevent double submission
+        if (isSubmitting) {
+            console.log('Form is already submitting, ignoring duplicate submission');
+            return;
+        }
+        
         try {
+            setIsSubmitting(true);
+            console.log('RoomForm: Starting submit process');
+            
             // Auto-calculate capacity from seat layout (considering last row adjustment)
             let capacity = seatLayout.rows * seatLayout.cols;
             
@@ -480,7 +559,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                 capacity = capacity - 1; // Last row loses 1 seat to make it even
             }
             
-            const submitData: ICreateRoomData & { seatLayout?: SeatLayout } = {
+            const submitData: ICreateRoomData = {
                 name: values.name,
                 theater: values.theater,
                 capacity: capacity,
@@ -490,9 +569,19 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                 seatLayout: seatLayout
             };
             
+            console.log('RoomForm: Calling onSubmit with data:', submitData);
+            console.log('SeatLayout details:', {
+                rows: seatLayout.rows,
+                cols: seatLayout.cols,
+                seatsCount: Object.keys(seatLayout.seats).length,
+                sampleSeats: Object.keys(seatLayout.seats).slice(0, 5)
+            });
             onSubmit(submitData);
+            
         } catch (error) {
             console.error('Error submitting room form:', error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -748,14 +837,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Trạng thái ghế:</h4>
                                 <div className="flex gap-4 flex-wrap">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 bg-red-400 border border-red-600 rounded"></div>
-                                        <span className="text-sm">Đã đặt</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 bg-blue-400 border border-blue-600 rounded"></div>
-                                        <span className="text-sm">Đang chọn</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
                                         <div className="w-6 h-6 bg-gray-600 border border-gray-800 rounded relative flex items-center justify-center">
                                             <span className="text-red-600 text-sm font-bold">✕</span>
                                         </div>
@@ -930,7 +1011,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                         type="default"
                         onClick={onCancel}
                         size="large"
-                        disabled={loading}
+                        disabled={loading || isSubmitting}
                     >
                         Hủy
                     </Button>
@@ -938,10 +1019,11 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                         type="primary"
                         htmlType="submit"
                         size="large"
-                        loading={loading}
+                        loading={loading || isSubmitting}
+                        disabled={loading || isSubmitting}
                         className="bg-black hover:bg-gray-800"
                     >
-                        {room ? 'Cập nhật' : 'Thêm mới'}
+                        {loading || isSubmitting ? (room ? 'Đang cập nhật...' : 'Đang thêm...') : (room ? 'Cập nhật' : 'Thêm mới')}
                     </Button>
                 </div>
             </Form>
@@ -992,18 +1074,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                         onClick={() => handleSeatStatusChange(contextMenu.seatId, 'available')}
                     >
                         ✅ Có thể đặt
-                    </button>
-                    <button
-                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-                        onClick={() => handleSeatStatusChange(contextMenu.seatId, 'booked')}
-                    >
-                        🔴 Đã đặt
-                    </button>
-                    <button
-                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-                        onClick={() => handleSeatStatusChange(contextMenu.seatId, 'selected')}
-                    >
-                        🔵 Đang chọn
                     </button>
                     <button
                         className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"

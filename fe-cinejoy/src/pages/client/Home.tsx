@@ -245,8 +245,8 @@ const HomePage = () => {
                 </div>
             </div>
 
-            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="nowShowing" />
-            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="upcoming" />
+            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="Phim đang chiếu" />
+            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="Phim sắp chiếu" />
             <div ref={scheduleRef}>
                 <ScheduleList />
             </div>

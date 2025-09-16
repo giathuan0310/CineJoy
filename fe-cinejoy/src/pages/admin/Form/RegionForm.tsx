@@ -1,17 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Input } from 'antd';
+import { Modal, Form, Input, Spin } from 'antd';
 import type { InputRef } from 'antd';
 
 interface RegionFormProps {
     region?: IRegion;
-    onSubmit: (regionData: Partial<IRegion>) => void;
+    onSubmit: (regionData: Partial<IRegion>) => Promise<void>;
     onCancel: () => void;
 }
 
 const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
         if (region) {
@@ -33,7 +34,14 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
     }, [region]);
 
     const handleSubmit = async (values: { name: string }) => {
-        await onSubmit(values);
+        try {
+            setIsLoading(true);
+            await onSubmit(values);
+        } catch (error) {
+            console.error('Error submitting form:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -104,11 +112,20 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
                     </motion.button>
                     <motion.button
                         type="submit"
-                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 cursor-pointer transition-colors"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={isLoading}
+                        className={`px-6 py-2 text-white rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${
+                            isLoading 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        whileHover={!isLoading ? { scale: 1.05 } : {}}
+                        whileTap={!isLoading ? { scale: 0.95 } : {}}
                     >
-                        {region ? '✏️ Cập nhật' : '➕ Thêm khu vực'}
+                        {isLoading && <Spin size="small" />}
+                        {isLoading 
+                            ? (region ? 'Đang cập nhật...' : 'Đang thêm...') 
+                            : (region ? '✏️ Cập nhật' : '➕ Thêm khu vực')
+                        }
                     </motion.button>
                 </div>
             </Form>

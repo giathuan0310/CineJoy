@@ -7,7 +7,11 @@ import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addFoodCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
-import { getAllUsersApi, createUserApi, updateUserApi, deleteUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, getAllSeatsApi, createSeatApi, updateSeatApi, deleteSeatApi } from "@/services/api";
+import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
+import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
+import createInstanceAxios from "@/services/axios.customize";
+
+const axios = createInstanceAxios(import.meta.env.VITE_BACKEND_URL);
 import {
   deleteMovie,
   getMovies,
@@ -35,6 +39,7 @@ import TheaterForm from "@/pages/admin/Form/TheaterForm";
 import UserForm from "@/pages/admin/Form/UserForm";
 import RoomForm from "./Form/RoomForm";
 import SeatForm from "./Form/SeatForm";
+import ShowSessionForm from "./Form/ShowSessionForm";
 import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
@@ -50,7 +55,7 @@ const Dashboard: React.FC = () => {
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
-  const [seats, setSeats] = useState<any[]>([]);
+  const [showSessions, setShowSessions] = useState<IShowSession[]>([]);
   const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
   const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(
     undefined
@@ -79,6 +84,7 @@ const Dashboard: React.FC = () => {
   const [selectedTheater, setSelectedTheater] = useState<ITheater | undefined>(
     undefined
   );
+  const [theaterLoading, setTheaterLoading] = useState<boolean>(false);
   const [showUserForm, setShowUserForm] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<IUser | undefined>(
     undefined
@@ -91,6 +97,11 @@ const Dashboard: React.FC = () => {
   const [selectedSeat, setSelectedSeat] = useState<any | undefined>(
     undefined
   );
+  const [showShowSessionForm, setShowShowSessionForm] = useState<boolean>(false);
+  const [selectedShowSession, setSelectedShowSession] = useState<IShowSession | undefined>(
+    undefined
+  );
+  const [showSessionSubmitting, setShowSessionSubmitting] = useState<boolean>(false);
   const { user } = useAppStore();
 
   const itemsPerPage = 5;
@@ -98,25 +109,42 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     getTheaters()
       .then((data) => setTheaters(data))
-      .catch(() => setTheaters([]));
+      .catch((error) => {
+        console.error("Error fetching theaters:", error);
+        setTheaters([]);
+      });
     getMovies()
       .then((res) => setMovies(res && Array.isArray(res) ? res : []))
-      .catch(() => setMovies([]));
+      .catch((error) => {
+        console.error("Error fetching movies:", error);
+        setMovies([]);
+      });
     getFoodCombos()
       .then((data) => setFoodCombos(data))
-      .catch(() => setFoodCombos([]));
+      .catch((error) => {
+        console.error("Error fetching food combos:", error);
+        setFoodCombos([]);
+      });
     getRegions()
       .then((data) => setRegions(data))
-      .catch(() => setRegions([]));
+      .catch((error) => {
+        console.error("Error fetching regions:", error);
+        setRegions([]);
+      });
     getVouchers()
       .then((data) => setVouchers(data))
-      .catch(() => setVouchers([]));
+      .catch((error) => {
+        console.error("Error fetching vouchers:", error);
+        setVouchers([]);
+      });
     getBlogs()
       .then((data) => setBlogs(data))
-      .catch(() => setBlogs([]));
+      .catch((error) => {
+        console.error("Error fetching blogs:", error);
+        setBlogs([]);
+      });
     getShowTimes()
       .then((data) => {
-        console.log("Showtimes API response:", data);
         setShowtimes(data && Array.isArray(data) ? data : []);
       })
       .catch((error) => {
@@ -125,7 +153,6 @@ const Dashboard: React.FC = () => {
       });
     getAllUsersApi()
       .then((response) => {
-        console.log("Users API response:", response);
         setUsers(response.data && Array.isArray(response.data) ? response.data : []);
       })
       .catch((error) => {
@@ -133,7 +160,7 @@ const Dashboard: React.FC = () => {
         setUsers([]);
       });
     loadRooms();
-    loadSeats();
+    loadShowSessions();
   }, []);
 
   // Lọc và phân trang cho từng tab
@@ -222,6 +249,14 @@ const Dashboard: React.FC = () => {
       );
     });
 
+  // Show Sessions
+  console.log("Current showSessions state:", showSessions);
+  const { paginated: paginatedShowSessions, totalPages: totalShowSessionPages } =
+    filterAndPaginate<IShowSession>(showSessions, (session) =>
+      (session.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
+    );
+  console.log("Paginated show sessions:", paginatedShowSessions);
+
   // Reset page when tab/searchTerm thay đổi
   React.useEffect(() => {
     setCurrentPage(1);
@@ -248,7 +283,8 @@ const Dashboard: React.FC = () => {
       // Đóng modal và reset
       setShowRegionForm(false);
       setSelectedRegion(undefined);
-    } catch {
+    } catch (error) {
+      console.error("Error submitting region:", error);
       toast.error(selectedRegion ? "Cập nhật khu vực thất bại!" : "Thêm khu vực thất bại!");
     }
   };
@@ -261,17 +297,18 @@ const Dashboard: React.FC = () => {
       );
       toast.success("Xóa khu vực thành công!");
     } catch (error) {
-      console.error("Lỗi khi xóa khu vực:", error);
+      console.error("Error deleting region:", error);
       toast.success("Xóa khu vực thất bại!");
     }
   };
+  
   const handleEditRegion = async (regionId: string) => {
     try {
       const region = await getRegionById(regionId);
       setSelectedRegion(region);
       setShowRegionForm(true);
     } catch (error) {
-      console.log(error);
+      console.error("Error getting region:", error);
       toast.error("Không lấy được thông tin khu vực!");
     }
   };
@@ -286,38 +323,100 @@ const Dashboard: React.FC = () => {
     try {
       const response = await getAllRoomsApi() as any;
       setRooms(response.data && Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error("Error loading rooms:", error);
+    } catch {
       setRooms([]);
     }
   };
 
-  const loadSeats = async () => {
-    try {
-      const response = await getAllSeatsApi() as any;
-      setSeats(response.data && Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error("Error loading seats:", error);
-      setSeats([]);
-    }
-  };
 
   // Room handlers
+  const [isRoomSubmitting, setIsRoomSubmitting] = useState(false);
+  
   const handleRoomSubmit = async (roomData: any) => {
+    if (isRoomSubmitting) {
+      return;
+    }
+    
+    setIsRoomSubmitting(true);
     try {
+      
       if (selectedRoom) {
-        await updateRoomApi(selectedRoom._id, roomData);
+        // Extract seatLayout from roomData
+        const { seatLayout, ...roomDataOnly } = roomData;
+        
+        // Update room basic info
+        await updateRoomApi(selectedRoom._id, roomDataOnly);
+        
+        // If seatLayout exists, update seats
+        if (seatLayout && seatLayout.seats && Object.keys(seatLayout.seats).length > 0) {
+          
+          // Convert seatLayout to ISeat array
+          const newSeats: any[] = [];
+          Object.keys(seatLayout.seats).forEach(seatId => {
+            const seatInfo = seatLayout.seats[seatId];
+            const row = seatId.charAt(0);
+            const number = parseInt(seatId.substring(1));
+            
+            newSeats.push({
+              seatId: seatId,
+              room: selectedRoom._id,
+              row: row,
+              number: number,
+              type: seatInfo.type,
+              status: seatInfo.status,
+              price: getSeatPrice(seatInfo.type),
+              position: {
+                x: (number - 1) * 40,
+                y: (row.charCodeAt(0) - 65) * 40
+              }
+            });
+          });
+          
+          await updateRoomSeats(selectedRoom._id, newSeats);
+        }
+        
         toast.success("Cập nhật phòng chiếu thành công!");
       } else {
+        // Create new room (seatLayout will be handled by backend)
         await createRoomApi(roomData);
         toast.success("Thêm phòng chiếu thành công!");
       }
+      
       setShowRoomForm(false);
       setSelectedRoom(undefined);
-      loadRooms();
+      
+      await loadRooms();
+      
     } catch (error) {
       console.error("Error submitting room:", error);
       toast.error(selectedRoom ? "Cập nhật phòng chiếu thất bại!" : "Thêm phòng chiếu thất bại!");
+    } finally {
+      setIsRoomSubmitting(false);
+    }
+  };
+
+  // Update room seats based on seat layout
+  const updateRoomSeats = async (roomId: string, newSeats: any[]) => {
+    // Only update if there are seats to create
+    if (newSeats.length === 0) {
+      return;
+    }
+    
+    // Optimized approach: Use existing APIs but minimize calls
+    // Step 1: Delete all existing seats for this room (single API call)
+    await axios.delete(`/seats/room/${roomId}/all`);
+    
+    // Step 2: Create new seats in bulk (single API call)
+    await createMultipleSeatsApi(newSeats);
+  };
+
+  // Helper function to get seat price based on type
+  const getSeatPrice = (type: string): number => {
+    switch (type) {
+      case 'vip': return 120000;
+      case 'couple': return 150000;
+      case '4dx': return 180000;
+      default: return 75000; // normal
     }
   };
 
@@ -342,6 +441,67 @@ const Dashboard: React.FC = () => {
     setShowRoomForm(true);
   };
 
+  // Load functions for Show Sessions
+  const loadShowSessions = async () => {
+    try {
+      console.log("Loading show sessions...");
+      const response = await getAllShowSessionsApi();
+      console.log("Show sessions response:", response);
+      setShowSessions(response || []);
+    } catch (error) {
+      console.error("Error loading show sessions:", error);
+      setShowSessions([]);
+    }
+  };
+
+  // Show Session handlers
+  const handleShowSessionSubmit = async (sessionData: Partial<IShowSession>) => {
+    try {
+      setShowSessionSubmitting(true);
+      if (selectedShowSession) {
+        // Update
+        await updateShowSessionApi(selectedShowSession._id, sessionData);
+        toast.success("Cập nhật ca chiếu thành công!");
+      } else {
+        // Create new
+        await createShowSessionApi(sessionData as any);
+        toast.success("Thêm ca chiếu thành công!");
+      }
+      
+      // Reload data after add/edit
+      await loadShowSessions();
+      setShowShowSessionForm(false);
+      setSelectedShowSession(undefined);
+    } catch (error) {
+      console.error("Error submitting show session:", error);
+      toast.error(selectedShowSession ? "Cập nhật ca chiếu thất bại!" : (error as any)?.response?.data?.message);
+    } finally {
+      setShowSessionSubmitting(false);
+    }
+  };
+
+  const handleDeleteShowSession = async (sessionId: string) => {
+    try {
+      await deleteShowSessionApi(sessionId);
+      toast.success("Xóa ca chiếu thành công!");
+      loadShowSessions();
+    } catch (error) {
+      console.error("Error deleting show session:", error);
+      toast.error("Xóa ca chiếu thất bại!");
+    }
+  };
+
+  const handleEditShowSession = (session: IShowSession) => {
+    setSelectedShowSession(session);
+    setShowShowSessionForm(true);
+  };
+
+  const handleAddShowSession = () => {
+    setSelectedShowSession(undefined);
+    setShowShowSessionForm(true);
+  };
+
+
   // Seat handlers
   const handleSeatSubmit = async (seatData: any) => {
     try {
@@ -354,33 +514,12 @@ const Dashboard: React.FC = () => {
       }
       setShowSeatForm(false);
       setSelectedSeat(undefined);
-      loadSeats();
     } catch (error) {
       console.error("Error submitting seat:", error);
       toast.error(selectedSeat ? "Cập nhật ghế ngồi thất bại!" : "Thêm ghế ngồi thất bại!");
     }
   };
 
-  const handleEditSeat = (seat: any) => {
-    setSelectedSeat(seat);
-    setShowSeatForm(true);
-  };
-
-  const handleDeleteSeat = async (seatId: string) => {
-    try {
-      await deleteSeatApi(seatId);
-      toast.success("Xóa ghế ngồi thành công!");
-      loadSeats();
-    } catch (error) {
-      console.error("Error deleting seat:", error);
-      toast.error("Xóa ghế ngồi thất bại!");
-    }
-  };
-
-  const handleAddSeat = () => {
-    setSelectedSeat(undefined);
-    setShowSeatForm(true);
-  };
 
   /////////////////////////////////////////////////////////////////
 
@@ -396,6 +535,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleTheaterSubmit = async (theaterData: Partial<ITheater>) => {
+    setTheaterLoading(true);
     try {
       if (selectedTheater) {
         // Cập nhật
@@ -414,8 +554,11 @@ const Dashboard: React.FC = () => {
       await loadTheaters();
       setShowTheaterForm(false);
       setSelectedTheater(undefined);
-    } catch {
+    } catch (error) {
+      console.error("Error submitting theater:", error);
       toast.error(selectedTheater ? "Cập nhật rạp thất bại!" : "Thêm rạp thất bại!");
+    } finally {
+      setTheaterLoading(false);
     }
   };
 
@@ -470,7 +613,7 @@ const Dashboard: React.FC = () => {
       setShowUserForm(false);
       setSelectedUser(undefined);
     } catch (error: unknown) {
-      console.error("Error with user:", error);
+      console.error("Error submitting user:", error);
       const errorObj = error as { error?: number };
       if (errorObj?.error === 400) {
         toast.error("Email đã tồn tại!");
@@ -480,17 +623,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    try {
-      await deleteUserApi(userId);
-      // Reload dữ liệu sau khi xóa
-      await loadUsers();
-      toast.success("Xóa người dùng thành công!");
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      toast.error("Xóa người dùng thất bại!");
-    }
-  };
 
   const handleEditUser = (user: IUser) => {
     setSelectedUser(user);
@@ -508,8 +640,7 @@ const Dashboard: React.FC = () => {
     try {
       const data = await getFoodCombos();
       setFoodCombos(data);
-    } catch (error) {
-      console.error("Error loading food combos:", error);
+    } catch {
       setFoodCombos([]);
     }
   };
@@ -530,7 +661,7 @@ const Dashboard: React.FC = () => {
       setShowFoodComboForm(false);
       setSelectedFoodCombo(undefined);
     } catch (error) {
-      console.error("Error submitting combo:", error);
+      console.error("Error submitting food combo:", error);
       toast.error(selectedFoodCombo ? "Cập nhật combo thất bại!" : "Thêm combo thất bại!");
     }
   };
@@ -542,7 +673,7 @@ const Dashboard: React.FC = () => {
       await loadFoodCombos();
       toast.success("Xóa combo thành công!");
     } catch (error) {
-      console.error("Error deleting combo:", error);
+      console.error("Error deleting food combo:", error);
       toast.error("Xóa combo thất bại!");
     }
   };
@@ -622,7 +753,7 @@ const Dashboard: React.FC = () => {
       );
       toast.success("Xóa Movie thành công!");
     } catch (error) {
-      console.error("Lỗi khi xóa movie:", error);
+      console.error("Error deleting movie:", error);
       toast.error("Xóa movie thất bại!");
     }
   };
@@ -634,7 +765,7 @@ const Dashboard: React.FC = () => {
       setShowMovieForm(false);
       toast.success("Thêm phim thành công!");
     } catch (error) {
-      console.error("Lỗi khi thêm phim:", error);
+      console.error("Error adding movie:", error);
       toast.error("Thêm phim thất bại!");
     }
   };
@@ -655,7 +786,7 @@ const Dashboard: React.FC = () => {
       setSelectedMovie(undefined);
       toast.success("Cập nhật phim thành công!");
     } catch (error) {
-      console.error("Lỗi khi cập nhật phim:", error);
+      console.error("Error updating movie:", error);
       toast.error("Cập nhật phim thất bại!");
     }
   };
@@ -720,6 +851,7 @@ const Dashboard: React.FC = () => {
               { label: "Voucher", value: "vouchers", icon: "🎟️" },
               { label: "Người dùng", value: "users", icon: "👥" },
               { label: "Phòng chiếu", value: "rooms", icon: "🏬" },
+              { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
             ].map((tab) => (
               <li
@@ -812,7 +944,8 @@ const Dashboard: React.FC = () => {
                       <th className="p-3 text-left">STT</th>
                       <th className="p-3 text-left">Poster</th>
                       <th className="p-3 text-left">Tên phim</th>
-                      <th className="p-3 text-left">Ngày phát hành</th>
+                      <th className="p-3 text-left">Ngày khởi chiếu</th>
+                      <th className="p-3 text-left">Ngày kết thúc</th>
                       <th className="p-3 text-left">Thời lượng</th>
                       <th className="p-3 text-left">Diễn Viên</th>
                       <th className="p-3 text-left">Thể loại</th>
@@ -840,9 +973,14 @@ const Dashboard: React.FC = () => {
                         </td>
                         <td className="p-3">{movie.title}</td>
                         <td className="p-3">
-                          {new Date(movie.releaseDate).toLocaleDateString(
+                          {movie.startDate ? new Date(movie.startDate).toLocaleDateString(
                             "vi-VN"
-                          )}
+                          ) : 'Chưa có'}
+                        </td>
+                        <td className="p-3">
+                          {movie.endDate ? new Date(movie.endDate).toLocaleDateString(
+                            "vi-VN"
+                          ) : 'Chưa có'}
                         </td>
                         <td className="p-3">{movie.duration} phút</td>
                         <td className="p-3">
@@ -1512,33 +1650,14 @@ const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="p-3">
-                          <div className="flex gap-2">
-                            <motion.button
-                              onClick={() => handleEditUser(user)}
-                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              Sửa
-                            </motion.button>
-                            {user.role !== 'ADMIN' && (
-                              <Popconfirm
-                                title="Xóa người dùng"
-                                description="Bạn có chắc chắn muốn xóa người dùng này?"
-                                onConfirm={() => handleDeleteUser(user._id!)}
-                                okText="Có"
-                                cancelText="Không"
-                              >
-                                <motion.button
-                                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  Xóa
-                                </motion.button>
-                              </Popconfirm>
-                            )}
-                          </div>
+                          <motion.button
+                            onClick={() => handleEditUser(user)}
+                            className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            Sửa
+                          </motion.button>
                         </td>
                       </tr>
                     ))}
@@ -1560,130 +1679,267 @@ const Dashboard: React.FC = () => {
                   placeholder="Tìm kiếm phòng chiếu..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border border-gray-300 px-4 py-2 rounded-lg"
+                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
                 />
-                <motion.button
-                  onClick={handleAddRoom}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Thêm phòng mới
-                </motion.button>
-              </div>
-
-              {/* Room Cards */}
-              {filterAndPaginate(
-                rooms,
-                (room: any) =>
-                  room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  room.theater?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  room.roomType?.toLowerCase().includes(searchTerm.toLowerCase())
-              ).paginated.map((room: any) => (
-                <motion.div
-                  key={room._id}
-                  className="bg-white rounded-lg shadow-md p-6 mb-4 hover:shadow-lg transition-shadow"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-800">
-                          {room.name}
-                        </h3>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          room.roomType === 'VIP' ? 'bg-yellow-100 text-yellow-800' :
-                          room.roomType === 'IMAX' ? 'bg-blue-100 text-blue-800' :
-                          room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {room.roomType}
-                        </span>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          room.status === 'active' ? 'bg-green-100 text-green-800' :
-                          room.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {room.status === 'active' ? 'Hoạt động' : 
-                           room.status === 'maintenance' ? 'Bảo trì' : 'Không hoạt động'}
-                        </span>
-                      </div>
-                      <p className="text-gray-600 mb-2">
-                        <span className="font-medium">Rạp:</span> {room.theater?.name} - {room.theater?.address}
-                      </p>
-                      <p className="text-gray-600 mb-2">
-                        <span className="font-medium">Sức chứa:</span> {room.capacity} ghế
-                      </p>
-                      {room.description && (
-                        <p className="text-gray-600 mb-2">
-                          <span className="font-medium">Mô tả:</span> {room.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 mt-3">
-                        <span className="text-sm text-gray-500">
-                          Số ghế hiện có: {room.seats?.length || 0}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          Được tạo: {new Date(room.createdAt).toLocaleDateString('vi-VN')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <motion.button
-                        onClick={() => handleEditRoom(room)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors text-sm"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        Sửa
-                      </motion.button>
-                      <Popconfirm
-                        title="Xác nhận xóa"
-                        description="Bạn có chắc chắn muốn xóa phòng chiếu này không? Tất cả ghế trong phòng cũng sẽ bị xóa."
-                        onConfirm={() => handleDeleteRoom(room._id)}
-                        okText="Xóa"
-                        cancelText="Hủy"
-                        okButtonProps={{ danger: true }}
-                      >
-                        <motion.button
-                          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors text-sm"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          Xóa
-                        </motion.button>
-                      </Popconfirm>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-
-              {/* Pagination */}
-              {filterAndPaginate(rooms, () => true).totalPages > 1 && (
-                <div className="flex justify-center mt-6">
-                  <div className="flex gap-2">
-                    {Array.from(
-                      { length: filterAndPaginate(rooms, () => true).totalPages },
-                      (_, i) => i + 1
-                    ).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 rounded ${
-                          currentPage === page
-                            ? "bg-black text-white"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                        } transition-colors`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddRoom}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Thêm phòng mới
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {filterAndPaginate(rooms, () => true).totalPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === filterAndPaginate(rooms, () => true).totalPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* Room Table */}
+              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-black text-white">
+                    <tr>
+                      <th className="p-3 text-left">STT</th>
+                      <th className="p-3 text-left">Tên phòng</th>
+                      <th className="p-3 text-left">Loại phòng</th>
+                      <th className="p-3 text-left">Rạp chiếu</th>
+                      <th className="p-3 text-left">Sức chứa</th>
+                      <th className="p-3 text-left">Trạng thái</th>
+                      <th className="p-3 text-left">Số ghế</th>
+                      <th className="p-3 text-left">Ngày tạo</th>
+                      <th className="p-3 text-left">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filterAndPaginate(
+                      rooms,
+                      (room: any) =>
+                        room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        room.theater?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        room.roomType?.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).paginated.map((room: any, idx: number) => (
+                      <tr key={room._id} className="border-b hover:bg-gray-50">
+                        <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                        <td className="p-3 font-medium">{room.name}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            room.roomType === 'VIP' ? 'bg-yellow-100 text-yellow-800' :
+                            room.roomType === 'IMAX' ? 'bg-blue-100 text-blue-800' :
+                            room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {room.roomType}
+                          </span>
+                        </td>
+                        <td className="p-3">{room.theater?.name}</td>
+                        <td className="p-3">{room.capacity} ghế</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            room.status === 'active' ? 'bg-green-100 text-green-800' :
+                            room.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {room.status === 'active' ? 'Hoạt động' : 
+                             room.status === 'maintenance' ? 'Bảo trì' : 'Không hoạt động'}
+                          </span>
+                        </td>
+                        <td className="p-3">{room.seats?.length || 0}</td>
+                        <td className="p-3">{new Date(room.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              onClick={() => handleEditRoom(room)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors text-sm cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xác nhận xóa"
+                              description="Bạn có chắc chắn muốn xóa phòng chiếu này không? Tất cả ghế trong phòng cũng sẽ bị xóa."
+                              onConfirm={() => handleDeleteRoom(room._id)}
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              okButtonProps={{ danger: true }}
+                            >
+                              <motion.button
+                                className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors text-sm cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
             </div>
           )}
 
+          {/* Show Sessions Tab */}
+          {activeTab === "showSessions" && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                Quản lý Ca chiếu
+              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm ca chiếu..."
+                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <div className="flex items-center gap-4">
+                  <motion.button
+                    onClick={handleAddShowSession}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Thêm ca chiếu
+                  </motion.button>
+                  <div>
+                    <span>
+                      Trang {currentPage} / {totalShowSessionPages}
+                    </span>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                      disabled={currentPage === totalShowSessionPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-black text-white">
+                    <tr>
+                      <th className="p-3 text-left">STT</th>
+                      <th className="p-3 text-left">Tên ca chiếu</th>
+                      <th className="p-3 text-left">Thời gian bắt đầu</th>
+                      <th className="p-3 text-left">Thời gian kết thúc</th>
+                      <th className="p-3 text-left">Thời lượng</th>
+                      <th className="p-3 text-left">Ngày tạo</th>
+                      <th className="p-3 text-left">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedShowSessions.map((session, idx) => {
+                      // Calculate duration - handle overnight sessions
+                      let duration;
+                      if (session.endTime === '00:00') {
+                        // Overnight session (e.g., 20:30 - 00:00)
+                        const startTime = new Date(`2000-01-01 ${session.startTime}`);
+                        const endTime = new Date(`2000-01-02 ${session.endTime}`);
+                        duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
+                      } else {
+                        // Normal session within same day
+                        const startTime = new Date(`2000-01-01 ${session.startTime}`);
+                        const endTime = new Date(`2000-01-01 ${session.endTime}`);
+                        duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // in minutes
+                      }
+                      
+                      return (
+                        <tr
+                          key={session._id}
+                          className="border-b hover:bg-gray-100"
+                        >
+                          <td className="p-3">
+                            {(currentPage - 1) * itemsPerPage + idx + 1}
+                          </td>
+                          <td className="p-3">
+                            <span className="font-medium text-lg">{session.name}</span>
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-semibold">
+                              {session.startTime}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-semibold">
+                              {session.endTime}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
+                              {Math.floor(duration / 60)}h {duration % 60}m
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {new Date(session.createdAt).toLocaleDateString('vi-VN')}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2">
+                              <motion.button
+                                onClick={() => handleEditShowSession(session)}
+                                className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Sửa
+                              </motion.button>
+                              <Popconfirm
+                                title="Xóa ca chiếu"
+                                description="Bạn có chắc chắn muốn xóa ca chiếu này?"
+                                onConfirm={() => handleDeleteShowSession(session._id)}
+                                okText="Có"
+                                cancelText="Không"
+                                placement="topRight"
+                                getPopupContainer={() => document.body}
+                                overlayStyle={{ maxWidth: 'calc(100vw - 10px)', overflowWrap: 'break-word', wordBreak: 'break-word', marginLeft: 8 }}
+                              >
+                                <motion.button
+                                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  Xóa
+                                </motion.button>
+                              </Popconfirm>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Showtimes Tab */}
           {activeTab === "showtimes" && (
@@ -1734,8 +1990,8 @@ const Dashboard: React.FC = () => {
                       <th className="p-3 text-left">STT</th>
                       <th className="p-3 text-left">Phim</th>
                       <th className="p-3 text-left">Rạp</th>
-                      <th className="p-3 text-left">Ngày bắt đầu</th>
-                      <th className="p-3 text-left">Ngày kết thúc</th>
+                      <th className="p-3 text-left">Ngày chiếu đầu tiên</th>
+                      <th className="p-3 text-left">Ngày chiếu cuối cùng</th>
                       <th className="p-3 text-left">Số suất chiếu</th>
                       <th className="p-3 text-left">Chi tiết suất chiếu</th>
                       <th className="p-3 text-left">Hành Động</th>
@@ -1753,14 +2009,16 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">{showtime.movieId.title}</td>
                         <td className="p-3">{showtime.theaterId.name}</td>
                         <td className="p-3">
-                          {new Date(showtime.showDate.start).toLocaleDateString(
-                            "vi-VN"
-                          )}
+                          {showtime.showTimes.length > 0 ? 
+                            new Date(showtime.showTimes[0].date).toLocaleDateString("vi-VN") : 
+                            'N/A'
+                          }
                         </td>
                         <td className="p-3">
-                          {new Date(showtime.showDate.end).toLocaleDateString(
-                            "vi-VN"
-                          )}
+                          {showtime.showTimes.length > 0 ? 
+                            new Date(showtime.showTimes[showtime.showTimes.length - 1].date).toLocaleDateString("vi-VN") : 
+                            'N/A'
+                          }
                         </td>
                         <td className="p-3">{showtime.showTimes.length}</td>
                         <td className="p-3">
@@ -1783,7 +2041,7 @@ const Dashboard: React.FC = () => {
                             </motion.button>
                             <Popconfirm
                               title="Xóa suất chiếu"
-                              description="Bạn có chắc chắn muốn xóa suất chiếu này?"
+                              description="Bạn có chắc chắn muốn xóa suất chiếu này? (Xóa suất chiếu sẽ xóa tất cả các suất chiếu của phim trong rạp)"
                               okText="Xóa"
                               cancelText="Hủy"
                               onConfirm={() => handleDeleteShowtime(showtime._id)}
@@ -1896,16 +2154,20 @@ const Dashboard: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="📅 Khoảng thời gian">
                 <Space direction="vertical" size="small">
-                  <span>
-                    <Tag color="green">
-                      Từ: {new Date(selectedShowtime.showDate.start).toLocaleDateString("vi-VN")}
-                    </Tag>
-                  </span>
-                  <span>
-                    <Tag color="orange">
-                      Đến: {new Date(selectedShowtime.showDate.end).toLocaleDateString("vi-VN")}
-                    </Tag>
-                  </span>
+                  {selectedShowtime.showTimes.length > 0 && (
+                    <>
+                      <span>
+                        <Tag color="green">
+                          Từ: {new Date(selectedShowtime.showTimes[0].date).toLocaleDateString("vi-VN")}
+                        </Tag>
+                      </span>
+                      <span>
+                        <Tag color="orange">
+                          Đến: {new Date(selectedShowtime.showTimes[selectedShowtime.showTimes.length - 1].date).toLocaleDateString("vi-VN")}
+                        </Tag>
+                      </span>
+                    </>
+                  )}
                 </Space>
               </Descriptions.Item>
               <Descriptions.Item label="🎪 Tổng số suất chiếu">
@@ -1921,17 +2183,22 @@ const Dashboard: React.FC = () => {
                 📋 Danh sách suất chiếu chi tiết
               </h4>
               <Table
-                dataSource={selectedShowtime.showTimes.map((time, index) => ({
-                  key: index,
-                  index: index + 1,
-                  date: time.date,
-                  start: time.start,
-                  end: time.end,
-                  room: time.room,
-                  availableSeats: time.seats.filter(seat => seat.status === "available").length,
-                  totalSeats: time.seats.length,
-                  seats: time.seats
-                }))}
+                dataSource={selectedShowtime.showTimes.map((time: any, index: number) => {
+                  const roomVal = time.room;
+                  const roomDisplay = typeof roomVal === 'string' ? roomVal : (roomVal?.name || roomVal?._id || 'N/A');
+                  const seatsArr = Array.isArray(time.seats) ? time.seats : [];
+                  return {
+                    key: index,
+                    index: index + 1,
+                    date: time.date,
+                    start: time.start,
+                    end: time.end,
+                    room: roomDisplay,
+                    availableSeats: seatsArr.filter((s: any) => s.status === 'available').length,
+                    totalSeats: seatsArr.length,
+                    seats: seatsArr
+                  };
+                })}
                 columns={[
                   {
                     title: 'STT',
@@ -1975,7 +2242,7 @@ const Dashboard: React.FC = () => {
                     title: '🏠 Phòng chiếu',
                     dataIndex: 'room',
                     key: 'room',
-                    render: (room) => (
+                    render: (room: string) => (
                       <Tag color="purple" className="font-medium">
                         {room}
                       </Tag>
@@ -2030,11 +2297,9 @@ const Dashboard: React.FC = () => {
             // Refresh showtimes data
             getShowTimes()
               .then((data) => {
-                console.log("Showtimes API response:", data);
                 setShowtimes(data && Array.isArray(data) ? data : []);
               })
-              .catch((error) => {
-                console.error("Error fetching showtimes:", error);
+              .catch(() => {
                 setShowtimes([]);
               });
           }}
@@ -2062,7 +2327,9 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setShowTheaterForm(false);
             setSelectedTheater(undefined);
+            setTheaterLoading(false);
           }}
+          loading={theaterLoading}
         />
       )}
 
@@ -2085,6 +2352,7 @@ const Dashboard: React.FC = () => {
           theaters={theaters.map(t => ({ _id: t._id, name: t.name, address: t.location?.address || '', location: { city: t.location?.city || '' }, regionId: t.regionId }))}
           regions={regions}
           onSubmit={handleRoomSubmit}
+          loading={isRoomSubmitting}
           onCancel={() => {
             setShowRoomForm(false);
             setSelectedRoom(undefined);
@@ -2102,6 +2370,19 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setShowSeatForm(false);
             setSelectedSeat(undefined);
+          }}
+        />
+      )}
+
+      {/* Show Session Form Modal */}
+      {showShowSessionForm && (
+        <ShowSessionForm
+          showSession={selectedShowSession}
+          loading={showSessionSubmitting}
+          onSubmit={handleShowSessionSubmit}
+          onCancel={() => {
+            setShowShowSessionForm(false);
+            setSelectedShowSession(undefined);
           }}
         />
       )}

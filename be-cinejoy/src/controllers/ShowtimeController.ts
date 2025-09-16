@@ -101,6 +101,20 @@ export default class ShowtimeController {
     }
   }
 
+  async getShowtimesByRoomAndDate(req: Request, res: Response): Promise<void> {
+    const { roomId, date } = req.query as { roomId?: string; date?: string };
+    if (!roomId || !date) {
+      res.status(400).json({ message: "Missing roomId or date" });
+      return;
+    }
+    try {
+      const list = await showtimeService.getShowtimesByRoomAndDate(roomId, date);
+      res.status(200).json(list);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching showtimes by room/date", error });
+    }
+  }
+
   // Lấy danh sách ghế theo suất chiếu cụ thể
   async getSeatsForShowtime(req: Request, res: Response): Promise<void> {
     try {

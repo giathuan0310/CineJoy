@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+/* */
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Select, DatePicker, TimePicker, Button, Card } from 'antd';
+import { Modal, Form, Select, DatePicker, TimePicker, Button, Card, Spin, message } from 'antd';
+import axiosClient from '@/apiservice/axiosClient';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getMovies } from '@/apiservice/apiMovies';
 import { getTheaters } from '@/apiservice/apiTheater';
-import { createShowtime, updateShowtime } from '@/apiservice/apiShowTime';
+import { createShowtime, updateShowtime, getShowtimesByRoomAndDateApi } from '@/apiservice/apiShowTime';
 import { getRegions } from '@/apiservice/apiRegion';
+import { getActiveRoomsByTheaterApi } from '@/apiservice/apiRoom';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
 
@@ -21,19 +24,27 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
     const [allTheaters, setAllTheaters] = useState<ITheater[]>([]);
     const [filteredTheaters, setFilteredTheaters] = useState<ITheater[]>([]);
     const [selectedRegionId, setSelectedRegionId] = useState<string>('');
+    const [selectedMovie, setSelectedMovie] = useState<IMovie | null>(null);
+    const [rooms, setRooms] = useState<{_id: string; name: string; theater: {_id: string}}[]>([]);
+    const [selectedTheaterId, setSelectedTheaterId] = useState<string>('');
     const [form] = Form.useForm();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [showSessions, setShowSessions] = useState<IShowSession[]>([]);
+
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [moviesData, theatersData, regionsData] = await Promise.all([
+                const [moviesRes, theatersRes, regionsRes, sessionsRes] = await Promise.all([
                     getMovies(),
                     getTheaters(),
-                    getRegions()
+                    getRegions(),
+                    axiosClient.get('/show-sessions')
                 ]);
-                setMovies(Array.isArray(moviesData) ? moviesData : []);
-                setAllTheaters(theatersData || []);
-                setRegions(regionsData || []);
+                setMovies(Array.isArray(moviesRes) ? moviesRes : []);
+                setAllTheaters(theatersRes || []);
+                setRegions(regionsRes || []);
+                setShowSessions((sessionsRes.data as { data: IShowSession[] }).data || []);
             } catch (error) {
                 console.error('Error fetching data:', error);
                 toast.error('Không thể tải dữ liệu phim, rạp và khu vực');
@@ -63,143 +74,249 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
     }, [selectedRegionId, allTheaters, regions, form]);
 
     useEffect(() => {
-        if (editData) {
-            // Tìm khu vực của rạp được chọn khi edit
-            const selectedTheater = allTheaters.find(t => t._id === editData.theaterId._id);
-            if (selectedTheater) {
-                // Tìm khu vực phù hợp với location.city của rạp
-                const matchingRegion = regions.find(region => 
-                    selectedTheater.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
-                    region.name.toLowerCase().includes(selectedTheater.location.city.toLowerCase())
-                );
-                if (matchingRegion) {
-                    setSelectedRegionId(matchingRegion._id);
+        const loadEditData = async () => {
+            if (editData) {
+                // Tìm khu vực của rạp được chọn khi edit
+                const selectedTheater = allTheaters.find(t => t._id === editData.theaterId._id);
+                if (selectedTheater) {
+                    // Tìm khu vực phù hợp với location.city của rạp
+                    const matchingRegion = regions.find(region => 
+                        selectedTheater.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
+                        region.name.toLowerCase().includes(selectedTheater.location.city.toLowerCase())
+                    );
+                    if (matchingRegion) {
+                        setSelectedRegionId(matchingRegion._id);
+                    }
                 }
+                
+                // Load rooms cho rạp khi edit TRƯỚC KHI set form values
+                try {
+                    const theaterRooms = await getActiveRoomsByTheaterApi(editData.theaterId._id);
+                    setRooms(theaterRooms);
+                    setSelectedTheaterId(editData.theaterId._id);
+                    
+                    // Sau khi load rooms xong, set form values
+                    form.setFieldsValue({
+                        movieId: editData.movieId._id,
+                        regionId: regions.find(region => 
+                            selectedTheater?.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
+                            region.name.toLowerCase().includes(selectedTheater?.location.city.toLowerCase() || '')
+                        )?._id,
+                        theaterId: editData.theaterId._id,
+                        showTimes: (editData.showTimes as Array<{ 
+                            date: string; 
+                            start: string; 
+                            end: string; 
+                            room: string | { _id: string; name: string }; 
+                            showSessionId?: string | { _id: string; name: string } 
+                        }>).map((st) => ({
+                            date: dayjs(st.date),
+                            startTime: dayjs(st.start),
+                            endTime: dayjs(st.end),
+                            room: typeof st.room === 'object' ? st.room._id : st.room,
+                            sessionId: typeof st.showSessionId === 'object' ? st.showSessionId._id : st.showSessionId
+                        }))
+                    });
+                } catch (error) {
+                    console.error('Error loading rooms for edit:', error);
+                    setRooms([]);
+                }
+            } else {
+                // Set default showtime when creating new
+                form.setFieldsValue({
+                    showTimes: [{
+                        date: undefined,
+                        startTime: undefined,
+                        endTime: undefined,
+                        room: undefined,
+                        sessionId: undefined
+                    }]
+                });
             }
-            
-            form.setFieldsValue({
-                movieId: editData.movieId._id,
-                regionId: regions.find(region => 
-                    selectedTheater?.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
-                    region.name.toLowerCase().includes(selectedTheater?.location.city.toLowerCase() || '')
-                )?._id,
-                theaterId: editData.theaterId._id,
-                showDate: [
-                    dayjs(editData.showDate.start),
-                    dayjs(editData.showDate.end)
-                ],
-                showTimes: editData.showTimes.map(st => ({
-                    date: dayjs(st.date),
-                    timeRange: [dayjs(st.start), dayjs(st.end)],
-                    room: st.room
-                }))
-            });
-        } else {
-            // Set default showtime when creating new
-            form.setFieldsValue({
-                showTimes: [{
-                    date: undefined,
-                    timeRange: undefined,
-                    room: undefined
-                }]
-            });
-        }
+        };
+        
+        loadEditData();
     }, [editData, form, allTheaters, regions]);
 
     // Handler cho việc chọn khu vực
     const handleRegionChange = (regionId: string) => {
         setSelectedRegionId(regionId);
+        // Reset theater và room khi chọn khu vực mới
+        form.setFieldValue('theaterId', undefined);
+        setSelectedTheaterId('');
+        setRooms([]);
+    };
+
+    // Handler cho việc chọn phim
+    const handleMovieChange = (movieId: string) => {
+        const movie = movies.find(m => m._id === movieId);
+        setSelectedMovie(movie || null);
+    };
+
+    // Set selectedMovie khi edit
+    useEffect(() => {
+        if (editData && movies.length > 0) {
+            const movie = movies.find(m => m._id === editData.movieId._id);
+            if (movie) {
+                setSelectedMovie(movie);
+            }
+        }
+    }, [editData, movies]);
+
+    // Handler cho việc chọn rạp chiếu
+    const handleTheaterChange = async (theaterId: string) => {
+        setSelectedTheaterId(theaterId);
+        
+        // Chỉ reset room values khi KHÔNG đang edit (tạo mới)
+        if (!editData) {
+            const currentShowTimes = form.getFieldValue('showTimes') || [];
+            const updatedShowTimes = currentShowTimes.map((showTime: {
+                date?: dayjs.Dayjs;
+                startTime?: dayjs.Dayjs;
+                endTime?: dayjs.Dayjs;
+                room?: string;
+            }) => ({
+                ...showTime,
+                room: undefined // Reset room value chỉ khi tạo mới
+            }));
+            form.setFieldValue('showTimes', updatedShowTimes);
+        }
+        
+        try {
+            // Load rooms cho rạp này sử dụng API chuyên biệt
+            const theaterRooms = await getActiveRoomsByTheaterApi(theaterId);
+            setRooms(theaterRooms);
+        } catch (error) {
+            console.error('Error loading rooms:', error);
+            toast.error('Không thể tải danh sách phòng chiếu');
+            setRooms([]);
+        }
+    };
+
+    // Helper: tính time theo phút
+    const toMinutes = (t: string) => {
+        const [h, m] = t.split(':').map(Number); return h * 60 + m;
+    };
+    const minutesToDayjs = (base: dayjs.Dayjs, minutes: number) => {
+        const h = Math.floor(minutes / 60) % 24; const m = minutes % 60;
+        return base.hour(h).minute(m).second(0).millisecond(0);
+    };
+
+    // Khi chọn ca chiếu cho 1 showTime item
+    const onChangeSessionForRow = async (rowIndex: number, sessionId: string) => {
+        const session = showSessions.find(s => s._id === sessionId) || null;
+        // set selected session for the row
+        const rows: Array<{ date?: dayjs.Dayjs; room?: string; startTime?: dayjs.Dayjs; endTime?: dayjs.Dayjs; sessionId?: string; }> = form.getFieldValue('showTimes') || [];
+        const row = rows[rowIndex];
+        if (!row?.date || !row?.room || !session) {
+            message.warning('Vui lòng chọn ngày và phòng trước');
+            return;
+        }
+        const dateStr = dayjs(row.date).format('YYYY-MM-DD');
+        const existing = await getShowtimesByRoomAndDateApi(row.room, dateStr);
+        // lọc suất trong cùng ca
+        const sStart = toMinutes(session.startTime); const sEnd = toMinutes(session.endTime) + (session.endTime <= session.startTime ? 24*60 : 0);
+        const listInSession = existing.filter(e => {
+            const st = toMinutes(e.startTime); let en = toMinutes(e.endTime); if (en <= st) en += 24*60;
+            return st >= sStart && st < sEnd;
+        });
+        let nextStartMin = sStart;
+        if (listInSession.length > 0) {
+            // sort endTime asc
+            const last = listInSession.sort((a,b)=>{
+                const ae = toMinutes(a.endTime) + (a.endTime <= a.startTime ? 24*60:0);
+                const be = toMinutes(b.endTime) + (b.endTime <= b.startTime ? 24*60:0);
+                return ae - be;
+            })[listInSession.length-1];
+            nextStartMin = (toMinutes(last.endTime) + 20) % (24*60); // +20p vệ sinh
+        }
+        rows[rowIndex].startTime = minutesToDayjs(dayjs(row.date), nextStartMin);
+        // auto compute end theo duration phim
+        if (selectedMovie?.duration) {
+            const endMin = nextStartMin + selectedMovie.duration + 20;
+            rows[rowIndex].endTime = minutesToDayjs(dayjs(row.date), endMin % (24*60));
+            // validate vượt ca (trừ ca đêm)
+            if (!(session.name.includes('đêm'))) {
+                const over = endMin > (sEnd % (24*60));
+                if (over) {
+                    message.error('Suất này vượt quá ca, hãy chọn phim ngắn hơn hoặc ca khác');
+                    rows[rowIndex].startTime = undefined;
+                    rows[rowIndex].endTime = undefined;
+                }
+            }
+        }
+        rows[rowIndex].sessionId = sessionId;
+        form.setFieldValue('showTimes', rows);
     };
 
     const handleSubmit = async (values: {
         movieId: string;
         regionId: string;
         theaterId: string;
-        showDate: [dayjs.Dayjs, dayjs.Dayjs];
         showTimes: Array<{
             date: dayjs.Dayjs;
-            timeRange: [dayjs.Dayjs, dayjs.Dayjs];
+            startTime: dayjs.Dayjs;
+            endTime: dayjs.Dayjs;
             room: string;
         }>;
     }) => {
         try {
-            // Create seats array for each showtime
-            const defaultSeats = Array(16).fill(null).map((_, index) => ({
-                seatId: `A${index + 1}`,
-                status: 'available',
-                type: 'normal',
-                price: 75000
-            }));
+            setIsLoading(true);
+            // Backend sẽ khởi tạo ghế sau; không gửi mảng ghế từ frontend
 
             const formattedData = {
-                movieId: {
-                    _id: values.movieId,
-                    title: movies.find(m => m._id === values.movieId)?.title || ''
-                },
-                theaterId: {
-                    _id: values.theaterId,
-                    name: filteredTheaters.find(t => t._id === values.theaterId)?.name || ''
-                },
-                showDate: {
-                    start: values.showDate[0].toISOString(),
-                    end: values.showDate[1].toISOString()
-                },
-                showTimes: values.showTimes.map(st => ({
+                movieId: values.movieId,
+                theaterId: values.theaterId,
+                showTimes: (values.showTimes as Array<{ date: dayjs.Dayjs; startTime: dayjs.Dayjs; endTime: dayjs.Dayjs; room: string; sessionId?: string }>).map((st) => ({
                     date: st.date.toISOString(),
-                    start: st.timeRange[0].toISOString(),
-                    end: st.timeRange[1].toISOString(),
+                    start: st.startTime.toISOString(),
+                    end: st.endTime.toISOString(),
                     room: st.room,
-                    seats: defaultSeats
+                    // lưu kèm ca chiếu để backend có thể kiểm soát nếu cần
+                    showSessionId: st.sessionId
                 }))
             };
 
             if (editData) {
-                await updateShowtime(editData._id, formattedData as Partial<IShowtime>);
+                await updateShowtime(editData._id, formattedData as unknown as IShowtime);
                 toast.success('Cập nhật suất chiếu thành công!');
             } else {
-                await createShowtime(formattedData as Partial<IShowtime>);
+                await createShowtime(formattedData as unknown as IShowtime);
                 toast.success('Thêm suất chiếu thành công!');
             }
             onSuccess();
         } catch (error) {
             console.error('Error saving showtime:', error);
             toast.error(editData ? 'Cập nhật suất chiếu thất bại!' : 'Thêm suất chiếu thất bại!');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const validateShowDate = (current: dayjs.Dayjs) => {
-        return current && current < dayjs().startOf('day');
-    };
-
-    const validateShowTimeDate = (_: unknown, value: dayjs.Dayjs) => {
-        const showDateRange = form.getFieldValue('showDate');
-        if (!value || !showDateRange) {
+    // Validation cho ngày chiếu: phải nằm trong khoảng startDate và endDate của phim
+    const validateMovieShowDate = (_: unknown, value: dayjs.Dayjs) => {
+        if (!value || !selectedMovie) {
             return Promise.resolve();
         }
         
-        const [startDate, endDate] = showDateRange;
-        if (value.isBefore(startDate, 'day') || value.isAfter(endDate, 'day')) {
-            return Promise.reject(new Error('Ngày chiếu phải nằm trong khoảng thời gian chiếu!'));
-        }
-        return Promise.resolve();
-    };
-
-    const validateTimeRange = (_: unknown, value: [dayjs.Dayjs, dayjs.Dayjs]) => {
-        if (!value || !value[0] || !value[1]) {
-            return Promise.resolve();
+        const movieStartDate = dayjs(selectedMovie.startDate);
+        const movieEndDate = dayjs(selectedMovie.endDate);
+        
+        if (value.isBefore(movieStartDate, 'day')) {
+            return Promise.reject(new Error(`Ngày chiếu phải từ ${movieStartDate.format('DD/MM/YYYY')} (ngày khởi chiếu phim)`));
         }
         
-        if (value[1].isSameOrBefore(value[0])) {
-            return Promise.reject(new Error('Thời gian kết thúc phải sau thời gian bắt đầu!'));
+        if (value.isAfter(movieEndDate, 'day')) {
+            return Promise.reject(new Error(`Ngày chiếu phải trước ${movieEndDate.format('DD/MM/YYYY')} (ngày kết thúc chiếu phim)`));
         }
         
-        const duration = value[1].diff(value[0], 'minutes');
-        if (duration < 30) {
-            return Promise.reject(new Error('Thời lượng chiếu phải ít nhất 30 phút!'));
+        if (value.isBefore(dayjs(), 'day')) {
+            return Promise.reject(new Error('Ngày chiếu không được là ngày đã qua'));
         }
         
         return Promise.resolve();
     };
+
 
     return (
         <Modal
@@ -245,6 +362,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                             filterOption={(input, option) =>
                                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                             }
+                            onChange={handleMovieChange}
                             options={movies.map(movie => ({ 
                                 value: movie._id, 
                                 label: movie.title 
@@ -291,6 +409,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                             }
                             disabled={!selectedRegionId}
+                            onChange={handleTheaterChange}
                             options={filteredTheaters.map(theater => ({ 
                                 value: theater._id, 
                                 label: theater.name 
@@ -300,21 +419,6 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                     </Form.Item>
                         </div>
 
-                <Form.Item
-                    name="showDate"
-                    label="Thời gian chiếu (từ ngày - đến ngày)"
-                    rules={[
-                        { required: true, message: 'Vui lòng chọn thời gian chiếu!' }
-                    ]}
-                >
-                    <DatePicker.RangePicker
-                        placeholder={['Ngày bắt đầu', 'Ngày kết thúc']}
-                        size="large"
-                        style={{ width: '100%' }}
-                        format="DD/MM/YYYY"
-                        disabledDate={validateShowDate}
-                    />
-                </Form.Item>
 
                 <div className="mb-6">
                     <h4 className="text-lg font-medium mb-4">Danh sách suất chiếu</h4>
@@ -350,66 +454,148 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                 ) : null
                                             }
                                         >
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <Form.Item
-                                                    {...restField}
-                                                    name={[name, 'date']}
-                                                    label="Ngày chiếu"
-                                                    rules={[
-                                                        { required: true, message: 'Vui lòng chọn ngày chiếu!' },
-                                                        { validator: validateShowTimeDate }
-                                                    ]}
-                                                >
-                                                    <DatePicker
-                                                        placeholder="Chọn ngày chiếu"
-                                                        size="large"
-                                                        style={{ width: '100%' }}
-                                                        format="DD/MM/YYYY"
-                                                        disabledDate={validateShowDate}
-                                                    />
-                                                </Form.Item>
-    
-                                                <Form.Item
-                                                    {...restField}
-                                                    name={[name, 'timeRange']}
-                                                    label="Thời gian chiếu"
-                                                    rules={[
-                                                        { required: true, message: 'Vui lòng chọn thời gian chiếu!' },
-                                                        { validator: validateTimeRange }
-                                                    ]}
-                                                >
-                                                    <TimePicker.RangePicker
-                                                        placeholder={['Giờ bắt đầu', 'Giờ kết thúc']}
-                                                        size="large"
-                                                        style={{ width: '100%' }}
-                                                        format="HH:mm"
-                                                        minuteStep={15}
-                                                    />
-                                                </Form.Item>
-    
-                                                <Form.Item
-                                                    {...restField}
-                                                    name={[name, 'room']}
-                                                    label="Phòng chiếu"
-                                                    rules={[
-                                                        { required: true, message: 'Vui lòng chọn phòng chiếu!' }
-                                                    ]}
-                                                >
-                                                    <Select
-                                                        placeholder="Chọn phòng chiếu"
-                                                        size="large"
-                                                        allowClear
-                                                        showSearch={false}
-                                                        options={[
-                                                            { value: 'Room 1', label: '🎬 Room 1' },
-                                                            { value: 'Room 2', label: '🎬 Room 2' },
-                                                            { value: 'Room 3', label: '🎬 Room 3' },
-                                                            { value: 'Room 4', label: '🎬 Room 4' },
-                                                            { value: 'Room 5', label: '🎬 Room 5' }
+                                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                                    <Form.Item
+                                                        {...restField}
+                                                        name={[name, 'date']}
+                                                        label="Ngày chiếu"
+                                                        rules={[
+                                                            { required: true, message: 'Vui lòng chọn ngày chiếu!' },
+                                                            { validator: validateMovieShowDate }
                                                         ]}
-                                                    />
-                                                </Form.Item>
+                                                    >
+                                                        <DatePicker
+                                                            placeholder="Chọn ngày chiếu"
+                                                            size="large"
+                                                            style={{ width: '100%' }}
+                                                            format="DD/MM/YYYY"
+                                                            disabled={!selectedMovie}
+                                                            disabledDate={(current) => {
+                                                                if (!selectedMovie) return true;
+                                                                const movieStart = dayjs(selectedMovie.startDate);
+                                                                const movieEnd = dayjs(selectedMovie.endDate);
+                                                                return current && (current.isBefore(movieStart, 'day') || current.isAfter(movieEnd, 'day') || current.isBefore(dayjs(), 'day'));
+                                                            }}
+                                                        />
+                                                    </Form.Item>
+        
+                                                    <Form.Item
+                                                        {...restField}
+                                                        name={[name, 'room']}
+                                                        label="Phòng chiếu"
+                                                        rules={[
+                                                            { required: true, message: 'Vui lòng chọn phòng chiếu!' }
+                                                        ]}
+                                                    >
+                                                        <Select
+                                                            placeholder={selectedTheaterId ? "Chọn phòng chiếu" : "Chọn rạp chiếu trước"}
+                                                            size="large"
+                                                            allowClear
+                                                            showSearch
+                                                            optionFilterProp="children"
+                                                            filterOption={(input, option) =>
+                                                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                                            }
+                                                            disabled={!selectedTheaterId}
+                                                            value={form.getFieldValue(['showTimes', name, 'room'])}
+                                                            options={rooms.map(room => ({
+                                                                value: room._id,
+                                                                label: `🎬 ${room.name}`
+                                                            }))}
+                                                            notFoundContent={selectedTheaterId ? "Không có phòng chiếu nào" : "Vui lòng chọn rạp chiếu trước"}
+                                                        />
+                                                    </Form.Item>
+
+                                                    <Form.Item
+                                                        // Re-render this block when date or room in this row changes
+                                                        shouldUpdate={(prev, cur) => {
+                                                            const p = prev?.showTimes?.[name] || {};
+                                                            const c = cur?.showTimes?.[name] || {};
+                                                            return p.date !== c.date || p.room !== c.room;
+                                                        }}
+                                                        noStyle
+                                                    >
+                                                        {() => (
+                                                            <Form.Item
+                                                                {...restField}
+                                                                name={[name, 'sessionId']}
+                                                                label="Ca chiếu"
+                                                                rules={[{ required: true, message: 'Vui lòng chọn ca chiếu!' }]}
+                                                            >
+                                                                <Select
+                                                                    placeholder={
+                                                                        form.getFieldValue(['showTimes', name, 'date']) && form.getFieldValue(['showTimes', name, 'room'])
+                                                                            ? 'Chọn ca chiếu'
+                                                                            : 'Vui lòng chọn Ngày chiếu và Phòng trước'
+                                                                    }
+                                                                    size="large"
+                                                                    showSearch
+                                                                    optionFilterProp="children"
+                                                                    filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                                                                    value={form.getFieldValue(['showTimes', name, 'sessionId'])}
+                                                                    options={showSessions.map(s => ({ value: s._id, label: `${s.name} (${s.startTime} - ${s.endTime})` }))}
+                                                                    onChange={(val)=> onChangeSessionForRow(name, val)}
+                                                                    disabled={
+                                                                        !(
+                                                                            form.getFieldValue(['showTimes', name, 'date']) &&
+                                                                            form.getFieldValue(['showTimes', name, 'room'])
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </Form.Item>
+                                                        )}
+                                                    </Form.Item>
                                     </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <Form.Item
+                                                        {...restField}
+                                                        name={[name, 'startTime']}
+                                                        label="Thời gian bắt đầu"
+                                                        rules={[
+                                                            { required: true, message: 'Vui lòng chọn thời gian bắt đầu!' }
+                                                        ]}
+                                                    >
+                                                        <TimePicker
+                                                            placeholder="Chọn giờ bắt đầu"
+                                                            size="large"
+                                                            style={{ width: '100%' }}
+                                                            format="HH:mm"
+                                                            minuteStep={15}
+                                                            disabled={!selectedMovie}
+                                                            onChange={(time) => {
+                                                                if (time && selectedMovie) {
+                                                                    // Tự động tính thời gian kết thúc
+                                                                    const endTime = time.add(selectedMovie.duration + 20, 'minute');
+                                                                    const currentShowTimes = form.getFieldValue('showTimes') || [];
+                                                                    currentShowTimes[name] = {
+                                                                        ...currentShowTimes[name],
+                                                                        startTime: time,
+                                                                        endTime: endTime
+                                                                    };
+                                                                    form.setFieldValue('showTimes', currentShowTimes);
+                                                                    form.setFieldValue(['showTimes', name, 'endTime'], endTime);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </Form.Item>
+
+                                                    <Form.Item
+                                                        {...restField}
+                                                        name={[name, 'endTime']}
+                                                        label={`Thời gian kết thúc ${selectedMovie ? `(+${selectedMovie.duration + 20} phút)` : ''}`}
+                                                    >
+                                                        <TimePicker
+                                                            placeholder="Tự động tính toán"
+                                                            size="large"
+                                                            style={{ width: '100%' }}
+                                                            format="HH:mm"
+                                                            disabled
+                                                        />
+                                                    </Form.Item>
+                                    </div>
+                                </div>
                                         </Card>
                             </div>
                         ))}
@@ -443,11 +629,20 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                         </motion.button>
                         <motion.button
                             type="submit"
-                        className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            disabled={isLoading}
+                            className={`px-4 py-2 text-white rounded cursor-pointer flex items-center gap-2 ${
+                                isLoading 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-black hover:bg-gray-800'
+                            }`}
+                            whileHover={!isLoading ? { scale: 1.05 } : {}}
+                            whileTap={!isLoading ? { scale: 0.95 } : {}}
                         >
-                            {editData ? 'Cập nhật' : 'Thêm suất chiếu'}
+                            {isLoading && <Spin size="small" />}
+                            {isLoading 
+                                ? (editData ? 'Đang cập nhật...' : 'Đang thêm...') 
+                                : (editData ? 'Cập nhật' : 'Thêm suất chiếu')
+                            }
                         </motion.button>
                     </div>
             </Form>

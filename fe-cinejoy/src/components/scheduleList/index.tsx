@@ -336,8 +336,8 @@ const ScheduleList: React.FC = () => {
                     onClick={() => setSelectedCinemaId(cinema._id)}
                   >
                     <img
-                      src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
-                      alt="CGV"
+                      src="https://res.cloudinary.com/dd1vwmybp/image/upload/v1757904774/cinejoy/bynlzrloegzerc5ucbxw.png"
+                      alt="CNJ"
                       className="w-9 h-9"
                     />
                     <span
@@ -362,7 +362,7 @@ const ScheduleList: React.FC = () => {
             >
               <img
                 className="w-10 h-10"
-                src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
+                src="https://res.cloudinary.com/dd1vwmybp/image/upload/v1757904774/cinejoy/bynlzrloegzerc5ucbxw.png"
                 alt="logo"
               />
               <div className="select-none">

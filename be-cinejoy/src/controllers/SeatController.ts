@@ -85,11 +85,16 @@ class SeatController {
         } catch (error: unknown) {
             console.error('Lỗi khi tạo ghế ngồi:', error);
             
-            if (error instanceof Error && error.message.includes('validation')) {
- errorResponse(res, 400, 'Dữ liệu ghế ngồi không hợp lệ');
+            if (error instanceof Error) {
+                if (error.message.includes('validation')) {
+                    return errorResponse(res, 400, 'Dữ liệu ghế ngồi không hợp lệ');
+                }
+                if (error.message.includes('E11000') || error.message.includes('duplicate key')) {
+                    return errorResponse(res, 400, 'Ghế ngồi đã tồn tại trong phòng này');
+                }
             }
             
- errorResponse(res, 500, 'Lỗi server khi tạo ghế ngồi');
+            return errorResponse(res, 500, 'Lỗi server khi tạo ghế ngồi');
         }
     }
 
@@ -107,11 +112,16 @@ class SeatController {
         } catch (error: unknown) {
             console.error('Lỗi khi tạo ghế ngồi hàng loạt:', error);
             
-            if (error instanceof Error && error.message.includes('duplicate')) {
- errorResponse(res, 400, 'Một số ghế ngồi đã tồn tại');
+            if (error instanceof Error) {
+                if (error.message.includes('validation')) {
+                    return errorResponse(res, 400, 'Dữ liệu ghế ngồi không hợp lệ');
+                }
+                if (error.message.includes('E11000') || error.message.includes('duplicate')) {
+                    return errorResponse(res, 400, 'Một số ghế ngồi đã tồn tại');
+                }
             }
             
- errorResponse(res, 500, 'Lỗi server khi tạo ghế ngồi hàng loạt');
+            return errorResponse(res, 500, 'Lỗi server khi tạo ghế ngồi hàng loạt');
         }
     }
 
@@ -214,17 +224,20 @@ class SeatController {
     async deleteAllSeatsInRoom(req: Request, res: Response) {
         try {
             const { roomId } = req.params;
+            console.log(`🎯 API: Deleting all seats in room ${roomId}`);
 
             const isDeleted = await SeatService.deleteAllSeatsInRoom(roomId);
             
             if (isDeleted) {
- successResponse(res, 200, 'Xóa tất cả ghế trong phòng thành công');
+                console.log(`✅ API: Successfully deleted seats in room ${roomId}`);
+                return successResponse(res, 200, 'Xóa tất cả ghế trong phòng thành công');
             } else {
- successResponse(res, 200, 'Không có ghế nào để xóa trong phòng này');
+                console.log(`⚠️ API: No seats found to delete in room ${roomId}`);
+                return successResponse(res, 200, 'Không có ghế nào để xóa trong phòng này');
             }
         } catch (error: unknown) {
-            console.error('Lỗi khi xóa tất cả ghế trong phòng:', error);
- errorResponse(res, 500, 'Lỗi server khi xóa tất cả ghế trong phòng');
+            console.error('❌ API: Lỗi khi xóa tất cả ghế trong phòng:', error);
+            return errorResponse(res, 500, 'Lỗi server khi xóa tất cả ghế trong phòng');
         }
     }
 

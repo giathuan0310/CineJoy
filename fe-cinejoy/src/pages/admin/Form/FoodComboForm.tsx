@@ -1,17 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Input, InputNumber } from 'antd';
+import { Modal, Form, Input, InputNumber, Spin } from 'antd';
 import type { InputRef } from 'antd';
 
 interface FoodComboFormProps {
     combo?: IFoodCombo;
-    onSubmit: (comboData: Partial<IFoodCombo>) => void;
+    onSubmit: (comboData: Partial<IFoodCombo>) => Promise<void>;
     onCancel: () => void;
 }
 
 const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
         if (combo) {
@@ -44,6 +45,7 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
         quantity: number;
     }) => {
         try {
+            setIsLoading(true);
             const submitData = {
                 name: values.name,
                 price: values.price,
@@ -51,9 +53,11 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                 quantity: values.quantity,
             };
             
-            onSubmit(submitData);
+            await onSubmit(submitData);
         } catch (error) {
             console.error('Error submitting form:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -170,11 +174,20 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                     </motion.button>
                     <motion.button
                         type="submit"
-                        className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={isLoading}
+                        className={`px-4 py-2 text-white rounded cursor-pointer flex items-center gap-2 ${
+                            isLoading 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-black hover:bg-gray-800'
+                        }`}
+                        whileHover={!isLoading ? { scale: 1.05 } : {}}
+                        whileTap={!isLoading ? { scale: 0.95 } : {}}
                     >
-                        {combo ? 'Cập nhật' : 'Thêm mới'}
+                        {isLoading && <Spin size="small" />}
+                        {isLoading 
+                            ? (combo ? 'Đang cập nhật...' : 'Đang thêm...') 
+                            : (combo ? 'Cập nhật' : 'Thêm mới')
+                        }
                     </motion.button>
                 </div>
             </Form>

@@ -39,7 +39,7 @@ class RoomService {
         seatLayout?: { 
             rows: number; 
             cols: number; 
-            seats: { [key: string]: 'normal' | 'vip' | 'couple' } 
+            seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } 
         } 
     }): Promise<IRoom> {
         const { seatLayout, ...roomDataOnly } = roomData;
@@ -48,7 +48,15 @@ class RoomService {
 
         // Auto-create seats if layout is provided
         if (seatLayout) {
+            console.log('🎯 SeatLayout provided, calling generateSeatsForRoom...');
+            console.log('SeatLayout details:', {
+                rows: seatLayout.rows,
+                cols: seatLayout.cols,
+                seatsCount: Object.keys(seatLayout.seats).length
+            });
             await this.generateSeatsForRoom(savedRoom._id, seatLayout);
+        } else {
+            console.log('⚠️ No seatLayout provided, skipping seat creation');
         }
 
         return savedRoom;
@@ -57,8 +65,12 @@ class RoomService {
     // Generate seats for room based on layout
     private async generateSeatsForRoom(
         roomId: string,
-        layout: { rows: number; cols: number; seats: { [key: string]: 'normal' | 'vip' | 'couple' | '4dx' } }
+        layout: { rows: number; cols: number; seats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } }
     ): Promise<void> {
+        console.log('🚀 Starting generateSeatsForRoom...');
+        console.log('RoomId:', roomId);
+        console.log('Layout:', JSON.stringify(layout, null, 2));
+        
         const seats = [];
         
         for (let row = 0; row < layout.rows; row++) {
@@ -66,7 +78,9 @@ class RoomService {
             
             for (let col = 0; col < layout.cols; col++) {
                 const seatId = `${rowLetter}${col + 1}`;
-                const seatType = layout.seats[seatId] || 'normal';
+                const seatData = layout.seats[seatId];
+                const seatType = seatData?.type || 'normal';
+                const seatStatus = seatData?.status || 'available';
                 
                 // Calculate price based on seat type
                 let price = 75000; // Base price
@@ -82,24 +96,36 @@ class RoomService {
                         break;
                 }
                 
-                seats.push({
+                const seatObject = {
                     seatId,
                     room: roomId,
                     row: rowLetter,
                     number: col + 1,
                     type: seatType,
                     price,
-                    status: 'available',
+                    status: seatStatus,
                     position: {
                         x: col,
                         y: row
                     }
-                });
+                };
+                
+                seats.push(seatObject);
+                console.log(`Created seat: ${seatId} - ${seatType} - ${seatStatus} - $${price}`);
             }
         }
 
-        // Bulk insert seats
-        await Seat.insertMany(seats);
+        console.log(`📊 Total seats to create: ${seats.length}`);
+        console.log('Sample seats:', seats.slice(0, 3));
+
+        try {
+            // Bulk insert seats
+            const insertedSeats = await Seat.insertMany(seats);
+            console.log(`✅ Successfully created ${insertedSeats.length} seats for room ${roomId}`);
+        } catch (error) {
+            console.error('❌ Error creating seats:', error);
+            throw error;
+        }
     }
 
     // Update room
@@ -151,7 +177,9 @@ class RoomService {
         return await Room.find({ 
             theater: theaterId, 
             status: 'active' 
-        }).sort({ name: 1 });
+        })
+        .populate('theater', 'name address location')
+        .sort({ name: 1 });
     }
 }
 

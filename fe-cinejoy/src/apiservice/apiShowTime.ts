@@ -80,6 +80,24 @@ export const getShowTimesByTheater = async (theaterId: string) => {
   }
 };
 
+// New: get flat showtimes list for a room and date
+export const getShowtimesByRoomAndDateApi = async (
+  roomId: string,
+  date: string
+) => {
+  const response = await axiosClient.get(`/showtimes/by-room-date`, {
+    params: { roomId, date },
+  });
+  return response.data as Array<{
+    showtimeId: string;
+    room: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    movieId: string;
+  }>;
+};
+
 // Seat management APIs
 export const getSeatsForShowtimeApi = async (
   showtimeId: string,
@@ -121,7 +139,7 @@ export const getSeatsForShowtimeApi = async (
       };
       seats: Array<{
         seatId: string;
-        status: "available" | "occupied" | "selected" | "reserved";
+        status: "available" | "occupied" | "reserved";
         type: "standard" | "vip" | "couple";
         price: number;
       }>;
@@ -156,7 +174,7 @@ export const bookSeatsApi = async (
   const response = await axiosClient.post<
     IBackendResponse<{
       message: string;
-      bookedSeats: string[];
+      reservedSeats: string[];
       showtimeId: string;
       reservationTime: string;
       reservationExpires: string;

@@ -16,7 +16,7 @@ interface SeatProps {
 
 interface SeatData {
   seatId: string;
-  status: "available" | "occupied" | "selected" | "reserved";
+  status: "available" | "occupied" | "reserved";
   type: "standard" | "vip" | "couple";
   price: number;
   number: number;
@@ -50,8 +50,6 @@ interface SeatLayout {
 const seatImages: Record<string, string> = {
   empty:
     "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809663/seat-unselect-normal_hygw6w.png",
-  selected:
-    "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-select-normal_nfev6o.png",
   holding:
     "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-process-normal_lzfigz.png",
   sold: "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-buy-normal_ryk3xl.png",
@@ -125,7 +123,6 @@ const Seat: React.FC<SeatProps> = ({
                   status: seat.status as
                     | "available"
                     | "occupied"
-                    | "selected"
                     | "reserved",
                   type: seat.type as "standard" | "vip" | "couple",
                 })),
@@ -152,7 +149,7 @@ const Seat: React.FC<SeatProps> = ({
   }, [showtimeId, date, startTime, room]); // Removed onSeatsLoaded from dependencies
 
   const getSeatStatus = (seatName: string) => {
-    if (selectedSeats.includes(seatName)) return "selected";
+    // Note: selectedSeats functionality removed - no longer using "selected" status
 
     // Check API data first if available
     if (seatLayout) {

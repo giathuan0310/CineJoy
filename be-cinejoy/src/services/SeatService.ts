@@ -43,7 +43,31 @@ class SeatService {
 
     // Create multiple seats at once
     async createMultipleSeats(seatsData: Partial<ISeat>[]): Promise<ISeat[]> {
-        return await Seat.insertMany(seatsData) as ISeat[];
+        // For bulk creation, we assume seats have been pre-deleted
+        // No need to check for existing seats as this is handled by the calling function
+        console.log(`Creating ${seatsData.length} seats using insertMany...`);
+        
+        try {
+            return await Seat.insertMany(seatsData) as ISeat[];
+        } catch (error: any) {
+            console.error('insertMany error:', error);
+            if (error.code === 11000) {
+                // Duplicate key error - some seats still exist
+                console.error('Duplicate key details:', error.writeErrors);
+                
+                // Extract seatId from writeErrors
+                let duplicateSeatId = 'unknown';
+                if (error.writeErrors && error.writeErrors.length > 0) {
+                    const firstError = error.writeErrors[0];
+                    if (firstError.err && firstError.err.keyValue) {
+                        duplicateSeatId = firstError.err.keyValue.seatId || 'unknown';
+                    }
+                }
+                
+                throw new Error(`Ghế ${duplicateSeatId} đã tồn tại trong phòng này. Vui lòng đảm bảo ghế cũ đã được xóa hoàn toàn.`);
+            }
+            throw error;
+        }
     }
 
     // Update seat
@@ -63,7 +87,21 @@ class SeatService {
 
     // Delete all seats in a room
     async deleteAllSeatsInRoom(roomId: string): Promise<boolean> {
+        console.log(`🗑️ Deleting all seats in room: ${roomId}`);
+        
+        // First, count existing seats
+        const existingCount = await Seat.countDocuments({ room: roomId });
+        console.log(`📊 Found ${existingCount} seats to delete in room ${roomId}`);
+        
+        if (existingCount === 0) {
+            console.log('✅ No seats to delete');
+            return true;
+        }
+        
+        // Delete all seats
         const result = await Seat.deleteMany({ room: roomId });
+        console.log(`🗑️ Deleted ${result.deletedCount} seats from room ${roomId}`);
+        
         return result.deletedCount > 0;
     }
 

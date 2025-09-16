@@ -16,8 +16,8 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
         actors: [],
         genre: [],
         director: '',
-        status: '',
-        language: '',
+        status: undefined,
+        language: undefined,
         description: ''
     });
 
@@ -171,8 +171,9 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                 required
                             >
                                 <option value="">Chọn trạng thái</option>
-                                <option value="Đang chiếu">Đang chiếu</option>
-                                <option value="Sắp chiếu">Sắp chiếu</option>
+                                <option value="Phim đang chiếu">Phim đang chiếu</option>
+                                <option value="Phim sắp chiếu">Phim sắp chiếu</option>
+                                <option value="Suất chiếu đặc biệt">Suất chiếu đặc biệt</option>
                                 <option value="Đã kết thúc">Đã kết thúc</option>
                             </select>
                         </div>

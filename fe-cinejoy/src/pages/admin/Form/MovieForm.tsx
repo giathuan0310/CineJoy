@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, DatePicker, Spin } from 'antd';
 import type { InputRef } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 interface MovieFormProps {
     movie?: IMovie;
-    onSubmit: (movieData: Partial<IMovie>) => void;
+    onSubmit: (movieData: Partial<IMovie>) => Promise<void>;
     onCancel: () => void;
 }
 
@@ -18,6 +18,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     const [posterPreview, setPosterPreview] = useState<string>('');
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
     const [posterPreviewUrl, setPosterPreviewUrl] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
         if (movie) {
@@ -26,9 +27,11 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                 image: movie.image,
                 posterImage: movie.posterImage,
                 releaseDate: movie.releaseDate ? dayjs(movie.releaseDate) : undefined,
+                startDate: movie.startDate ? dayjs(movie.startDate) : undefined,
+                endDate: movie.endDate ? dayjs(movie.endDate) : undefined,
                 duration: movie.duration,
                 actors: movie.actors?.join(', '),
-                genre: movie.genre?.[0],
+                genre: movie.genre || [],
                 director: movie.director,
                 status: movie.status,
                 language: movie.language?.[0],
@@ -78,17 +81,26 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     ];
 
     const genres = [
-        'Action',
-        'Adventure',
-        'Comedy',
-        'Drama',
-        'Horror',
-        'Sci-Fi',
-        'Romance',
-        'Thriller',
-        'War',
-        'Western',
-        'Animation',
+        'Hành động', // Action
+        'Phiêu lưu', // Adventure  
+        'Hài hước', // Comedy
+        'Chính kịch', // Drama
+        'Kinh dị', // Horror
+        'Khoa học viễn tưởng', // Sci-Fi
+        'Lãng mạn', // Romance
+        'Giật gân', // Thriller
+        'Chiến tranh', // War
+        'Miền tây', // Western
+        'Hoạt hình', // Animation
+        'Tài liệu', // Documentary
+        'Gia đình', // Family
+        'Tâm lý', // Psychological
+        'Tội phạm', // Crime
+        'Siêu anh hùng', // Superhero
+        'Thể thao', // Sports
+        'Âm nhạc', // Musical
+        'Học đường', // School
+        'Võ thuật' // Martial Arts
     ];
 
     const ageRestrictions = ['T13+', 'T16+', 'T18+', 'P'];
@@ -98,9 +110,11 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
         image: string;
         posterImage: string;
         releaseDate: dayjs.Dayjs;
+        startDate: dayjs.Dayjs;
+        endDate: dayjs.Dayjs;
         duration: number;
         actors: string;
-        genre: string;
+        genre: string[];
         director: string;
         status: string;
         language: string;
@@ -109,25 +123,30 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
         ageRating: string;
     }) => {
         try {
+            setIsLoading(true);
             const submitData = {
                 title: values.title,
                 image: values.image,
                 posterImage: values.posterImage,
                 releaseDate: values.releaseDate ? values.releaseDate.toISOString() : '',
+                startDate: values.startDate ? values.startDate.toISOString() : '',
+                endDate: values.endDate ? values.endDate.toISOString() : '',
                 duration: values.duration,
                 actors: values.actors ? values.actors.split(',').map((item: string) => item.trim()) : [],
-                genre: values.genre ? [values.genre] : [],
+                genre: values.genre || [],
                 director: values.director,
-                status: values.status,
+                status: values.status as 'Phim đang chiếu' | 'Phim sắp chiếu' | 'Suất chiếu đặc biệt' | 'Đã kết thúc',
                 language: values.language ? [values.language] : [],
                 description: values.description,
                 trailer: values.trailer,
                 ageRating: values.ageRating,
             };
             
-            onSubmit(submitData);
+            await onSubmit(submitData);
         } catch (error) {
             console.error('Error submitting form:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -269,16 +288,61 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                     </Form.Item>
 
                     <Form.Item
+                        name="startDate"
+                        label="Ngày khởi chiếu"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngày khởi chiếu!' }
+                        ]}
+                    >
+                        <DatePicker
+                            placeholder="Chọn ngày khởi chiếu"
+                            size="large"
+                            style={{ width: '100%' }}
+                            format="DD/MM/YYYY"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="endDate"
+                        label="Ngày kết thúc chiếu"
+                        rules={[
+                            { required: true, message: 'Vui lòng chọn ngày kết thúc chiếu!' },
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                    const startDate = getFieldValue('startDate');
+                                    if (!value || !startDate || value.isAfter(startDate)) {
+                                        return Promise.resolve();
+                                    }
+                                    return Promise.reject(new Error('Ngày kết thúc phải sau ngày khởi chiếu!'));
+                                },
+                            }),
+                        ]}
+                    >
+                        <DatePicker
+                            placeholder="Chọn ngày kết thúc chiếu"
+                            size="large"
+                            style={{ width: '100%' }}
+                            format="DD/MM/YYYY"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
                         name="genre"
                         label="Thể loại"
                         rules={[
-                            { required: true, message: 'Vui lòng chọn thể loại!' }
+                            { required: true, message: 'Vui lòng chọn ít nhất một thể loại!' },
                         ]}
                     >
                         <Select
-                            placeholder="Chọn thể loại"
+                            mode="multiple"
+                            placeholder="Chọn một hoặc nhiều thể loại"
                             size="large"
                             options={genres.map(genre => ({ value: genre, label: genre }))}
+                            showSearch
+                            filterOption={(input, option) =>
+                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                            }
+                            maxTagCount="responsive"
                         />
                     </Form.Item>
 
@@ -307,9 +371,10 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                             placeholder="Chọn trạng thái"
                             size="large"
                             options={[
-                                { value: 'nowShowing', label: 'Now Showing' },
-                                { value: 'upcoming', label: 'Upcoming' },
-                                { value: 'special', label: 'Special' }
+                                { value: 'Phim đang chiếu', label: 'Phim đang chiếu' },
+                                { value: 'Phim sắp chiếu', label: 'Phim sắp chiếu' },
+                                { value: 'Suất chiếu đặc biệt', label: 'Suất chiếu đặc biệt' },
+                                { value: 'Đã kết thúc', label: 'Đã kết thúc' }
                             ]}
                         />
                     </Form.Item>
@@ -479,11 +544,20 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                         </motion.button>
                         <motion.button
                             type="submit"
-                            className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 cursor-pointer"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            disabled={isLoading}
+                            className={`px-4 py-2 text-white rounded cursor-pointer flex items-center gap-2 ${
+                                isLoading 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-black hover:bg-gray-800'
+                            }`}
+                            whileHover={!isLoading ? { scale: 1.05 } : {}}
+                            whileTap={!isLoading ? { scale: 0.95 } : {}}
                         >
-                            {movie ? 'Cập nhật' : 'Thêm mới'}
+                            {isLoading && <Spin size="small" />}
+                            {isLoading 
+                                ? (movie ? 'Đang cập nhật...' : 'Đang thêm...') 
+                                : (movie ? 'Cập nhật' : 'Thêm mới')
+                            }
                         </motion.button>
                     </div>
             </Form>

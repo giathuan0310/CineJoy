@@ -46,7 +46,10 @@ export default class ShowtimeController {
         res.status(404).json({ message: "Showtime not found" });
         return;
       }
-      res.status(200).json(updatedShowtime);
+      
+      // Populate room data before returning
+      const populatedShowtime = await showtimeService.getShowtimeById(id);
+      res.status(200).json(populatedShowtime);
     } catch (error) {
       res.status(500).json({ message: "Error updating showtime", error });
     }

@@ -89,34 +89,11 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                     }
                 }
                 
-                // Load rooms cho rạp khi edit TRƯỚC KHI set form values
+                // Load rooms cho rạp khi edit
                 try {
                     const theaterRooms = await getActiveRoomsByTheaterApi(editData.theaterId._id);
                     setRooms(theaterRooms);
                     setSelectedTheaterId(editData.theaterId._id);
-                    
-                    // Sau khi load rooms xong, set form values
-                    form.setFieldsValue({
-                        movieId: editData.movieId._id,
-                        regionId: regions.find(region => 
-                            selectedTheater?.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
-                            region.name.toLowerCase().includes(selectedTheater?.location.city.toLowerCase() || '')
-                        )?._id,
-                        theaterId: editData.theaterId._id,
-                        showTimes: (editData.showTimes as Array<{ 
-                            date: string; 
-                            start: string; 
-                            end: string; 
-                            room: string | { _id: string; name: string }; 
-                            showSessionId?: string | { _id: string; name: string } 
-                        }>).map((st) => ({
-                            date: dayjs(st.date),
-                            startTime: dayjs(st.start),
-                            endTime: dayjs(st.end),
-                            room: typeof st.room === 'object' ? st.room._id : st.room,
-                            sessionId: typeof st.showSessionId === 'object' ? st.showSessionId._id : st.showSessionId
-                        }))
-                    });
                 } catch (error) {
                     console.error('Error loading rooms for edit:', error);
                     setRooms([]);
@@ -137,6 +114,63 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
         
         loadEditData();
     }, [editData, form, allTheaters, regions]);
+
+    // Effect để set form values sau khi rooms đã được load
+    useEffect(() => {
+        if (editData && rooms.length > 0 && selectedTheaterId) {
+            const selectedTheater = allTheaters.find(t => t._id === editData.theaterId._id);
+            form.setFieldsValue({
+                movieId: editData.movieId._id,
+                regionId: regions.find(region => 
+                    selectedTheater?.location.city.toLowerCase().includes(region.name.toLowerCase()) ||
+                    region.name.toLowerCase().includes(selectedTheater?.location.city.toLowerCase() || '')
+                )?._id,
+                theaterId: editData.theaterId._id,
+                showTimes: (editData.showTimes as Array<{ 
+                    date: string; 
+                    start: string; 
+                    end: string; 
+                    room: string | { _id: string; name: string }; 
+                    showSessionId?: string | { _id: string; name: string } 
+                }>).map((st) => ({
+                    date: dayjs(st.date),
+                    startTime: dayjs(st.start),
+                    endTime: dayjs(st.end),
+                    room: typeof st.room === 'object' ? st.room._id : st.room,
+                    sessionId: typeof st.showSessionId === 'object' ? st.showSessionId._id : st.showSessionId
+                }))
+            });
+        }
+    }, [editData, rooms, selectedTheaterId, allTheaters, regions, form]);
+
+    // Effect để clear room values khi rooms thay đổi (khi đổi rạp)
+    useEffect(() => {
+        if (rooms.length > 0) {
+            const currentShowTimes = form.getFieldValue('showTimes') || [];
+            let hasInvalidRoom = false;
+            
+            const updatedShowTimes = currentShowTimes.map((showTime: any) => {
+                if (showTime.room) {
+                    const roomExists = rooms.some(room => room._id === showTime.room);
+                    if (!roomExists) {
+                        hasInvalidRoom = true;
+                        return {
+                            ...showTime,
+                            room: undefined,
+                            sessionId: undefined,
+                            startTime: undefined,
+                            endTime: undefined
+                        };
+                    }
+                }
+                return showTime;
+            });
+            
+            if (hasInvalidRoom) {
+                form.setFieldValue('showTimes', updatedShowTimes);
+            }
+        }
+    }, [rooms, form]);
 
     // Handler cho việc chọn khu vực
     const handleRegionChange = (regionId: string) => {
@@ -167,20 +201,25 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
     const handleTheaterChange = async (theaterId: string) => {
         setSelectedTheaterId(theaterId);
         
-        // Chỉ reset room values khi KHÔNG đang edit (tạo mới)
-        if (!editData) {
-            const currentShowTimes = form.getFieldValue('showTimes') || [];
-            const updatedShowTimes = currentShowTimes.map((showTime: {
-                date?: dayjs.Dayjs;
-                startTime?: dayjs.Dayjs;
-                endTime?: dayjs.Dayjs;
-                room?: string;
-            }) => ({
-                ...showTime,
-                room: undefined // Reset room value chỉ khi tạo mới
-            }));
-            form.setFieldValue('showTimes', updatedShowTimes);
-        }
+        // Reset room values khi đổi rạp (cả khi tạo mới và edit)
+        const currentShowTimes = form.getFieldValue('showTimes') || [];
+        const updatedShowTimes = currentShowTimes.map((showTime: {
+            date?: dayjs.Dayjs;
+            startTime?: dayjs.Dayjs;
+            endTime?: dayjs.Dayjs;
+            room?: string;
+            sessionId?: string;
+        }) => ({
+            ...showTime,
+            room: undefined, // Reset room value khi đổi rạp
+            sessionId: undefined, // Reset session value khi đổi rạp
+            startTime: undefined, // Reset start time khi đổi rạp
+            endTime: undefined // Reset end time khi đổi rạp
+        }));
+        form.setFieldValue('showTimes', updatedShowTimes);
+        
+        // Force clear rooms array trước khi load rooms mới
+        setRooms([]);
         
         try {
             // Load rooms cho rạp này sử dụng API chuyên biệt
@@ -489,6 +528,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                         ]}
                                                     >
                                                         <Select
+                                                            key={`room-${selectedTheaterId}-${rooms.length}`}
                                                             placeholder={selectedTheaterId ? "Chọn phòng chiếu" : "Chọn rạp chiếu trước"}
                                                             size="large"
                                                             allowClear
@@ -498,11 +538,24 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                                                             }
                                                             disabled={!selectedTheaterId}
-                                                            value={form.getFieldValue(['showTimes', name, 'room'])}
+                                                            value={
+                                                                (() => {
+                                                                    const roomValue = form.getFieldValue(['showTimes', name, 'room']);
+                                                                    // Kiểm tra xem room value có tồn tại trong rooms hiện tại không
+                                                                    const roomExists = rooms.some(room => room._id === roomValue);
+                                                                    return roomExists ? roomValue : undefined;
+                                                                })()
+                                                            }
                                                             options={rooms.map(room => ({
                                                                 value: room._id,
                                                                 label: `🎬 ${room.name}`
                                                             }))}
+                                                            loading={rooms.length === 0 && selectedTheaterId}
+                                                            placeholder={
+                                                                form.getFieldValue(['showTimes', name, 'room']) && rooms.length > 0
+                                                                    ? undefined
+                                                                    : selectedTheaterId ? "Chọn phòng chiếu" : "Chọn rạp chiếu trước"
+                                                            }
                                                             notFoundContent={selectedTheaterId ? "Không có phòng chiếu nào" : "Vui lòng chọn rạp chiếu trước"}
                                                         />
                                                     </Form.Item>

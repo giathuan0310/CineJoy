@@ -1,6 +1,8 @@
 import { IShowtime, Showtime } from "../models/Showtime";
 import ShowSession from "../models/ShowSession";
 import SeatModel from "../models/Seat";
+import RoomModel from "../models/Room";
+import mongoose from "mongoose";
 
 class ShowtimeService {
   private dateKeyUTC(d: Date | string): string {
@@ -69,6 +71,25 @@ class ShowtimeService {
         // Chưa có → tạo mới một document nhưng vẫn phải validate: tối đa 2 suất/ca và thời gian nằm trong ca
         for (let i = 0; i < normalizedShowTimes.length; i++) {
           const incoming = normalizedShowTimes[i] as any;
+          
+          // Kiểm tra xem có document nào khác đã có suất chiếu trùng không
+          const existingDuplicate = await Showtime.findOne({
+            "showTimes.date": { $gte: new Date(incoming.date), $lt: new Date(new Date(incoming.date).getTime() + 24 * 60 * 60 * 1000) },
+            "showTimes.room": incoming.room,
+            "showTimes.start": { 
+              $gte: new Date(new Date(incoming.start).getTime() - 60 * 1000), // -1 phút
+              $lte: new Date(new Date(incoming.start).getTime() + 60 * 1000)  // +1 phút
+            }
+          });
+          
+          if (existingDuplicate) {
+            const roomDoc = await RoomModel.findById(incoming.room).select("name");
+            const roomLabel = roomDoc?.name || String(incoming.room);
+            const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
+            console.log('🚫 Throwing duplicate error (new doc):', errorMessage);
+            throw new Error(errorMessage);
+          }
+          
           // Tính khung ca
           let sessionStartMin: number | null = null;
           let sessionEndMin: number | null = null;
@@ -142,6 +163,15 @@ class ShowtimeService {
           const sameStart = Math.abs(startA - startB) < 60 * 1000; // 1 phút
           return sameDate && sameRoom && sameStart;
         });
+
+        if (exists) {
+          // Nếu đã tồn tại suất chiếu trùng, throw error
+          const roomDoc = await RoomModel.findById(incoming.room).select("name");
+          const roomLabel = roomDoc?.name || String(incoming.room);
+          const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
+          console.log('🚫 Throwing duplicate error:', errorMessage);
+          throw new Error(errorMessage);
+        }
 
         if (!exists) {
           // Kiểm tra giới hạn 2 suất/ca trong ngày/phòng
@@ -312,19 +342,25 @@ class ShowtimeService {
     endTime: string;
     movieId: string;
   }[]> {
-    // Chuẩn hóa khoảng ngày theo UTC để khớp chính xác ngày, tránh lệch timezone
-    const d = new Date(date);
-    const startOfDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0));
-
     const items = await Showtime.aggregate([
       { $unwind: "$showTimes" },
       {
         $match: {
-          "showTimes.room": roomId,
-          "showTimes.date": { $gte: startOfDay, $lt: endOfDay },
+          "showTimes.room": new mongoose.Types.ObjectId(roomId),
         },
       },
+      {
+        $addFields: {
+          dateKey: {
+            $dateToString: {
+              date: "$showTimes.date",
+              format: "%Y-%m-%d",
+              timezone: "Asia/Ho_Chi_Minh",
+            },
+          },
+        },
+      },
+      { $match: { dateKey: date } },
       {
         $project: {
           showtimeId: "$_id",

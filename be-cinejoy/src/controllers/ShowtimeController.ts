@@ -30,8 +30,11 @@ export default class ShowtimeController {
     try {
       const newShowtime = await showtimeService.addShowtime(req.body);
       res.status(201).json(newShowtime);
-    } catch (error) {
-      res.status(500).json({ message: "Error adding showtime", error });
+    } catch (error: any) {
+      console.error('Error in addShowtime controller:', error);
+      // Trả về message cụ thể từ error nếu có, nếu không thì dùng message mặc định
+      const errorMessage = error?.message || "Error adding showtime";
+      res.status(400).json({ message: errorMessage, error: error?.message });
     }
   }
 
@@ -50,8 +53,11 @@ export default class ShowtimeController {
       // Populate room data before returning
       const populatedShowtime = await showtimeService.getShowtimeById(id);
       res.status(200).json(populatedShowtime);
-    } catch (error) {
-      res.status(500).json({ message: "Error updating showtime", error });
+    } catch (error: any) {
+      console.error('Error in updateShowtime controller:', error);
+      // Trả về message cụ thể từ error nếu có, nếu không thì dùng message mặc định
+      const errorMessage = error?.message || "Error updating showtime";
+      res.status(400).json({ message: errorMessage, error: error?.message });
     }
   }
 

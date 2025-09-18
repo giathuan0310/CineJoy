@@ -2193,6 +2193,7 @@ const Dashboard: React.FC = () => {
                     date: time.date,
                     start: time.start,
                     end: time.end,
+                    session: time.showSessionId,
                     room: roomDisplay,
                     availableSeats: seatsArr.filter((s: any) => s.status === 'available').length,
                     totalSeats: seatsArr.length,
@@ -2237,6 +2238,24 @@ const Dashboard: React.FC = () => {
                         </Tag>
                       </Space>
                     )
+                  },
+                  {
+                    title: '🕒 Ca chiếu',
+                    key: 'session',
+                    render: (_, record) => {
+                      const s = record.session;
+                      const name = typeof s === 'object' ? (s?.name || '') : '';
+                      const start = typeof s === 'object' ? s?.startTime : '';
+                      const end = typeof s === 'object' ? s?.endTime : '';
+                      return (
+                        <Space direction="vertical" size="small">
+                          <Tag color="geekblue" className="font-medium">{name || 'N/A'}</Tag>
+                          {(start && end) && (
+                            <div className="text-xs text-gray-600">{start} - {end}</div>
+                          )}
+                        </Space>
+                      );
+                    }
                   },
                   {
                     title: '🏠 Phòng chiếu',

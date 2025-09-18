@@ -320,7 +320,7 @@ const CardInfMovie = () => {
               isDarkMode ? "bg-gray-800 text-white" : "bg-[#F6F6F6]"
             }`}
           >
-            <div className="flex justify-center gap-4 mb-8 pt-3 pb-3 pl-3 pr-3">
+            <div className="flex justify-center gap-4 mb-4 p-4">
               <button
                 className={`w-50 h-8 border rounded font-semibold transition cursor-pointer ${
                   activeTab === "Phim đang chiếu"
@@ -346,21 +346,8 @@ const CardInfMovie = () => {
               >
                 Phim sắp chiếu
               </button>
-
-              <button
-                className={` w-50 h-8 border rounded font-semibold transition cursor-pointer ${
-                  activeTab === "Đã kết thúc"
-                    ? "bg-[#6b7280] text-white"
-                    : isDarkMode
-                    ? "bg-gray-700 text-white hover:bg-[#6b7280]"
-                    : "bg-white text-[#2d3a5a] hover:bg-[#6b7280] hover:text-white"
-                }`}
-                onClick={() => setActiveTab("Đã kết thúc")}
-              >
-                Đã kết thúc
-              </button>
             </div>
-            <ul className="space-y-4">
+            <ul className="space-y-4 pb-4">
               {filteredMovies.map((item) => (
                 <li
                   key={item._id}

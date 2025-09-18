@@ -61,7 +61,10 @@ const createDefaultSeatTemplate = (rows: number, cols: number) => {
                 seatType = 'vip';
             }
             
-            seats[seatId] = { type: seatType, status: 'available' };
+            // Chỉ tạo ghế nếu không phải ghế I11 (ghế lẻ cuối cùng trong hàng cặp đôi)
+            if (!(row === rows - 1 && col === cols - 1 && cols % 2 !== 0)) {
+                seats[seatId] = { type: seatType, status: 'available' };
+            }
         }
     }
     
@@ -102,8 +105,8 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
             // Find region for the theater when editing
             const theater = theaters.find(t => t._id === room.theater._id);
             if (theater) {
-                const regionName = theater.location.city;
-                const region = regions.find(r => r.name.toLowerCase() === regionName.toLowerCase());
+                // Tìm region dựa trên regionId của theater
+                const region = regions.find(r => r._id === theater.regionId);
                 if (region) {
                     setSelectedRegion(region._id);
                 }
@@ -111,7 +114,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
             
             form.setFieldsValue({
                 name: room.name,
-                region: theater ? regions.find(r => r.name.toLowerCase() === theater.location.city.toLowerCase())?._id : '',
+                region: theater ? theater.regionId : '',
                 theater: room.theater._id,
                 roomType: room.roomType,
                 status: room.status,
@@ -168,6 +171,14 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
         }
     }, [selectedRegion, theaters, regions]);
 
+    // Effect để cập nhật filteredTheaters khi edit room
+    useEffect(() => {
+        if (room && selectedRegion) {
+            const regionTheaters = theaters.filter(theater => theater.regionId === selectedRegion);
+            setFilteredTheaters(regionTheaters);
+        }
+    }, [room, selectedRegion, theaters]);
+
     useEffect(() => {
         if (!room) {
             const timer = setTimeout(() => {
@@ -221,13 +232,62 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                     maxCol = Math.max(maxCol, col);
                 });
                 
+                // Lọc bỏ ghế lẻ cuối cùng trong tất cả các hàng cặp đôi
+                console.log('=== DEBUG: Filtering odd seats from couple rows ===');
+                const coupleRows = new Set<string>();
+                Object.keys(existingSeats).forEach(seatId => {
+                    if (existingSeats[seatId].type === 'couple') {
+                        coupleRows.add(seatId.charAt(0));
+                    }
+                });
+                
+                console.log('Couple rows found:', Array.from(coupleRows));
+                
+                coupleRows.forEach(rowChar => {
+                    const seatsInRow = Object.keys(existingSeats).filter(seatId => 
+                        seatId.charAt(0) === rowChar && existingSeats[seatId].type === 'couple'
+                    );
+                    
+                    console.log(`Row ${rowChar} couple seats:`, seatsInRow);
+                    
+                    if (seatsInRow.length > 0) {
+                        // Tìm ghế có số cột cao nhất trong hàng này
+                        const maxColInRow = Math.max(...seatsInRow.map(seatId => parseInt(seatId.substring(1))));
+                        console.log(`Row ${rowChar} max column:`, maxColInRow);
+                        
+                        // Nếu số cột lẻ và có ghế ở vị trí cuối cùng
+                        if (maxColInRow % 2 !== 0) {
+                            const oddSeatId = `${rowChar}${maxColInRow}`;
+                            console.log(`Found odd seat: ${oddSeatId}, exists:`, !!existingSeats[oddSeatId]);
+                            if (existingSeats[oddSeatId]) {
+                                console.log(`Removing odd seat ${oddSeatId} from couple row ${rowChar}`);
+                                delete existingSeats[oddSeatId];
+                            }
+                        } else {
+                            console.log(`Row ${rowChar} has even number of seats, no removal needed`);
+                        }
+                    }
+                });
+                
+                console.log('=== END DEBUG ===');
+                
+                // Tính lại maxCol sau khi đã lọc bỏ ghế lẻ
+                let newMaxCol = 0;
+                Object.keys(existingSeats).forEach(seatId => {
+                    const col = parseInt(seatId.substring(1)) - 1; // 1=0, 2=1, etc.
+                    newMaxCol = Math.max(newMaxCol, col);
+                });
+                
+                console.log('Original maxCol:', maxCol, 'New maxCol after filtering:', newMaxCol);
+                
                 setSeatLayout({
                     rows: maxRow + 1,
-                    cols: maxCol + 1,
+                    cols: newMaxCol + 1,
                     seats: existingSeats
                 });
                 
-                console.log('Loaded seat layout:', maxRow + 1, 'rows,', maxCol + 1, 'cols,', Object.keys(existingSeats).length, 'seats');
+                console.log('Loaded seat layout:', maxRow + 1, 'rows,', newMaxCol + 1, 'cols,', Object.keys(existingSeats).length, 'seats');
+                console.log('Final seatLayout.cols will be:', newMaxCol + 1);
             } else {
                 // No existing seats, create default layout
                 console.log('No existing seats found, creating default layout');

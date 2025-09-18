@@ -1,7 +1,7 @@
 /* */
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Modal, Form, Select, DatePicker, TimePicker, Button, Card, Spin, message } from 'antd';
+import { Modal, Form, Select, DatePicker, TimePicker, Button, Card, Spin, message, Popconfirm } from 'antd';
 import axiosClient from '@/apiservice/axiosClient';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getMovies } from '@/apiservice/apiMovies';
@@ -149,7 +149,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             const currentShowTimes = form.getFieldValue('showTimes') || [];
             let hasInvalidRoom = false;
             
-            const updatedShowTimes = currentShowTimes.map((showTime: any) => {
+            const updatedShowTimes = currentShowTimes.map((showTime: { room?: string }) => {
                 if (showTime.room) {
                     const roomExists = rooms.some(room => room._id === showTime.room);
                     if (!roomExists) {
@@ -259,14 +259,30 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             const st = toMinutes(e.startTime); let en = toMinutes(e.endTime); if (en <= st) en += 24*60;
             return st >= sStart && st < sEnd;
         });
+        // cộng thêm các suất đang có trong form thuộc cùng ca (chưa lưu DB)
+        const inFormSameSession = rows
+            .map((r, idx) => ({ r, idx }))
+            .filter(({ r, idx }) => idx !== rowIndex && r.date && r.room && r.sessionId === sessionId && r.startTime && r.endTime)
+            .map(({ r }) => ({ startTime: r.startTime!.format('HH:mm'), endTime: r.endTime!.format('HH:mm') }));
+        const combined: Array<{ startTime: string; endTime: string }> = [
+            ...listInSession,
+            ...inFormSameSession
+        ];
+        // giới hạn tối đa 2 suất/ca
+        if (combined.length >= 2) {
+            message.error('Trong một ca chỉ được tối đa 2 suất chiếu.');
+            rows[rowIndex].sessionId = undefined;
+            form.setFieldValue('showTimes', rows);
+            return;
+        }
         let nextStartMin = sStart;
-        if (listInSession.length > 0) {
+        if (combined.length > 0) {
             // sort endTime asc
-            const last = listInSession.sort((a,b)=>{
+            const last = combined.sort((a:{startTime:string;endTime:string}, b:{startTime:string;endTime:string})=>{
                 const ae = toMinutes(a.endTime) + (a.endTime <= a.startTime ? 24*60:0);
                 const be = toMinutes(b.endTime) + (b.endTime <= b.startTime ? 24*60:0);
                 return ae - be;
-            })[listInSession.length-1];
+            })[combined.length-1];
             nextStartMin = (toMinutes(last.endTime) + 20) % (24*60); // +20p vệ sinh
         }
         rows[rowIndex].startTime = minutesToDayjs(dayjs(row.date), nextStartMin);
@@ -278,7 +294,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             if (!(session.name.includes('đêm'))) {
                 const over = endMin > (sEnd % (24*60));
                 if (over) {
-                    message.error('Suất này vượt quá ca, hãy chọn phim ngắn hơn hoặc ca khác');
+                    message.error('Thời gian của suất chiếu vượt quá thời gian của ca chiếu. Vui lòng chọn phim ngắn hơn, đổi ca hoặc đổi ngày.');
                     rows[rowIndex].startTime = undefined;
                     rows[rowIndex].endTime = undefined;
                 }
@@ -482,14 +498,25 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                             title={`Suất chiếu ${index + 1}`}
                                             extra={
                                                 fields.length > 1 ? (
-                                                    <Button
-                                                        type="text"
-                                                        danger
-                                                        icon={<DeleteOutlined />}
-                                                        onClick={() => remove(name)}
+                                                    <Popconfirm
+                                                        title="Xác nhận xóa suất chiếu"
+                                                        description={`Bạn có chắc muốn xóa Suất chiếu ${index + 1}?`}
+                                                        okText="Xóa"
+                                                        cancelText="Hủy"
+                                                        okButtonProps={{ danger: true }}
+                                                        onConfirm={() => {
+                                                            remove(name);
+                                                            message.success('Đã xóa suất chiếu');
+                                                        }}
                                                     >
-                                                        Xóa
-                                                    </Button>
+                                                        <Button
+                                                            type="text"
+                                                            danger
+                                                            icon={<DeleteOutlined />}
+                                                        >
+                                                            Xóa
+                                                        </Button>
+                                                    </Popconfirm>
                                                 ) : null
                                             }
                                         >
@@ -527,9 +554,8 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                             { required: true, message: 'Vui lòng chọn phòng chiếu!' }
                                                         ]}
                                                     >
-                                                        <Select
-                                                            key={`room-${selectedTheaterId}-${rooms.length}`}
-                                                            placeholder={selectedTheaterId ? "Chọn phòng chiếu" : "Chọn rạp chiếu trước"}
+                                                            <Select
+                                                                key={`room-${selectedTheaterId}-${rooms.length}`}
                                                             size="large"
                                                             allowClear
                                                             showSearch
@@ -550,7 +576,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                                 value: room._id,
                                                                 label: `🎬 ${room.name}`
                                                             }))}
-                                                            loading={rooms.length === 0 && selectedTheaterId}
+                                                            loading={rooms.length === 0 && !!selectedTheaterId}
                                                             placeholder={
                                                                 form.getFieldValue(['showTimes', name, 'room']) && rooms.length > 0
                                                                     ? undefined
@@ -617,8 +643,57 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                             format="HH:mm"
                                                             minuteStep={15}
                                                             disabled={!selectedMovie}
+                                                            // Khóa khung giờ theo ca đã chọn
+                                                            disabledHours={() => {
+                                                                const sessionId = form.getFieldValue(['showTimes', name, 'sessionId']);
+                                                                const session = showSessions.find(s => s._id === sessionId);
+                                                                if (!session) { return []; }
+                                                                // Cho phép ca đêm tự do
+                                                                if (/đêm/i.test(session.name)) { return []; }
+                                                                const [sh] = session.startTime.split(':').map(Number);
+                                                                const [eh, em] = session.endTime.split(':').map(Number);
+                                                                const disabled: number[] = [];
+                                                                for (let h = 0; h < 24; h++) {
+                                                                    if (h < sh || h > eh || (h === eh && em === 0)) {
+                                                                        disabled.push(h);
+                                                                    }
+                                                                }
+                                                                return disabled;
+                                                            }}
+                                                            disabledMinutes={(selectedHour) => {
+                                                                const sessionId = form.getFieldValue(['showTimes', name, 'sessionId']);
+                                                                const session = showSessions.find(s => s._id === sessionId);
+                                                                if (!session) { return []; }
+                                                                if (/đêm/i.test(session.name)) { return []; }
+                                                                const [sh, sm] = session.startTime.split(':').map(Number);
+                                                                const [eh, em] = session.endTime.split(':').map(Number);
+                                                                const mins: number[] = [];
+                                                                // Nếu giờ chọn là giờ bắt đầu ca → cấm phút < sm
+                                                                if (selectedHour === sh) {
+                                                                    for (let m = 0; m < sm; m++) mins.push(m);
+                                                                }
+                                                                // Nếu giờ chọn là giờ kết thúc ca → cấm phút >= em
+                                                                if (selectedHour === eh) {
+                                                                    for (let m = em; m < 60; m++) mins.push(m);
+                                                                }
+                                                                return mins;
+                                                            }}
                                                             onChange={(time) => {
                                                                 if (time && selectedMovie) {
+                                                                    // Validate nằm trong khoảng ca (nếu có session và không phải ca đêm)
+                                                                    const sessionId = form.getFieldValue(['showTimes', name, 'sessionId']);
+                                                                    const session = showSessions.find(s => s._id === sessionId);
+                                                                    if (session && !/đêm/i.test(session.name)) {
+                                                                        const [sh, sm] = session.startTime.split(':').map(Number);
+                                                                        const [eh, em] = session.endTime.split(':').map(Number);
+                                                                        const startBoundary = dayjs(time).hour(sh).minute(sm).second(0).millisecond(0);
+                                                                        const endBoundary = dayjs(time).hour(eh).minute(em).second(0).millisecond(0);
+                                                                        if (time.isBefore(startBoundary) || !time.isBefore(endBoundary)) {
+                                                                            message.error('Thời gian bắt đầu phải nằm trong khoảng của ca chiếu đã chọn.');
+                                                                            // Auto snap về giới hạn đầu ca
+                                                                            time = startBoundary;
+                                                                        }
+                                                                    }
                                                                     // Tự động tính thời gian kết thúc
                                                                     const endTime = time.add(selectedMovie.duration + 20, 'minute');
                                                                     const currentShowTimes = form.getFieldValue('showTimes') || [];

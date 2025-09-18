@@ -1,7 +1,12 @@
 import { IShowtime, Showtime } from "../models/Showtime";
+import ShowSession from "../models/ShowSession";
 import SeatModel from "../models/Seat";
 
 class ShowtimeService {
+  private dateKeyUTC(d: Date | string): string {
+    const x = new Date(d);
+    return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`;
+  }
   async getShowtimes(): Promise<IShowtime[]> {
     try {
       const showtimes = await Showtime.find()
@@ -42,24 +47,193 @@ class ShowtimeService {
 
   async addShowtime(showtimeData: Partial<IShowtime>): Promise<IShowtime> {
     try {
-      // Clone room seat template into each showTimes[i].seats
-      if (Array.isArray(showtimeData.showTimes)) {
-        const populated = await Promise.all(
-          showtimeData.showTimes.map(async (st: any) => {
-            // If seats not provided, copy from Seat collection of that room
-            if (!st.seats || st.seats.length === 0) {
-              const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
-              st.seats = roomSeats.map((s) => ({ seat: s._id, status: "available" }));
-            }
-            return st;
-          })
-        );
-        showtimeData.showTimes = populated as any;
+      if (!showtimeData.movieId || !showtimeData.theaterId || !showtimeData.showTimes || showtimeData.showTimes.length === 0) {
+        throw new Error("Thiếu dữ liệu bắt buộc để tạo suất chiếu");
       }
 
-      const newShowtime = new Showtime(showtimeData);
-      await newShowtime.save();
-      return newShowtime;
+      // Chuẩn hóa mảng showTimes: fill seats nếu thiếu
+      const normalizedShowTimes = await Promise.all(
+        (showtimeData.showTimes as any[]).map(async (st: any) => {
+          if (!st.seats || st.seats.length === 0) {
+            const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
+            st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: "available" }));
+          }
+          return st;
+        })
+      );
+
+      // Tìm xem đã có document cho cặp movieId + theaterId chưa
+      let doc = await Showtime.findOne({ movieId: showtimeData.movieId, theaterId: showtimeData.theaterId });
+
+      if (!doc) {
+        // Chưa có → tạo mới một document nhưng vẫn phải validate: tối đa 2 suất/ca và thời gian nằm trong ca
+        for (let i = 0; i < normalizedShowTimes.length; i++) {
+          const incoming = normalizedShowTimes[i] as any;
+          // Tính khung ca
+          let sessionStartMin: number | null = null;
+          let sessionEndMin: number | null = null;
+          let sessionName: string | undefined;
+          if (incoming.showSessionId) {
+            const session = await ShowSession.findById(incoming.showSessionId);
+            if (session) {
+              sessionName = session.name;
+              const [sh, sm] = session.startTime.split(":").map(Number);
+              const [eh, em] = session.endTime.split(":").map(Number);
+              sessionStartMin = sh * 60 + sm;
+              sessionEndMin = eh * 60 + em;
+              if (sessionEndMin <= sessionStartMin) sessionEndMin += 24 * 60;
+            }
+          }
+          if (sessionStartMin === null || sessionEndMin === null) {
+            const start = new Date(incoming.start);
+            sessionStartMin = start.getHours() * 60 + start.getMinutes();
+            sessionEndMin = sessionStartMin + 5 * 60; // fallback
+          }
+
+          // Validate start/end nằm trong ca (trừ ca đêm)
+          const start = new Date(incoming.start);
+          const end = new Date(incoming.end);
+          let startMin = start.getHours() * 60 + start.getMinutes();
+          let endMin = end.getHours() * 60 + end.getMinutes();
+          if (endMin <= startMin) endMin += 24 * 60;
+          if (sessionName && !/đêm/i.test(sessionName)) {
+            if (startMin < sessionStartMin || startMin >= sessionEndMin) {
+              throw new Error("Thời gian bắt đầu không nằm trong khoảng của ca chiếu đã chọn");
+            }
+            if (endMin > sessionEndMin) {
+              throw new Error("Thời gian kết thúc vượt quá thời gian của ca chiếu");
+            }
+          }
+
+          // Đếm số suất trong cùng ca của cùng ngày/phòng trong batch
+          const dateStr = this.dateKeyUTC(incoming.date);
+          const alsoIncoming = normalizedShowTimes.filter((st: any, idx: number) => {
+            if (idx === i) return false;
+            const sameDate = this.dateKeyUTC(st.date) === dateStr;
+            const sameRoom = st.room.toString() === incoming.room.toString();
+            if (!sameDate || !sameRoom) return false;
+            const hh = new Date(st.start).getHours();
+            const mm = new Date(st.start).getMinutes();
+            const stMin = hh * 60 + mm;
+            return stMin >= sessionStartMin! && stMin < sessionEndMin!;
+          });
+          if (alsoIncoming.length >= 2) {
+            throw new Error(
+              `Trong cùng ca đã đủ 2 suất cho phòng này (ngày ${new Date(incoming.date).toLocaleDateString("vi-VN")}). Vui lòng chọn ca khác hoặc ngày khác.`
+            );
+          }
+        }
+        doc = new Showtime({
+          movieId: showtimeData.movieId,
+          theaterId: showtimeData.theaterId,
+          showTimes: normalizedShowTimes,
+        } as any);
+        await doc.save();
+        return doc;
+      }
+
+      // Đã có document → gộp các showTimes, tránh thêm trùng
+      for (const incoming of normalizedShowTimes) {
+        const exists = doc.showTimes.some((st: any) => {
+          const sameDate = this.dateKeyUTC(st.date) === this.dateKeyUTC(incoming.date);
+          const sameRoom = st.room.toString() === incoming.room.toString();
+          const startA = new Date(st.start).getTime();
+          const startB = new Date(incoming.start).getTime();
+          const sameStart = Math.abs(startA - startB) < 60 * 1000; // 1 phút
+          return sameDate && sameRoom && sameStart;
+        });
+
+        if (!exists) {
+          // Kiểm tra giới hạn 2 suất/ca trong ngày/phòng
+          // Ưu tiên dùng showSessionId nếu có; nếu không, suy ra theo time range
+          let sessionStartMin: number | null = null;
+          let sessionEndMin: number | null = null;
+          let sessionName: string | undefined;
+          if (incoming.showSessionId) {
+            const session = await ShowSession.findById(incoming.showSessionId);
+            if (session) {
+              sessionName = session.name;
+              const [sh, sm] = session.startTime.split(":").map(Number);
+              const [eh, em] = session.endTime.split(":").map(Number);
+              sessionStartMin = sh * 60 + sm;
+              sessionEndMin = eh * 60 + em;
+              if (sessionEndMin <= sessionStartMin) {
+                sessionEndMin += 24 * 60; // qua ngày
+              }
+            }
+          }
+          // Nếu không có session, suy ra theo khoảng 5h mặc định quanh giờ bắt đầu (fallback an toàn)
+          if (sessionStartMin === null || sessionEndMin === null) {
+            const start = new Date(incoming.start);
+            sessionStartMin = start.getHours() * 60 + start.getMinutes();
+            sessionEndMin = sessionStartMin + 5 * 60;
+          }
+
+          const dateStr = this.dateKeyUTC(incoming.date);
+
+          // Validate start/end nằm trong ca (trừ ca đêm)
+          const start = new Date(incoming.start);
+          const end = new Date(incoming.end);
+          let startMin = start.getHours() * 60 + start.getMinutes();
+          let endMin = end.getHours() * 60 + end.getMinutes();
+          if (endMin <= startMin) endMin += 24 * 60;
+          if (sessionName && !/đêm/i.test(sessionName)) {
+            if (startMin < (sessionStartMin as number) || startMin >= (sessionEndMin as number)) {
+              throw new Error("Thời gian bắt đầu không nằm trong khoảng của ca chiếu đã chọn");
+            }
+            if (endMin > (sessionEndMin as number)) {
+              throw new Error("Thời gian kết thúc vượt quá thời gian của ca chiếu");
+            }
+          }
+          const inThisSession = doc.showTimes.filter((st: any) => {
+            const sameDate = this.dateKeyUTC(st.date) === dateStr;
+            const sameRoom = st.room.toString() === incoming.room.toString();
+            if (!sameDate || !sameRoom) return false;
+            let stStart = new Date(st.start);
+            let stEnd = new Date(st.end);
+            // quy đổi về phút
+            let stStartMin = stStart.getHours() * 60 + stStart.getMinutes();
+            let stEndMin = stEnd.getHours() * 60 + stEnd.getMinutes();
+            if (stEndMin <= stStartMin) stEndMin += 24 * 60;
+            return stStartMin >= (sessionStartMin as number) && stStartMin < (sessionEndMin as number);
+          });
+
+          // Cộng thêm các incoming khác trong cùng batch thuộc cùng ca
+          const alsoIncoming = normalizedShowTimes.filter((st: any) => {
+            if (st === incoming) return false;
+            const sameDate = this.dateKeyUTC(st.date) === dateStr;
+            const sameRoom = st.room.toString() === incoming.room.toString();
+            if (!sameDate || !sameRoom) return false;
+            const hh = new Date(st.start).getHours();
+            const mm = new Date(st.start).getMinutes();
+            const startMin = hh * 60 + mm;
+            return startMin >= (sessionStartMin as number) && startMin < (sessionEndMin as number);
+          });
+
+          const totalInSession = inThisSession.length + alsoIncoming.length;
+          if (totalInSession >= 2) {
+            throw new Error(
+              `Trong cùng ca đã đủ 2 suất cho phòng này (ngày ${new Date(incoming.date).toLocaleDateString("vi-VN")}). Vui lòng chọn ca khác hoặc ngày khác.`
+            );
+          }
+
+          doc.showTimes.push(incoming);
+        } else {
+          // Nếu đã tồn tại, có thể cập nhật seats nếu doc hiện tại chưa có
+          const idx = doc.showTimes.findIndex((st: any) => {
+            const sameDate = new Date(st.date).toDateString() === new Date(incoming.date).toDateString();
+            const sameRoom = st.room.toString() === incoming.room.toString();
+            const sameStart = Math.abs(new Date(st.start).getTime() - new Date(incoming.start).getTime()) < 60 * 1000;
+            return sameDate && sameRoom && sameStart;
+          });
+          if (idx !== -1 && (!doc.showTimes[idx].seats || doc.showTimes[idx].seats.length === 0)) {
+            doc.showTimes[idx].seats = incoming.seats;
+          }
+        }
+      }
+
+      await doc.save();
+      return doc;
     } catch (error) {
       throw error;
     }
@@ -138,12 +312,17 @@ class ShowtimeService {
     endTime: string;
     movieId: string;
   }[]> {
+    // Chuẩn hóa khoảng ngày theo UTC để khớp chính xác ngày, tránh lệch timezone
+    const d = new Date(date);
+    const startOfDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0));
+
     const items = await Showtime.aggregate([
       { $unwind: "$showTimes" },
       {
         $match: {
           "showTimes.room": roomId,
-          "showTimes.date": date,
+          "showTimes.date": { $gte: startOfDay, $lt: endOfDay },
         },
       },
       {
@@ -151,8 +330,8 @@ class ShowtimeService {
           showtimeId: "$_id",
           room: "$showTimes.room",
           date: "$showTimes.date",
-          startTime: "$showTimes.startTime",
-          endTime: "$showTimes.endTime",
+          startTime: "$showTimes.start",
+          endTime: "$showTimes.end",
           movieId: "$movieId",
         },
       },
@@ -200,7 +379,7 @@ class ShowtimeService {
         .populate({
           path: "showTimes.showSessionId",
           select: "name startTime endTime"
-        });
+      });
 
       if (!showtime) {
         return null;

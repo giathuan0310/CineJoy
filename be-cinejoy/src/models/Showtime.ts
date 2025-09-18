@@ -45,4 +45,10 @@ const ShowtimeSchema = new Schema<IShowtime>({
     ],
 });
 
+// Ngăn tạo trùng bản ghi theo phim và rạp. Một document duy nhất cho mỗi cặp movieId + theaterId
+ShowtimeSchema.index({ movieId: 1, theaterId: 1 }, { unique: true });
+
+// Tối ưu tìm kiếm theo các trường trong mảng showTimes
+ShowtimeSchema.index({ 'showTimes.date': 1, 'showTimes.room': 1, 'showTimes.start': 1 });
+
 export const Showtime = model<IShowtime>("Showtime", ShowtimeSchema);

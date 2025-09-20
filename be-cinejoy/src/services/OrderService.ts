@@ -2,9 +2,11 @@ import Order, { IOrder } from "../models/Order";
 import { FoodCombo } from "../models/FoodCombo";
 import { UserVoucher } from "../models/UserVoucher";
 import ShowtimeService from "./ShowtimeService";
+import FoodComboService from "./FoodComboService";
 import mongoose from "mongoose";
 
 const showtimeService = new ShowtimeService();
+const foodComboService = new FoodComboService();
 
 export interface CreateOrderData {
   userId: string;
@@ -56,27 +58,27 @@ class OrderService {
     session.startTransaction();
 
     try {
-      // Tính toán giá combo
+      // Tính toán giá combo/sản phẩm
       let comboPrice = 0;
       const combosWithPrice = [];
+      const itemsToUpdateQuantity: Array<{ productId: string; quantity: number }> = [];
 
       for (const combo of orderData.foodCombos) {
-        const foodCombo = await FoodCombo.findById(combo.comboId).session(
-          session
-        );
+        const foodCombo = await FoodCombo.findById(combo.comboId).populate('items.productId').session(session);
         if (!foodCombo) {
           await session.abortTransaction();
           return {
             success: false,
-            message: `Combo không tồn tại: ${combo.comboId}`,
+            message: `Sản phẩm/combo không tồn tại: ${combo.comboId}`,
           };
         }
 
+        // Kiểm tra số lượng có sẵn
         if (foodCombo.quantity < combo.quantity) {
           await session.abortTransaction();
           return {
             success: false,
-            message: `Combo ${foodCombo.name} không đủ số lượng`,
+            message: `${foodCombo.name} không đủ số lượng (có ${foodCombo.quantity}, cần ${combo.quantity})`,
           };
         }
 
@@ -89,10 +91,46 @@ class OrderService {
           price: foodCombo.price,
         });
 
-        // Cập nhật số lượng combo
+        // Nếu là combo, trừ số lượng từ các sản phẩm đơn lẻ
+        if (foodCombo.type === "combo" && foodCombo.items) {
+          for (const item of foodCombo.items) {
+            const product = item.productId as any;
+            if (product && product.type === "single") {
+              const requiredQuantity = item.quantity * combo.quantity;
+              if (product.quantity < requiredQuantity) {
+                await session.abortTransaction();
+                return {
+                  success: false,
+                  message: `Không đủ ${product.name} để tạo combo ${foodCombo.name}`,
+                };
+              }
+              itemsToUpdateQuantity.push({
+                productId: product._id.toString(),
+                quantity: requiredQuantity
+              });
+            }
+          }
+        } else if (foodCombo.type === "single") {
+          // Nếu là sản phẩm đơn lẻ
+          itemsToUpdateQuantity.push({
+            productId: foodCombo._id.toString(),
+            quantity: combo.quantity
+          });
+        }
+
+        // Cập nhật số lượng combo/sản phẩm
         await FoodCombo.findByIdAndUpdate(
           combo.comboId,
           { $inc: { quantity: -combo.quantity } },
+          { session }
+        );
+      }
+
+      // Cập nhật số lượng các sản phẩm đơn lẻ
+      for (const item of itemsToUpdateQuantity) {
+        await FoodCombo.findByIdAndUpdate(
+          item.productId,
+          { $inc: { quantity: -item.quantity } },
           { session }
         );
       }
@@ -462,14 +500,36 @@ class OrderService {
         throw new Error("Không thể hủy order đã thanh toán");
       }
 
-      // Hoàn lại số lượng combo
+      // Hoàn lại số lượng combo/sản phẩm
       for (const combo of order.foodCombos) {
-        await FoodCombo.findByIdAndUpdate(
-          combo.comboId,
-          { $inc: { quantity: combo.quantity } },
-          { session }
-        );
+        const foodCombo = await FoodCombo.findById(combo.comboId).populate('items.productId').session(session);
+        if (foodCombo) {
+          // Hoàn lại số lượng combo/sản phẩm
+          await FoodCombo.findByIdAndUpdate(
+            combo.comboId,
+            { $inc: { quantity: combo.quantity } },
+            { session }
+          );
+
+          // Nếu là combo, hoàn lại số lượng các sản phẩm đơn lẻ
+          if (foodCombo.type === "combo" && foodCombo.items) {
+            for (const item of foodCombo.items) {
+              const product = item.productId as any;
+              if (product && product.type === "single") {
+                const returnedQuantity = item.quantity * combo.quantity;
+                await FoodCombo.findByIdAndUpdate(
+                  product._id.toString(),
+                  { $inc: { quantity: returnedQuantity } },
+                  { session }
+                );
+              }
+            }
+          }
+        }
       }
+
+      // Tính lại số lượng combo sau khi hoàn trả
+      await foodComboService.recalculateComboQuantities();
 
       // Release ghế trong showtime khi hủy order
       try {

@@ -170,13 +170,25 @@ declare global {
     image: string;
   }
 
-  // FoodCombo
+  // FoodCombo - Sản phẩm đơn lẻ hoặc combo
+  interface IComboItem {
+    productId: string;
+    quantity: number;
+  }
+
   interface IFoodCombo {
     _id: string;
     name: string;
     price: number;
-    description: string;
     quantity: number;
+    type: "single" | "combo";
+    category?: string; // Chỉ cho single products
+    description?: string; // Chỉ cho single products
+    items?: IComboItem[]; // Chỉ cho combo
+    discountType?: "percent" | "fixed"; // Chỉ cho combo
+    discountValue?: number; // Chỉ cho combo
+    createdAt: string;
+    updatedAt: string;
   }
 
   // Region

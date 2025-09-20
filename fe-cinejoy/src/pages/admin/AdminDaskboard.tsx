@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
-import { getFoodCombos, addFoodCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
+import { getFoodCombos, addSingleProduct, addCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
 import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
 import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
@@ -645,16 +645,33 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleFoodComboSubmit = async (comboData: Partial<IFoodCombo>) => {
+  const handleFoodComboSubmit = async (comboData: any) => {
     try {
       if (selectedFoodCombo) {
         // Cập nhật
-        await updateFoodCombo(selectedFoodCombo._id!, comboData as IFoodCombo);
-        toast.success("Cập nhật combo thành công!");
+        await updateFoodCombo(selectedFoodCombo._id!, comboData);
+        toast.success("Cập nhật sản phẩm thành công!");
       } else {
         // Thêm mới
-        await addFoodCombo(comboData as IFoodCombo);
-        toast.success("Thêm combo thành công!");
+        if (comboData.type === 'single') {
+          await addSingleProduct({
+            name: comboData.name,
+            price: comboData.price,
+            category: comboData.category,
+            description: comboData.description,
+            quantity: comboData.quantity
+          });
+          toast.success("Thêm sản phẩm đơn lẻ thành công!");
+        } else {
+          await addCombo({
+            name: comboData.name,
+            description: comboData.description,
+            items: comboData.items,
+            discountType: comboData.discountType,
+            discountValue: comboData.discountValue
+          });
+          toast.success("Thêm combo thành công!");
+        }
       }
       // Reload dữ liệu sau khi thêm/sửa
       await loadFoodCombos();
@@ -662,7 +679,7 @@ const Dashboard: React.FC = () => {
       setSelectedFoodCombo(undefined);
     } catch (error) {
       console.error("Error submitting food combo:", error);
-      toast.error(selectedFoodCombo ? "Cập nhật combo thất bại!" : "Thêm combo thất bại!");
+      toast.error(selectedFoodCombo ? "Cập nhật sản phẩm thất bại!" : "Thêm sản phẩm thất bại!");
     }
   };
 
@@ -671,10 +688,10 @@ const Dashboard: React.FC = () => {
       await deleteFoodCombo(comboId);
       // Reload dữ liệu sau khi xóa
       await loadFoodCombos();
-      toast.success("Xóa combo thành công!");
+      toast.success("Xóa sản phẩm thành công!");
     } catch (error) {
       console.error("Error deleting food combo:", error);
-      toast.error("Xóa combo thất bại!");
+      toast.error("Xóa sản phẩm thất bại!");
     }
   };
 
@@ -845,7 +862,7 @@ const Dashboard: React.FC = () => {
             {[
               { label: "Phim", value: "movies", icon: "🎬" },
               { label: "Blog", value: "blogs", icon: "📰" },
-              { label: "Combo", value: "foodCombos", icon: "🍿" },
+              { label: "Sản phẩm & Combo", value: "foodCombos", icon: "🍿" },
               { label: "Khu vực", value: "regions", icon: "🌏" },
               { label: "Rạp", value: "theaters", icon: "🏢" },
               { label: "Voucher", value: "vouchers", icon: "🎟️" },
@@ -1104,12 +1121,12 @@ const Dashboard: React.FC = () => {
           {activeTab === "foodCombos" && (
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-black select-none">
-                Quản lý Combo
+                Quản lý Sản phẩm & Combo
               </h2>
               <div className="flex justify-between items-center mb-4">
                 <input
                   type="text"
-                  placeholder="Tìm kiếm combo..."
+                  placeholder="Tìm kiếm sản phẩm/combo..."
                   className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1121,7 +1138,7 @@ const Dashboard: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    Thêm combo
+                    Thêm sản phẩm
                   </motion.button>
                   <div>
                     <span>
@@ -1149,7 +1166,8 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-black text-white">
                     <tr>
                       <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên Combo</th>
+                      <th className="p-3 text-left">Loại</th>
+                      <th className="p-3 text-left">Tên</th>
                       <th className="p-3 text-left">Giá</th>
                       <th className="p-3 text-left">Mô tả</th>
                       <th className="p-3 text-left">Số lượng</th>
@@ -1165,12 +1183,19 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            combo.type === 'single' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {combo.type === 'single' ? 'Sản phẩm' : 'Combo'}
+                          </span>
+                        </td>
                         <td className="p-3 font-medium">{combo.name}</td>
                         <td className="p-3 text-green-600 font-semibold">
                           {combo.price.toLocaleString("vi-VN")} đ
                         </td>
-                        <td className="p-3 max-w-xs truncate" title={combo.description}>
-                          {combo.description}
+                        <td className="p-3 max-w-xs truncate" title={combo.description || combo.category}>
+                          {combo.description || combo.category}
                         </td>
                         <td className="p-3 text-center">
                           <span className={`px-2 py-1 rounded-full text-sm ${
@@ -1192,8 +1217,8 @@ const Dashboard: React.FC = () => {
                               Sửa
                             </motion.button>
                             <Popconfirm
-                              title="Xóa combo"
-                              description="Bạn có chắc chắn muốn xóa combo này?"
+                              title="Xóa sản phẩm"
+                              description="Bạn có chắc chắn muốn xóa sản phẩm này?"
                               onConfirm={() => handleDeleteFoodCombo(combo._id!)}
                               okText="Có"
                               cancelText="Không"

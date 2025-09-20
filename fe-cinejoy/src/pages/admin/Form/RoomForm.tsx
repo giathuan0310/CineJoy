@@ -8,6 +8,7 @@ interface RoomFormProps {
     room?: IRoom;
     theaters: Array<{ _id: string; name: string; address: string; location: { city: string }; regionId: string }>;
     regions: Array<{ _id: string; name: string }>;
+    preSelectedTheater?: { _id: string; name: string; address: string; location: { city: string }; regionId: string } | null;
     onSubmit: (roomData: ICreateRoomData) => void;
     onCancel: () => void;
     loading?: boolean;
@@ -85,7 +86,7 @@ const create4DXSeatTemplate = (rows: number, cols: number) => {
     return seats;
 };
 
-const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, onCancel, loading = false }) => {
+const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelectedTheater, onSubmit, onCancel, loading = false }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
     const [selectedRegion, setSelectedRegion] = useState<string>('');
@@ -127,8 +128,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
             loadRoomSeats(room._id);
         } else {
             form.resetFields();
-            setSelectedRegion('');
-            setFilteredTheaters([]);
             setSelectedRoomType('2D');
             
             // Set default values for new room
@@ -145,8 +144,23 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, onSubmit, 
                 seats: defaultSeats 
             });
             console.log('Default 2D template created:', Object.keys(defaultSeats).length, 'seats');
+            
+            // Handle preSelectedTheater if provided
+            if (preSelectedTheater) {
+                const region = regions.find(r => r._id === preSelectedTheater.regionId);
+                if (region) {
+                    setSelectedRegion(region._id);
+                    form.setFieldsValue({
+                        region: region._id,
+                        theater: preSelectedTheater._id
+                    });
+                }
+            } else {
+                setSelectedRegion('');
+                setFilteredTheaters([]);
+            }
         }
-    }, [room, form, theaters, regions]);
+    }, [room, form, theaters, regions, preSelectedTheater]);
 
     // Filter theaters based on selected region
     useEffect(() => {

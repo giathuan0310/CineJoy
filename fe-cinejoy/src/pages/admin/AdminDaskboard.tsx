@@ -56,6 +56,9 @@ const Dashboard: React.FC = () => {
   const [users, setUsers] = useState<IUser[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [showSessions, setShowSessions] = useState<IShowSession[]>([]);
+  const [showRoomModal, setShowRoomModal] = useState<boolean>(false);
+  const [selectedTheaterForRooms, setSelectedTheaterForRooms] = useState<ITheater | null>(null);
+  const [preSelectedTheater, setPreSelectedTheater] = useState<ITheater | null>(null);
   const [showMovieForm, setShowMovieForm] = useState<boolean>(false);
   const [selectedMovie, setSelectedMovie] = useState<IMovie | undefined>(
     undefined
@@ -205,13 +208,22 @@ const Dashboard: React.FC = () => {
   const { paginated: paginatedTheaters, totalPages: totalTheaterPages } =
     filterAndPaginate<ITheater>(
       theaters,
-      (theater) =>
-        (theater.name?.toLowerCase() ?? "").includes(
+      (theater) => {
+        const theaterMatch = (theater.name?.toLowerCase() ?? "").includes(
           searchTerm.toLowerCase()
         ) ||
         (theater.location?.city?.toLowerCase() ?? "").includes(
           searchTerm.toLowerCase()
-        )
+        );
+        
+        // Also search in rooms of this theater
+        const hasMatchingRoom = rooms.some(room => 
+          room.theater?._id === theater._id && 
+          (room.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
+        );
+        
+        return theaterMatch || hasMatchingRoom;
+      }
     );
 
   // Users
@@ -436,9 +448,11 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handleAddRoom = () => {
-    setSelectedRoom(undefined);
-    setShowRoomForm(true);
+
+  // Show rooms modal for theater
+  const handleShowRooms = (theater: ITheater) => {
+    setSelectedTheaterForRooms(theater);
+    setShowRoomModal(true);
   };
 
   // Load functions for Show Sessions
@@ -864,10 +878,9 @@ const Dashboard: React.FC = () => {
               { label: "Blog", value: "blogs", icon: "📰" },
               { label: "Sản phẩm & Combo", value: "foodCombos", icon: "🍿" },
               { label: "Khu vực", value: "regions", icon: "🌏" },
-              { label: "Rạp", value: "theaters", icon: "🏢" },
+              { label: "Rạp & Phòng chiếu", value: "theaters", icon: "🏢" },
               { label: "Voucher", value: "vouchers", icon: "🎟️" },
               { label: "Người dùng", value: "users", icon: "👥" },
-              { label: "Phòng chiếu", value: "rooms", icon: "🏬" },
               { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
             ].map((tab) => (
@@ -1341,12 +1354,12 @@ const Dashboard: React.FC = () => {
           {activeTab === "theaters" && (
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-black select-none">
-                Quản lý Rạp
+                Quản lý Rạp & Phòng chiếu
               </h2>
               <div className="flex justify-between items-center mb-4">
                 <input
                   type="text"
-                  placeholder="Tìm kiếm rạp..."
+                  placeholder="Tìm kiếm rạp hoặc phòng chiếu..."
                   className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1359,6 +1372,18 @@ const Dashboard: React.FC = () => {
                     whileTap={{ scale: 0.95 }}
                   >
                     Thêm rạp
+                  </motion.button>
+                  <motion.button
+                    onClick={() => {
+                      setSelectedRoom(undefined);
+                      setPreSelectedTheater(null); // Không fill rạp nào
+                      setShowRoomForm(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Thêm phòng
                   </motion.button>
                   <div>
                     <span>
@@ -1389,56 +1414,71 @@ const Dashboard: React.FC = () => {
                       <th className="p-3 text-left">Tên rạp</th>
                       <th className="p-3 text-left">Thành phố</th>
                       <th className="p-3 text-left">Địa chỉ</th>
+                      <th className="p-3 text-left">Số phòng</th>
                       <th className="p-3 text-left">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedTheaters.map((theater, idx) => (
-                      <tr
-                        key={theater._id}
-                        className="border-b hover:bg-gray-100"
-                      >
-                        <td className="p-3">
-                          {(currentPage - 1) * itemsPerPage + idx + 1}
-                        </td>
-                        <td className="p-3 font-medium">{theater.name}</td>
-                        <td className="p-3">
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
-                            {theater.location.city}
-                          </span>
-                        </td>
-                        <td className="p-3 max-w-xs truncate" title={theater.location.address}>
-                          {theater.location.address}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex gap-2">
-                            <motion.button
-                              onClick={() => handleEditTheater(theater)}
-                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              Sửa
-                            </motion.button>
-                            <Popconfirm
-                              title="Xóa rạp"
-                              description="Bạn có chắc chắn muốn xóa rạp này?"
-                              onConfirm={() => handleDeleteTheater(theater._id!)}
-                              okText="Có"
-                              cancelText="Không"
-                            >
+                    {paginatedTheaters.map((theater, idx) => {
+                      const theaterRooms = rooms.filter(room => room.theater?._id === theater._id);
+                      
+                      return (
+                        <tr key={theater._id} className="border-b hover:bg-gray-100">
+                          <td className="p-3">
+                            {(currentPage - 1) * itemsPerPage + idx + 1}
+                          </td>
+                          <td className="p-3 font-medium">{theater.name}</td>
+                          <td className="p-3">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
+                              {theater.location.city}
+                            </span>
+                          </td>
+                          <td className="p-3 max-w-xs truncate" title={theater.location.address}>
+                            {theater.location.address}
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
+                              {theaterRooms.length} phòng
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2">
                               <motion.button
-                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                onClick={() => handleShowRooms(theater)}
+                                className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 cursor-pointer"
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                               >
-                                Xóa
+                                Xem chi tiết
                               </motion.button>
-                            </Popconfirm>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              <motion.button
+                                onClick={() => handleEditTheater(theater)}
+                                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Sửa
+                              </motion.button>
+                              <Popconfirm
+                                title="Xóa rạp"
+                                description="Bạn có chắc chắn muốn xóa rạp này?"
+                                onConfirm={() => handleDeleteTheater(theater._id!)}
+                                okText="Có"
+                                cancelText="Không"
+                              >
+                                <motion.button
+                                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  Xóa
+                                </motion.button>
+                              </Popconfirm>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1692,138 +1732,6 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Rooms Tab */}
-          {activeTab === "rooms" && (
-            <div>
-              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
-                Quản lý Phòng chiếu
-              </h2>
-              <div className="flex justify-between items-center mb-4">
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm phòng chiếu..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
-                />
-                <div className="flex items-center gap-4">
-                  <motion.button
-                    onClick={handleAddRoom}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Thêm phòng mới
-                  </motion.button>
-                  <div>
-                    <span>
-                      Trang {currentPage} / {filterAndPaginate(rooms, () => true).totalPages}
-                    </span>
-                    <button
-                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage((p) => p - 1)}
-                    >
-                      Trước
-                    </button>
-                    <button
-                      className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
-                      disabled={currentPage === filterAndPaginate(rooms, () => true).totalPages}
-                      onClick={() => setCurrentPage((p) => p + 1)}
-                    >
-                      Sau
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Room Table */}
-              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="bg-black text-white">
-                    <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên phòng</th>
-                      <th className="p-3 text-left">Loại phòng</th>
-                      <th className="p-3 text-left">Rạp chiếu</th>
-                      <th className="p-3 text-left">Sức chứa</th>
-                      <th className="p-3 text-left">Trạng thái</th>
-                      <th className="p-3 text-left">Số ghế</th>
-                      <th className="p-3 text-left">Ngày tạo</th>
-                      <th className="p-3 text-left">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filterAndPaginate(
-                      rooms,
-                      (room: any) =>
-                        room.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        room.theater?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        room.roomType?.toLowerCase().includes(searchTerm.toLowerCase())
-                    ).paginated.map((room: any, idx: number) => (
-                      <tr key={room._id} className="border-b hover:bg-gray-50">
-                        <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                        <td className="p-3 font-medium">{room.name}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            room.roomType === 'VIP' ? 'bg-yellow-100 text-yellow-800' :
-                            room.roomType === 'IMAX' ? 'bg-blue-100 text-blue-800' :
-                            room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {room.roomType}
-                          </span>
-                        </td>
-                        <td className="p-3">{room.theater?.name}</td>
-                        <td className="p-3">{room.capacity} ghế</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            room.status === 'active' ? 'bg-green-100 text-green-800' :
-                            room.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {room.status === 'active' ? 'Hoạt động' : 
-                             room.status === 'maintenance' ? 'Bảo trì' : 'Không hoạt động'}
-                          </span>
-                        </td>
-                        <td className="p-3">{room.seats?.length || 0}</td>
-                        <td className="p-3">{new Date(room.createdAt).toLocaleDateString('vi-VN')}</td>
-                        <td className="p-3">
-                          <div className="flex gap-2">
-                            <motion.button
-                              onClick={() => handleEditRoom(room)}
-                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors text-sm cursor-pointer"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              Sửa
-                            </motion.button>
-                            <Popconfirm
-                              title="Xác nhận xóa"
-                              description="Bạn có chắc chắn muốn xóa phòng chiếu này không? Tất cả ghế trong phòng cũng sẽ bị xóa."
-                              onConfirm={() => handleDeleteRoom(room._id)}
-                              okText="Xóa"
-                              cancelText="Hủy"
-                              okButtonProps={{ danger: true }}
-                            >
-                              <motion.button
-                                className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors text-sm cursor-pointer"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                Xóa
-                              </motion.button>
-                            </Popconfirm>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-          )}
 
           {/* Show Sessions Tab */}
           {activeTab === "showSessions" && (
@@ -2395,13 +2303,151 @@ const Dashboard: React.FC = () => {
           room={selectedRoom}
           theaters={theaters.map(t => ({ _id: t._id, name: t.name, address: t.location?.address || '', location: { city: t.location?.city || '' }, regionId: t.regionId }))}
           regions={regions}
+          preSelectedTheater={preSelectedTheater ? {
+            _id: preSelectedTheater._id,
+            name: preSelectedTheater.name,
+            address: preSelectedTheater.location?.address || '',
+            location: { city: preSelectedTheater.location?.city || '' },
+            regionId: preSelectedTheater.regionId
+          } : null}
           onSubmit={handleRoomSubmit}
           loading={isRoomSubmitting}
           onCancel={() => {
             setShowRoomForm(false);
             setSelectedRoom(undefined);
+            setPreSelectedTheater(null);
           }}
         />
+      )}
+
+      {/* Rooms Modal */}
+      {showRoomModal && selectedTheaterForRooms && (
+        <Modal
+          title={
+            <div className="flex justify-between items-center">
+              <span>Phòng chiếu của rạp {selectedTheaterForRooms.name}</span>
+              <motion.button
+                onClick={() => {
+                  setShowRoomModal(false);
+                  setSelectedTheaterForRooms(null);
+                  setSelectedRoom(undefined);
+                  setPreSelectedTheater(selectedTheaterForRooms); // Fill sẵn rạp hiện tại
+                  setShowRoomForm(true);
+                }}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 cursor-pointer text-sm mr-8"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Thêm phòng mới
+              </motion.button>
+            </div>
+          }
+          open={showRoomModal}
+          onCancel={() => {
+            setShowRoomModal(false);
+            setSelectedTheaterForRooms(null);
+          }}
+          footer={null}
+          width={1000}
+          centered
+        >
+          <div className="max-h-96 overflow-y-auto">
+            {(() => {
+              const theaterRooms = rooms.filter(room => room.theater?._id === selectedTheaterForRooms._id);
+              
+              if (theaterRooms.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Rạp này chưa có phòng chiếu nào.</p>
+                    <p className="text-sm mt-2">Sử dụng nút "Thêm phòng mới" ở trên để thêm phòng đầu tiên.</p>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {theaterRooms.map((room) => (
+                    <div key={room._id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                      <div className="flex justify-between items-start mb-3">
+                        <h5 className="font-semibold text-gray-800 text-lg">{room.name}</h5>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          room.roomType === '2D' ? 'bg-blue-100 text-blue-800' :
+                          room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {room.roomType}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Sức chứa:</span>
+                          <span className="font-medium">{room.capacity} ghế</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Số ghế:</span>
+                          <span className="font-medium">{room.seats?.length || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Trạng thái:</span>
+                          <span className={`font-medium ${
+                            room.status === 'active' ? 'text-green-600' :
+                            room.status === 'maintenance' ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {room.status === 'active' ? 'Hoạt động' : 
+                             room.status === 'maintenance' ? 'Bảo trì' : 'Không hoạt động'}
+                          </span>
+                        </div>
+                        {room.description && (
+                          <div className="mt-2">
+                            <span className="text-gray-600 text-sm">Mô tả:</span>
+                            <p className="text-sm text-gray-700 mt-1">{room.description}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <motion.button
+                          onClick={() => {
+                            setShowRoomModal(false);
+                            setSelectedTheaterForRooms(null);
+                            handleEditRoom(room);
+                          }}
+                          className="flex-1 bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600 cursor-pointer"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          Sửa
+                        </motion.button>
+                        <Popconfirm
+                          title="Xác nhận xóa"
+                          description="Bạn có chắc chắn muốn xóa phòng chiếu này không?"
+                          onConfirm={() => {
+                            handleDeleteRoom(room._id);
+                            setShowRoomModal(false);
+                            setSelectedTheaterForRooms(null);
+                          }}
+                          okText="Xóa"
+                          cancelText="Hủy"
+                          okButtonProps={{ danger: true }}
+                        >
+                          <motion.button
+                            className="flex-1 bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            Xóa
+                          </motion.button>
+                        </Popconfirm>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </Modal>
       )}
 
       {/* Seat Form Modal */}

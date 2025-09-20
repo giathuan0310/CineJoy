@@ -61,7 +61,24 @@ const TheaterForm: React.FC<TheaterFormProps> = ({ theater, onSubmit, onCancel, 
             address: string;
         };
     }) => {
-        await onSubmit(values);
+        // Tìm regionId từ city được chọn
+        const selectedRegion = regions.find(region => region.name === values.location.city);
+        if (!selectedRegion) {
+            toast.error('Không tìm thấy khu vực tương ứng!');
+            return;
+        }
+
+        // Gửi dữ liệu với regionId
+        const theaterData = {
+            name: values.name,
+            regionId: selectedRegion._id,
+            location: {
+                city: values.location.city,
+                address: values.location.address
+            }
+        };
+
+        await onSubmit(theaterData);
     };
 
     return (

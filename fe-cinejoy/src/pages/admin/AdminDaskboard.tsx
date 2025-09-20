@@ -1461,10 +1461,11 @@ const Dashboard: React.FC = () => {
                               </motion.button>
                               <Popconfirm
                                 title="Xóa rạp"
-                                description="Bạn có chắc chắn muốn xóa rạp này?"
+                                description="Bạn có chắc chắn muốn xóa rạp này? Tất cả các phòng chiếu trong rạp này cũng sẽ bị xóa!"
                                 onConfirm={() => handleDeleteTheater(theater._id!)}
-                                okText="Có"
-                                cancelText="Không"
+                                okText="Xóa"
+                                cancelText="Hủy"
+                                okButtonProps={{ danger: true }}
                               >
                                 <motion.button
                                   className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"

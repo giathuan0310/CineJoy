@@ -128,7 +128,10 @@ class ShowtimeService {
 
           // Đếm số suất trong cùng ca của cùng ngày/phòng trong batch
           const dateStr = this.dateKeyUTC(incoming.date);
-          const alsoIncoming = normalizedShowTimes.filter((st: any, idx: number) => {
+          // Trước đây có kiểm tra giới hạn tối đa 2 suất/ca/phòng trong cùng ngày.
+          // Theo yêu cầu hiện tại, bỏ ràng buộc này để cho phép thêm không giới hạn trong một ca.
+          // Vẫn giữ nguyên các kiểm tra thời gian hợp lệ và tránh trùng suất chiếu ở phía trên.
+          normalizedShowTimes.filter((st: any, idx: number) => {
             if (idx === i) return false;
             const sameDate = this.dateKeyUTC(st.date) === dateStr;
             const sameRoom = st.room.toString() === incoming.room.toString();
@@ -138,11 +141,6 @@ class ShowtimeService {
             const stMin = hh * 60 + mm;
             return stMin >= sessionStartMin! && stMin < sessionEndMin!;
           });
-          if (alsoIncoming.length >= 2) {
-            throw new Error(
-              `Trong cùng ca đã đủ 2 suất cho phòng này (ngày ${new Date(incoming.date).toLocaleDateString("vi-VN")}). Vui lòng chọn ca khác hoặc ngày khác.`
-            );
-          }
         }
         doc = new Showtime({
           movieId: showtimeData.movieId,
@@ -240,12 +238,8 @@ class ShowtimeService {
             return startMin >= (sessionStartMin as number) && startMin < (sessionEndMin as number);
           });
 
+          // Bỏ giới hạn tối đa 2 suất/ca/phòng. Vẫn tiếp tục thêm suất chiếu nếu không trùng.
           const totalInSession = inThisSession.length + alsoIncoming.length;
-          if (totalInSession >= 2) {
-            throw new Error(
-              `Trong cùng ca đã đủ 2 suất cho phòng này (ngày ${new Date(incoming.date).toLocaleDateString("vi-VN")}). Vui lòng chọn ca khác hoặc ngày khác.`
-            );
-          }
 
           doc.showTimes.push(incoming);
         } else {

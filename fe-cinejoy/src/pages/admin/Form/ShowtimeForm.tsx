@@ -291,7 +291,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             ...listInSession,
             ...inFormSameSession
         ];
-        // giới hạn tối đa 2 suất/ca
+        // giới hạn tối đa 2 suất/ca (áp dụng cho tất cả ca)
         if (combined.length >= 2) {
             message.error('Trong một ca chỉ được tối đa 2 suất chiếu.');
             rows[rowIndex].sessionId = undefined;
@@ -316,23 +316,50 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
 
             // Thuật toán quét tìm gap
             let candidate = sStart;
+            
             for (const iv of intervals) {
                 if (iv.start > candidate) {
                     const gap = iv.start - candidate;
-                    if (gap >= required) { nextStartMin = candidate; break; }
+                    if (gap >= required) { 
+                        nextStartMin = candidate; 
+                        break; 
+                    }
                 }
-                if (iv.end > candidate) candidate = iv.end;
+                // Cập nhật candidate để tìm vị trí tiếp theo có thể đặt suất chiếu
+                candidate = Math.max(candidate, iv.end);
             }
+            
             // Nếu chưa chọn được, thử cuối ca
             if (nextStartMin === sStart) {
-                const endGap = (sEnd) - candidate;
+                let endGap;
+                // Xử lý ca đêm (kéo dài qua ngày)
+                if (sEnd <= sStart) {
+                    // Ca đêm: sEnd = 0, sStart = 20:30, cần tính gap từ candidate đến 24:00 + từ 00:00 đến sEnd
+                    const gapToMidnight = (24 * 60) - candidate;
+                    const gapFromMidnight = sEnd;
+                    endGap = gapToMidnight + gapFromMidnight;
+                } else {
+                    // Ca bình thường
+                    endGap = sEnd - candidate;
+                }
+                
+                const isNight = /đêm/i.test(session.name);
+                
                 if (endGap >= required) {
+                    // đủ chỗ trong khung ca -> đặt ở candidate (sau suất trước)
                     nextStartMin = candidate;
                 } else if (combined.length > 0) {
-                    message.error('Không còn khoảng trống phù hợp trong ca này cho phim đã chọn, chọn ca khác hoặc phim có thời lượng ngắn hơn.');
-                    rows[rowIndex].sessionId = undefined;
-                    form.setFieldValue('showTimes', rows);
-                    return;
+                    if (isNight) {
+                        // QUAN TRỌNG: cho phép ca đêm lấn quá giờ ca
+                        // vẫn xếp ngay SAU suất trước (candidate), dù endGap không đủ
+                        nextStartMin = candidate;
+                    } else {
+                        // các ca khác giữ nguyên ràng buộc cũ
+                        message.error('Không còn khoảng trống phù hợp trong ca này cho phim đã chọn, chọn ca khác hoặc phim có thời lượng ngắn hơn.');
+                        rows[rowIndex].sessionId = undefined;
+                        form.setFieldValue('showTimes', rows);
+                        return;
+                    }   
                 }
             }
         }

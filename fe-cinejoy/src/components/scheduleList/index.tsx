@@ -111,6 +111,7 @@ const ScheduleList: React.FC = () => {
           const movie = st.movieId as IMovie;
           const theaterData = st.theaterId as ITheater;
 
+
           return st.showTimes.map((innerSt) => ({
             ...innerSt,
             parentId: st._id, // Add parent document ID
@@ -120,6 +121,7 @@ const ScheduleList: React.FC = () => {
             genre: movie.genre,
             theaterId: theaterData._id,
             theaterName: theaterData.name,
+            room: typeof innerSt.room === 'string' ? innerSt.room : (innerSt.room as { name?: string; _id?: string })?.name || (innerSt.room as { name?: string; _id?: string })?._id || 'Unknown Room',
           }));
         })
         .flat();

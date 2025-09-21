@@ -14,20 +14,10 @@ interface SeatProps {
   onSeatsLoaded?: (seatData: any) => void;
 }
 
-interface SeatData {
-  seatId: string;
-  status: "available" | "occupied" | "reserved";
-  type: "standard" | "vip" | "couple";
-  price: number;
-  number: number;
-}
 
 interface SeatLayout {
-  rows: string[];
-  layout: Record<string, SeatData[]>;
-  totalSeats: number;
-  availableSeats: number;
-  occupiedSeats: number;
+  rows: number;
+  cols: number;
 }
 
 // Danh sách hàng và số ghế mỗi hàng (fallback values)
@@ -56,7 +46,6 @@ const seatImages: Record<string, string> = {
 };
 
 const Seat: React.FC<SeatProps> = ({
-  selectedSeats,
   soldSeats,
   onSelect,
   showtimeId,
@@ -95,7 +84,6 @@ const Seat: React.FC<SeatProps> = ({
         setLoading(true);
         setError(null);
         // Call the API to get seats
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         console.log("Calling API with params:", {
           showtimeId,
           date,
@@ -114,20 +102,8 @@ const Seat: React.FC<SeatProps> = ({
           // Cast the API response to match our SeatLayout interface
           const apiSeatLayout = response.data.seatLayout;
           const typedSeatLayout: SeatLayout = {
-            ...apiSeatLayout,
-            layout: Object.fromEntries(
-              Object.entries(apiSeatLayout.layout).map(([row, seats]) => [
-                row,
-                seats.map((seat) => ({
-                  ...seat,
-                  status: seat.status as
-                    | "available"
-                    | "occupied"
-                    | "reserved",
-                  type: seat.type as "standard" | "vip" | "couple",
-                })),
-              ])
-            ),
+            rows: apiSeatLayout.rows,
+            cols: apiSeatLayout.cols,
           };
 
           setSeatLayout(typedSeatLayout);
@@ -149,45 +125,20 @@ const Seat: React.FC<SeatProps> = ({
   }, [showtimeId, date, startTime, room]); // Removed onSeatsLoaded from dependencies
 
   const getSeatStatus = (seatName: string) => {
-    // Note: selectedSeats functionality removed - no longer using "selected" status
-
-    // Check API data first if available
-    if (seatLayout) {
-      const row = seatName.charAt(0);
-      const seatNumber = parseInt(seatName.substring(1));
-      const rowSeats = seatLayout.layout[row];
-
-      if (rowSeats) {
-        const seat = rowSeats.find((s) => s.number === seatNumber);
-        if (seat) {
-          switch (seat.status) {
-            case "occupied":
-              return "sold";
-            case "reserved":
-              return "holding";
-            default:
-              return "empty";
-          }
-        }
-      }
-    }
-
-    // Fallback to soldSeats prop (for static data)
+    // Check if seat is sold
     if (soldSeats.includes(seatName)) return "sold";
 
     return "empty";
   };
 
-  // Determine which rows and seats to render
+  // Determine which rows and seats to render based on backend data
   const renderRows = seatLayout
-    ? seatLayout.rows
+    ? Array.from({ length: seatLayout.rows }, (_, i) => String.fromCharCode(65 + i)) // A, B, C, D, E, F, G, H, I, J, K, L...
     : ["A", "B", "C", "D", "E", "F", "G", "H"];
+  
   const renderSeatsForRow = (row: string) => {
-    if (seatLayout && seatLayout.layout[row]) {
-      return seatLayout.layout[row];
-    }
-    // Fallback to static 10 seats per row
-    return Array.from({ length: 10 }, (_, i) => ({
+    const cols = seatLayout?.cols || 10;
+    return Array.from({ length: cols }, (_, i) => ({
       seatId: `${row}${i + 1}`,
       number: i + 1,
       status: "available" as const,
@@ -245,11 +196,11 @@ const Seat: React.FC<SeatProps> = ({
                                         }
                                     `}
                   onClick={() => {
-                    if (status !== "sold" && status !== "holding") {
+                    if (status !== "sold") {
                       onSelect(seatName);
                     }
                   }}
-                  disabled={status === "sold" || status === "holding"}
+                  disabled={status === "sold"}
                   type="button"
                 >
                   <img

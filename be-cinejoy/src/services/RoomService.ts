@@ -43,6 +43,15 @@ class RoomService {
         } 
     }): Promise<IRoom> {
         const { seatLayout, ...roomDataOnly } = roomData;
+        
+        // Add seatLayout structure to room data
+        if (seatLayout) {
+            (roomDataOnly as any).seatLayout = {
+                rows: seatLayout.rows,
+                cols: seatLayout.cols
+            };
+        }
+        
         const room = new Room(roomDataOnly);
         const savedRoom = await room.save();
 

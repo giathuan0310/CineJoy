@@ -8,6 +8,10 @@ export interface IRoom extends Document {
     roomType: '2D' | '4DX';
     status: 'active' | 'maintenance' | 'inactive';
     description?: string;
+    seatLayout: {
+        rows: number;
+        cols: number;
+    };
     createdAt: Date;
     updatedAt: Date;
 }
@@ -47,6 +51,20 @@ const RoomSchema = new Schema<IRoom>(
             type: String,
             maxlength: [500, 'Mô tả không được quá 500 ký tự'],
             trim: true
+        },
+        seatLayout: {
+            rows: {
+                type: Number,
+                required: [true, 'Số dòng ghế là bắt buộc'],
+                min: [4, 'Số dòng tối thiểu là 4'],
+                max: [20, 'Số dòng tối đa là 20']
+            },
+            cols: {
+                type: Number,
+                required: [true, 'Số ghế mỗi dòng là bắt buộc'],
+                min: [5, 'Số ghế mỗi dòng tối thiểu là 5'],
+                max: [25, 'Số ghế mỗi dòng tối đa là 25']
+            }
         }
     },
     {

@@ -348,7 +348,7 @@ const CardInfMovie = () => {
               </button>
             </div>
             <ul className="space-y-4 pb-4">
-              {filteredMovies.map((item) => (
+              {filteredMovies.filter((item) => item._id !== movie?._id).map((item) => (
                 <li
                   key={item._id}
                   className={`flex items-center gap-3 rounded-lg p-2 border-b mx-2 cursor-pointer transition-colors ${

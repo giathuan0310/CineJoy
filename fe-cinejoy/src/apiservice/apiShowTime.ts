@@ -144,20 +144,8 @@ export const getSeatsForShowtimeApi = async (
         price: number;
       }>;
       seatLayout: {
-        rows: string[];
-        layout: Record<
-          string,
-          Array<{
-            seatId: string;
-            number: number;
-            status: string;
-            type: string;
-            price: number;
-          }>
-        >;
-        totalSeats: number;
-        availableSeats: number;
-        occupiedSeats: number;
+        rows: number;
+        cols: number;
       };
     }>
   >(`/showtimes/${showtimeId}/seats?${params.toString()}`);

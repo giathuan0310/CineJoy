@@ -119,7 +119,7 @@ const MoviesListCarousel = (props: IProps) => {
           containerClass="pb-12"
         >
           {movies
-            .filter((movie) => movie.status === props.status)
+            .filter((movie) => movie.status === props.status || movie.status === "Suất chiếu đặc biệt")
             .map((movie, index) => {
               return (
                 <Link to={`/movies/${movie._id}`} key={movie._id}>

@@ -13,17 +13,10 @@ export const SelectSeat = () => {
   const { isDarkMode } = useAppStore();
   const { movie, cinema, date, time, room, showtimeId } = location.state || {};
 
-  const displayTime = time;
-  const getUtcTimeForApi = (vietnamTime: string) => {
-    if (!vietnamTime) return vietnamTime;
-    const [hour, minute] = vietnamTime.split(":").map(Number);
-    const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
-    return `${utcHour.toString().padStart(2, "0")}:${minute
-      .toString()
-      .padStart(2, "0")}`;
-  };
 
-  const utcTimeForApi = getUtcTimeForApi(time);
+  const displayTime = time;
+  // Không cần chuyển đổi UTC vì time đã là giờ địa phương
+  const apiTime = time; // Sử dụng trực tiếp time từ location.state
 
   const handleSelectSeat = (seat: string) => {
     setSelectedSeats((prev) =>
@@ -61,7 +54,7 @@ export const SelectSeat = () => {
           selectedSeatPrice={90000}
           showtimeId={showtimeId}
           date={date}
-          startTime={utcTimeForApi}
+          startTime={apiTime}
           room={room}
           onSeatsLoaded={handleSeatsLoaded}
         />
@@ -83,7 +76,7 @@ export const SelectSeat = () => {
                 seats: selectedSeats,
                 cinema,
                 date: date,
-                time: utcTimeForApi,
+                time: apiTime,
                 room: room,
               },
             })

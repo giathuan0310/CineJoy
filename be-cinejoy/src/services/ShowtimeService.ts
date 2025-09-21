@@ -86,7 +86,6 @@ class ShowtimeService {
             const roomDoc = await RoomModel.findById(incoming.room).select("name");
             const roomLabel = roomDoc?.name || String(incoming.room);
             const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
-            console.log('🚫 Throwing duplicate error (new doc):', errorMessage);
             throw new Error(errorMessage);
           }
           
@@ -167,7 +166,6 @@ class ShowtimeService {
           const roomDoc = await RoomModel.findById(incoming.room).select("name");
           const roomLabel = roomDoc?.name || String(incoming.room);
           const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
-          console.log('🚫 Throwing duplicate error:', errorMessage);
           throw new Error(errorMessage);
         }
 
@@ -418,12 +416,7 @@ class ShowtimeService {
       // Tìm suất chiếu cụ thể trong array showTimes
       const targetDate = new Date(date);
 
-      console.log("Target search:", {
-        date,
-        startTime,
-        room,
-        targetDate: targetDate.toDateString(),
-      });
+
 
       const specificShowtime = showtime.showTimes.find((st) => {
         // So sánh ngày
@@ -451,42 +444,24 @@ class ShowtimeService {
         } else {
           // Nếu startTime chỉ là thời gian (HH:mm) 24-hour format
           const showStartTime = new Date(st.start);
-          const showTimeHour = showStartTime.getUTCHours();
-          const showTimeMin = showStartTime.getUTCMinutes();
+          // Convert UTC time to local time for comparison
+          const showTimeHour = showStartTime.getHours(); // Use getHours() instead of getUTCHours()
+          const showTimeMin = showStartTime.getMinutes(); // Use getMinutes() instead of getUTCMinutes()
           const [targetHour, targetMin] = startTime.split(":").map(Number);
           timeMatch = showTimeHour === targetHour && showTimeMin === targetMin;
 
-          console.log("Time comparison details:", {
-            showTimeHour,
-            showTimeMin,
-            targetHour,
-            targetMin,
-            timeMatch,
-          });
         }
 
-        // So sánh phòng
-        const roomMatch = room ? st.room.toString() === room : true;
+        // So sánh phòng - st.room đã được populate thành object có name
+        const roomMatch = room ? (st.room as any)?.name === room : true;
 
-        console.log("Comparing showtime:", {
-          showDate: showDate.toDateString(),
-          targetDate: targetDate.toDateString(),
-          dateMatch,
-          showStart: st.start,
-          targetStart: startTime,
-          timeMatch,
-          roomMatch,
-          room: st.room,
-        });
 
         return dateMatch && timeMatch && roomMatch;
       });
 
-      console.log("Specific showtime found:", specificShowtime ? "YES" : "NO");
 
       if (!specificShowtime) {
         // Không tìm thấy suất chiếu phù hợp - trả về null thay vì fake data
-        console.log("No matching showtime found for the given parameters");
         return null;
       }
 
@@ -494,9 +469,6 @@ class ShowtimeService {
       let seatData;
       if (!specificShowtime.seats || specificShowtime.seats.length === 0) {
         // Nếu chưa có ghế trong database, tạo ghế mặc định (all available)
-        console.log(
-          "No seats in database, generating and saving default available seats"
-        );
         seatData = this.generateDefaultSeats();
 
         // Tự động lưu ghế mặc định vào database
@@ -535,11 +507,9 @@ class ShowtimeService {
         if (showtimeIndex !== -1) {
           showtime.showTimes[showtimeIndex].seats = seatData;
           await showtime.save();
-          console.log("Auto-saved default seats to database");
         }
       } else {
         // Sử dụng dữ liệu ghế thật từ database
-        console.log("Using actual seat data from database");
         seatData = specificShowtime.seats;
       }
 
@@ -554,7 +524,23 @@ class ShowtimeService {
           room: specificShowtime.room,
         },
         seats: seatData,
-        seatLayout: this.generateSeatLayout(seatData),
+        seatLayout: await (async () => {
+          const roomLayout = await RoomModel.findById((specificShowtime.room as any)._id).select('seatLayout');
+          
+          // Check if room has seatLayout, if not, use default values
+          if (roomLayout && roomLayout.seatLayout) {
+            return {
+              rows: roomLayout.seatLayout.rows,
+              cols: roomLayout.seatLayout.cols
+            };
+          } else {
+            // Default fallback for old rooms without seatLayout
+            return {
+              rows: 8,
+              cols: 15
+            };
+          }
+        })(),
       };
     } catch (error) {
       throw error;
@@ -562,14 +548,52 @@ class ShowtimeService {
   }
 
   // Tạo layout ghế theo hàng (A, B, C, D, E, F, G, H)
-  private generateSeatLayout(seats: any[]): any {
+  private async generateSeatLayout(seats: any[], roomId: string): Promise<any> {
+    
     const layout: any = {};
     const rows = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+    // Get room layout from database once
+    const room = await RoomModel.findById(roomId).select('seatLayout');
+    const seatsPerRow = room?.seatLayout?.cols || 15; // Default to 15 if not found
+
     // Group seats by row
-    seats.forEach((seat) => {
-      const seatNumber = parseInt(seat.seatId.substring(1)); // Extract number from A1, B2, etc.
-      const row = seat.seatId.charAt(0); // Extract letter A, B, C, etc.
+    for (let i = 0; i < seats.length; i++) {
+      const seat = seats[i];
+      // Check if we have seat identifier (could be seatId or seat property)
+      let seatIdentifier = seat.seatId || seat.seat;
+      
+      if (!seatIdentifier) {
+        continue; // Skip this seat
+      }
+      
+      // If seatIdentifier is ObjectId, generate a default layout
+      if (typeof seatIdentifier === 'object' || seatIdentifier.toString().includes('ObjectId') || seatIdentifier.length === 24) {
+        // Generate default seat layout based on seat index
+        const seatIndex = i;
+        
+        const rowIndex = Math.floor(seatIndex / seatsPerRow);
+        const colIndex = seatIndex % seatsPerRow;
+        const row = String.fromCharCode(65 + rowIndex); // A, B, C, D, E, F, G, H
+        const seatNumber = colIndex + 1;
+        
+        if (!layout[row]) {
+          layout[row] = [];
+        }
+        
+        layout[row].push({
+          seatId: `${row}${seatNumber}`,
+          number: seatNumber,
+          status: seat.status || "available",
+          type: seat.type || "standard",
+          price: seat.price || 90000,
+        });
+        continue;
+      }
+      
+      // Original logic for seatId format like "A1", "B2"
+      const seatNumber = parseInt(seatIdentifier.substring(1)); // Extract number from A1, B2, etc.
+      const row = seatIdentifier.charAt(0); // Extract letter A, B, C, etc.
 
       if (!layout[row]) {
         layout[row] = [];
@@ -582,14 +606,14 @@ class ShowtimeService {
         type: seat.type, // standard, vip, couple
         price: seat.price,
       });
-    });
+    }
 
     // Sort seats in each row by number
     Object.keys(layout).forEach((row) => {
       layout[row].sort((a: any, b: any) => a.number - b.number);
     });
 
-    return {
+    const result = {
       rows: rows.filter((row) => layout[row]), // Only include rows that have seats
       layout: layout,
       totalSeats: seats.length,
@@ -597,6 +621,9 @@ class ShowtimeService {
         .length,
       occupiedSeats: seats.filter((seat) => seat.status === "occupied").length,
     };
+    
+    
+    return result;
   }
 
   // Helper method để so sánh thời gian linh hoạt

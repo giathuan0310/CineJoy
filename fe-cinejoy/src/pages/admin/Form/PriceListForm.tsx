@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import type { InputRef } from 'antd';
 import { Modal, Form, Input, DatePicker, Button, Table, InputNumber, Select, message } from "antd";
 
 // CSS để ẩn scrollbar
@@ -53,6 +54,10 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
   const [products, setProducts] = useState<IProductsForPriceList>({ combos: [], singleProducts: [] });
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [existingPriceLists, setExistingPriceLists] = useState<IPriceList[]>([]);
+  const hasActivePriceList = useMemo(() => existingPriceLists.some(pl => pl.status === 'active'), [existingPriceLists]);
+  const today = useMemo(() => dayjs().startOf('day'), []);
+  const lockStartToday = useMemo(() => !priceList && !hasActivePriceList, [priceList, hasActivePriceList]);
+  const nameInputRef = useRef<InputRef>(null);
 
   // Function to initialize all price lines for new price list
   const initializeAllPriceLines = useCallback(() => {
@@ -119,16 +124,14 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
     loadProducts();
   }, []);
 
-  // Load existing price lists for date validation (only for new price list)
+  // Load existing price lists for date validation (used for both add and edit)
   useEffect(() => {
     const loadExistingPriceLists = async () => {
-      if (!priceList) {
-        try {
-          const data = await getAllPriceLists();
-          setExistingPriceLists(data);
-        } catch (error) {
-          console.error("Error loading existing price lists:", error);
-        }
+      try {
+        const data = await getAllPriceLists();
+        setExistingPriceLists(data);
+      } catch (error) {
+        console.error("Error loading existing price lists:", error);
       }
     };
 
@@ -153,13 +156,25 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
       setLines(priceList.lines);
     } else {
       // Creating new price list
+      const defaultStart = hasActivePriceList ? today.add(1, 'day') : today;
+      const defaultEnd = defaultStart.add(1, 'month');
       form.setFieldsValue({
         name: "",
-        dateRange: [dayjs().add(1, 'day'), dayjs().add(1, 'month')],
+        dateRange: [defaultStart, defaultEnd],
       });
       // Lines will be initialized by the useEffect that depends on products
     }
-  }, [priceList, form]);
+  }, [priceList, form, hasActivePriceList]);
+
+  // Focus tên bảng giá khi mở modal Thêm
+  useEffect(() => {
+    if (!priceList) {
+      const t = setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [priceList]);
 
   const handleSubmit = async () => {
     try {
@@ -490,7 +505,7 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
           label="Tên bảng giá"
           rules={[{ required: true, message: "Vui lòng nhập tên bảng giá" }]}
         >
-          <Input placeholder="Ví dụ: Bảng giá T10/2025" />
+          <Input placeholder="Ví dụ: Bảng giá T10/2025" ref={nameInputRef} />
         </Form.Item>
 
         <Form.Item
@@ -502,24 +517,63 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
             style={{ width: '100%' }}
             format="DD/MM/YYYY"
             placeholder={['Ngày bắt đầu', 'Ngày kết thúc (có thể cùng ngày)']}
+            allowClear={false}
+            inputReadOnly={lockStartToday}
+            onCalendarChange={(dates) => {
+              if (!dates) return;
+              if (lockStartToday) {
+                const end = dates[1] && dayjs(dates[1]);
+                const clampedEnd = end && end.isAfter(today, 'day') ? end : (dates[0] && dayjs(dates[0]).isAfter(today, 'day') ? dayjs(dates[0]) : today.add(7, 'day'));
+                // Giữ start = hôm nay, chỉ cho thay đổi end
+                form.setFieldsValue({ dateRange: [today, clampedEnd || today.add(1, 'day')] });
+              }
+            }}
+            onChange={(dates) => {
+              if (!dates) return;
+              if (lockStartToday) {
+                const end = dates[1] || dates[0];
+                form.setFieldsValue({ dateRange: [today, end || today.add(1, 'day')] });
+              }
+            }
+            }
             disabledDate={(current) => {
               if (!current) return false;
               
+              // When editing: allow selecting any day within the original range of this price list
+              if (priceList) {
+                const originalStart = dayjs(priceList.startDate).startOf('day');
+                const originalEnd = dayjs(priceList.endDate).endOf('day');
+                if (
+                  current.isSame(originalStart, 'day') ||
+                  current.isSame(originalEnd, 'day') ||
+                  (current.isAfter(originalStart, 'day') && current.isBefore(originalEnd, 'day'))
+                ) {
+                  return false;
+                }
+              }
+
               // Disable past dates
-              if (current < dayjs().startOf('day')) {
+              if (current < today) {
                 return true;
               }
+
+              // For creating new price list: if there is no active list, allow selecting today; otherwise disable today
+              if (!priceList) {
+                if (hasActivePriceList && current <= today) return true;
+                // Nếu đang khóa theo quy tắc "bắt đầu hôm nay", đảm bảo không thể chọn start khác hôm nay
+                if (lockStartToday && current.isSame(today, 'day')) return false;
+              }
               
-              // For new price list, check conflicts with existing price lists
-              if (!priceList && existingPriceLists.length > 0) {
-                // Check if this specific date falls within any existing price list range
-                return existingPriceLists.some(priceList => {
-                  const existingStart = dayjs(priceList.startDate);
-                  const existingEnd = dayjs(priceList.endDate);
-                  
-                  // Check if current date is within the existing range (inclusive)
-                  return current.isSameOrAfter(existingStart, 'day') && 
-                         current.isSameOrBefore(existingEnd, 'day');
+              // Check conflicts with existing price lists (for both add and edit)
+              if (existingPriceLists.length > 0) {
+                return existingPriceLists.some(pl => {
+                  // When editing, ignore the current price list's own range
+                  if (priceList && pl._id === priceList._id) return false;
+                  const existingStart = dayjs(pl.startDate).startOf('day');
+                  const existingEnd = dayjs(pl.endDate).endOf('day');
+                  return current.isSame(existingStart, 'day') ||
+                         current.isSame(existingEnd, 'day') ||
+                         (current.isAfter(existingStart, 'day') && current.isBefore(existingEnd, 'day'));
                 });
               }
               
@@ -555,6 +609,12 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
           <div style={{ fontSize: 12, color: '#666' }}>
             <strong>Lưu ý:</strong>
             <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
+              {!priceList && !hasActivePriceList && (
+                <li>
+                  Hiện chưa có bảng giá đang hoạt động: Ngày bắt đầu được đặt cố định là
+                  <span style={{ fontWeight: 600 }}> hôm nay</span> và không thể chỉnh sửa (chỉ chọn ngày kết thúc).
+                </li>
+              )}
               <li>Bảng giá phải có đầy đủ 4 loại ghế: Thường, VIP, Cặp đôi, 4DX</li>
               <li>Giá sản phẩm/combo sẽ được lấy từ giá niêm yết nếu không nhập</li>
               <li>Trạng thái mặc định là "Chờ hiệu lực" (Scheduled)</li>

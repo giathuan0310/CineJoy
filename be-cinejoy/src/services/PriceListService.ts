@@ -17,24 +17,54 @@ export interface IUpdatePriceListData {
 }
 
 class PriceListService {
+  private computeStatusByDate(startDate: Date, endDate: Date): 'scheduled' | 'active' | 'expired' {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    if (end < today) return 'expired';
+    if (start <= today && today <= end) return 'active';
+    return 'scheduled';
+  }
+
+  // Đồng bộ trạng thái theo thời gian; chỉ cập nhật khi lệch
+  private async syncStatusIfNeeded(priceList: IPriceList): Promise<IPriceList> {
+    const expected = this.computeStatusByDate(priceList.startDate, priceList.endDate);
+    if (priceList.status !== expected) {
+      await PriceList.findByIdAndUpdate(priceList._id, { status: expected });
+      // phản ánh ngay trong object trả về
+      (priceList as any).status = expected;
+    }
+    return priceList;
+  }
+
   // Lấy tất cả bảng giá
   async getAllPriceLists(): Promise<IPriceList[]> {
-    return await PriceList.find().sort({ startDate: -1 });
+    const lists = await PriceList.find().sort({ startDate: -1 });
+    // Đồng bộ trạng thái trước khi trả về
+    const synced = await Promise.all(lists.map((pl) => this.syncStatusIfNeeded(pl)));
+    return synced;
   }
 
   // Lấy bảng giá theo ID
   async getPriceListById(id: string): Promise<IPriceList | null> {
-    return await PriceList.findById(id);
+    const pl = await PriceList.findById(id);
+    if (!pl) return null;
+    return await this.syncStatusIfNeeded(pl);
   }
 
   // Lấy bảng giá hiện tại (active)
   async getCurrentPriceList(): Promise<IPriceList | null> {
     const now = new Date();
-    return await PriceList.findOne({
+    const pl = await PriceList.findOne({
       startDate: { $lte: now },
-      endDate: { $gte: now },
-      status: 'active'
+      endDate: { $gte: now }
     });
+    if (!pl) return null;
+    return await this.syncStatusIfNeeded(pl);
   }
 
   // Tạo bảng giá mới

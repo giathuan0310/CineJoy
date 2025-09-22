@@ -86,15 +86,28 @@ const PaymentPage = () => {
     // Nếu dateString đã ở format DD/MM/YYYY thì return luôn
     if (dateString.includes("/")) return dateString;
 
-    // Nếu dateString ở format YYYY-MM-DD hoặc các format khác
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString; // Nếu không parse được thì return nguyên
+    try {
+      // Xử lý format YYYY-MM-DD
+      if (dateString.includes("-")) {
+        const [year, month, day] = dateString.split("-");
+        if (year && month && day) {
+          return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+        }
+      }
 
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear();
+      // Xử lý các format khác bằng Date object
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
 
-    return `${day}/${month}/${year}`;
+      const day = date.getDate().toString().padStart(2, "0");
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const year = date.getFullYear();
+
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString;
+    }
   };
 
   const handleApplyVoucher = async () => {
@@ -346,12 +359,16 @@ const PaymentPage = () => {
                 } shadow-sm border ${
                   isDarkMode ? "border-gray-700" : "border-gray-200"
                 }`}
+                style={{ 
+                  maxHeight: '400px', 
+                  overflowY: 'auto'
+                }}
               >
                 <table className={`w-full ${isDarkMode ? "" : "bg-[#e7ede7]"}`}>
-                  <thead>
+                  <thead className="sticky top-0 z-10">
                     <tr
                       className={`text-left select-none border-b ${
-                        isDarkMode ? "border-gray-600" : "border-gray-300"
+                        isDarkMode ? "border-gray-600 bg-[#1a1f2e]" : "border-gray-300 bg-gray-50"
                       }`}
                     >
                       <th
@@ -665,7 +682,7 @@ const PaymentPage = () => {
                 <div className="row flex justify-between text-sm">
                   <p className="label font-bold">Ngày chiếu:</p>
                   <p className={`value ${isDarkMode ? "text-gray-200" : ""}`}>
-                    {date}
+                    {formatDate(date)}
                   </p>
                 </div>
                 <div className="row flex justify-between text-sm">

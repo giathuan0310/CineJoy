@@ -1,12 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
+
+// CSS để ẩn scrollbar
+const hideScrollbarStyle = `
+  .hide-scrollbar .ant-modal-body::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar .ant-modal-body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+// Thêm CSS vào head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = hideScrollbarStyle;
+  document.head.appendChild(style);
+}
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
-import { Popconfirm, Modal, Table, Tag, Space, Descriptions } from "antd";
+import { Popconfirm, Modal, Table, Tag, Space, Descriptions, Form, Input, DatePicker, Button, message, ConfigProvider } from "antd";
+import dayjs from "dayjs";
+import viVN from 'antd/locale/vi_VN';
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addSingleProduct, addCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
+import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, checkTimeGaps, splitPriceListVersion } from "@/apiservice/apiPriceList";
 import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
 import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
 import createInstanceAxios from "@/services/axios.customize";
@@ -40,6 +61,7 @@ import UserForm from "@/pages/admin/Form/UserForm";
 import RoomForm from "./Form/RoomForm";
 import SeatForm from "./Form/SeatForm";
 import ShowSessionForm from "./Form/ShowSessionForm";
+import PriceListForm from "./Form/PriceListForm";
 import useAppStore from "@/store/app.store";
 
 const Dashboard: React.FC = () => {
@@ -105,9 +127,49 @@ const Dashboard: React.FC = () => {
     undefined
   );
   const [showSessionSubmitting, setShowSessionSubmitting] = useState<boolean>(false);
+  
+  // Price List states
+  const [priceLists, setPriceLists] = useState<IPriceList[]>([]);
+  const [priceListFormVisible, setPriceListFormVisible] = useState(false);
+  const [editingPriceList, setEditingPriceList] = useState<IPriceList | null>(null);
+  const [timeGapWarning, setTimeGapWarning] = useState<string | null>(null);
+  const [timeGaps, setTimeGaps] = useState<string[]>([]);
+  const [viewingPriceList, setViewingPriceList] = useState<IPriceList | null>(null);
+  const [priceListDetailVisible, setPriceListDetailVisible] = useState(false);
+  const [splitVersionModalVisible, setSplitVersionModalVisible] = useState(false);
+  const [splitVersionData, setSplitVersionData] = useState({
+    newName: '',
+    oldEndDate: '',
+    newStartDate: ''
+  });
+  
+  
   const { user } = useAppStore();
 
   const itemsPerPage = 5;
+
+  // Function to load price lists and check for time gaps
+  const loadPriceLists = async () => {
+    try {
+      const data = await getAllPriceLists();
+      setPriceLists(data);
+      
+      // Check for time gaps
+      const gapResult = await checkTimeGaps();
+      if (gapResult.hasGap) {
+        setTimeGapWarning(gapResult.message || "Có khoảng thời gian trống chưa có bảng giá");
+        setTimeGaps(gapResult.gaps || []);
+      } else {
+        setTimeGapWarning(null);
+        setTimeGaps([]);
+      }
+    } catch (error) {
+      console.error("Error fetching price lists:", error);
+      setPriceLists([]);
+      setTimeGapWarning(null);
+      setTimeGaps([]);
+    }
+  };
 
   useEffect(() => {
     getTheaters()
@@ -140,6 +202,7 @@ const Dashboard: React.FC = () => {
         console.error("Error fetching vouchers:", error);
         setVouchers([]);
       });
+    loadPriceLists();
     getBlogs()
       .then((data) => setBlogs(data))
       .catch((error) => {
@@ -488,7 +551,7 @@ const Dashboard: React.FC = () => {
       setSelectedShowSession(undefined);
     } catch (error) {
       console.error("Error submitting show session:", error);
-      toast.error(selectedShowSession ? "Cập nhật ca chiếu thất bại!" : (error as any)?.response?.data?.message);
+      toast.error(selectedShowSession ? (error as any)?.message : (error as any)?.response?.data?.message);
     } finally {
       setShowSessionSubmitting(false);
     }
@@ -502,6 +565,72 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error("Error deleting show session:", error);
       toast.error("Xóa ca chiếu thất bại!");
+    }
+  };
+
+  // Price List handlers
+  const handlePriceListSubmit = async (priceListData: any) => {
+    try {
+      if (editingPriceList) {
+        // Update
+        await updatePriceList(editingPriceList._id, priceListData);
+        toast.success("Cập nhật bảng giá thành công!");
+      } else {
+        // Create new
+        await createPriceList(priceListData);
+        toast.success("Thêm bảng giá thành công!");
+      }
+      
+      // Reload price lists
+      await loadPriceLists();
+      
+      setPriceListFormVisible(false);
+      setEditingPriceList(null);
+    } catch (error: any) {
+      console.error("Error submitting price list:", error);
+      // Hiển thị lỗi từ backend
+      toast.error(error?.message || "Có lỗi xảy ra!");
+    }
+  };
+
+  const handleDeletePriceList = async (priceListId: string) => {
+    try {
+      await deletePriceList(priceListId);
+      toast.success("Xóa bảng giá thành công!");
+      
+      // Reload price lists
+      await loadPriceLists();
+    } catch (error: any) {
+      console.error("Error deleting price list:", error);
+      toast.error(error?.response?.data?.message || "Xóa bảng giá thất bại!");
+    }
+  };
+
+  const handleViewPriceList = (priceList: IPriceList) => {
+    setViewingPriceList(priceList);
+    setPriceListDetailVisible(true);
+  };
+
+  const handleSplitVersion = async (splitData: {
+    newName: string;
+    oldEndDate: string;
+    newStartDate: string;
+  }) => {
+    if (!editingPriceList) return;
+    
+    try {
+      await splitPriceListVersion(editingPriceList._id, splitData);
+      toast.success("Tạo split version thành công!");
+      
+      // Reload price lists
+      await loadPriceLists();
+      
+      // Close modal
+      setSplitVersionModalVisible(false);
+      setEditingPriceList(null);
+    } catch (error: any) {
+      console.error("Error splitting price list version:", error);
+      toast.error(error?.message || "Tạo split version thất bại!");
     }
   };
 
@@ -883,6 +1012,7 @@ const Dashboard: React.FC = () => {
               { label: "Người dùng", value: "users", icon: "👥" },
               { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
+              { label: "Bảng giá", value: "priceLists", icon: "💰" },
             ].map((tab) => (
               <li
                 key={tab.value}
@@ -1997,6 +2127,171 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Price Lists Tab */}
+          {activeTab === "priceLists" && (
+            <div>
+              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                Quản lý bảng giá
+              </h2>
+              
+              {/* Time Gap Warning */}
+              {timeGapWarning && (
+                <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="text-yellow-600 mr-2 mt-1">⚠️</div>
+                    <div className="text-yellow-800">
+                      <div className="font-bold mb-2">Cảnh báo: {timeGapWarning}</div>
+                      {timeGaps.length > 0 && (
+                        <div className="ml-4">
+                          <ul className="list-disc list-inside space-y-2">
+                            {timeGaps.map((gap, index) => (
+                              <li key={index} className="text-sm bg-yellow-50 p-2 rounded border-l-4 border-yellow-300">
+                                {gap}
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="mt-3 text-xs text-yellow-600 italic">
+                            💡 Gợi ý: Tạo bảng giá mới hoặc điều chỉnh thời gian của các bảng giá hiện có để lấp đầy các khoảng trống này.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center mb-4">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm bảng giá..."
+                  className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                  onClick={() => {
+                    setEditingPriceList(null);
+                    setPriceListFormVisible(true);
+                  }}
+                >
+                  Thêm bảng giá
+                </button>
+              </div>
+              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-black text-white">
+                    <tr>
+                      <th className="p-3 text-left">STT</th>
+                      <th className="p-3 text-left">Tên bảng giá</th>
+                      <th className="p-3 text-left">Ngày bắt đầu</th>
+                      <th className="p-3 text-left">Ngày kết thúc</th>
+                      <th className="p-3 text-left">Trạng thái</th>
+                      <th className="p-3 text-left">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {priceLists
+                      .sort((a, b) => {
+                        // Sắp xếp: active lên đầu, sau đó theo thời gian tạo (mới nhất trước)
+                        if (a.status === 'active' && b.status !== 'active') return -1;
+                        if (b.status === 'active' && a.status !== 'active') return 1;
+                        return new Date(b.createdAt || b._id).getTime() - new Date(a.createdAt || a._id).getTime();
+                      })
+                      .filter((priceList) =>
+                        priceList.name.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((priceList, idx) => (
+                        <tr
+                          key={priceList._id}
+                          className="border-b hover:bg-gray-100"
+                        >
+                          <td className="p-3">{idx + 1}</td>
+                          <td className="p-3 font-medium">{priceList.name}</td>
+                          <td className="p-3">
+                            {new Date(priceList.startDate).toLocaleDateString("vi-VN")}
+                          </td>
+                          <td className="p-3">
+                            {new Date(priceList.endDate).toLocaleDateString("vi-VN")}
+                          </td>
+                          <td className="p-3">
+                            <Tag
+                              color={
+                                priceList.status === "active"
+                                  ? "green"
+                                  : priceList.status === "scheduled"
+                                  ? "blue"
+                                  : "red"
+                              }
+                            >
+                              {priceList.status === "active"
+                                ? "Đang hoạt động"
+                                : priceList.status === "scheduled"
+                                ? "Chờ hiệu lực"
+                                : "Đã hết hạn"}
+                            </Tag>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleViewPriceList(priceList)}
+                                className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600 mr-2"
+                              >
+                                Xem chi tiết
+                              </button>
+                              {priceList.status === "active" && (
+                                <button
+                                  onClick={() => {
+                                    setEditingPriceList(priceList);
+                                    setSplitVersionData({
+                                      newName: `${priceList.name} - Cập nhật`,
+                                      oldEndDate: '',
+                                      newStartDate: ''
+                                    });
+                                    setSplitVersionModalVisible(true);
+                                  }}
+                                  className="bg-purple-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-purple-600 mr-2"
+                                >
+                                  Tách phiên bản
+                                </button>
+                              )}
+                              {priceList.status === "scheduled" && (
+                                <button
+                                  onClick={() => {
+                                    setEditingPriceList(priceList);
+                                    setPriceListFormVisible(true);
+                                  }}
+                                  className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
+                                >
+                                  Sửa
+                                </button>
+                              )}
+                              {priceList.status === "scheduled" && (
+                                <Popconfirm
+                                  title="Xóa bảng giá"
+                                  description="Bạn có chắc chắn muốn xóa bảng giá này?"
+                                  onConfirm={() => handleDeletePriceList(priceList._id)}
+                                  okText="Xóa"
+                                  cancelText="Hủy"
+                                  okButtonProps={{ danger: true }}
+                                >
+                                  <button
+                                    className="bg-red-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-red-600"
+                                  >
+                                    Xóa
+                                  </button>
+                                </Popconfirm>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -2325,22 +2620,26 @@ const Dashboard: React.FC = () => {
       {showRoomModal && selectedTheaterForRooms && (
         <Modal
           title={
-            <div className="flex justify-between items-center">
-              <span>Phòng chiếu của rạp {selectedTheaterForRooms.name}</span>
-              <motion.button
-                onClick={() => {
-                  setShowRoomModal(false);
-                  setSelectedTheaterForRooms(null);
-                  setSelectedRoom(undefined);
-                  setPreSelectedTheater(selectedTheaterForRooms); // Fill sẵn rạp hiện tại
-                  setShowRoomForm(true);
-                }}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 cursor-pointer text-sm mr-8"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Thêm phòng mới
-              </motion.button>
+            <div>
+              <div className="text-center text-lg mb-3">
+                <span>Phòng chiếu của rạp {selectedTheaterForRooms.name}</span>
+              </div>
+              <div className="flex justify-end">
+                <motion.button
+                  onClick={() => {
+                    setShowRoomModal(false);
+                    setSelectedTheaterForRooms(null);
+                    setSelectedRoom(undefined);
+                    setPreSelectedTheater(selectedTheaterForRooms); // Fill sẵn rạp hiện tại
+                    setShowRoomForm(true);
+                  }}
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 cursor-pointer text-sm"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Thêm phòng
+                </motion.button>
+              </div>
             </div>
           }
           open={showRoomModal}
@@ -2476,6 +2775,337 @@ const Dashboard: React.FC = () => {
             setSelectedShowSession(undefined);
           }}
         />
+      )}
+
+      {/* Price List Form Modal */}
+      {priceListFormVisible && (
+        <PriceListForm
+          priceList={editingPriceList || undefined}
+          onSubmit={handlePriceListSubmit}
+          onCancel={() => {
+            setPriceListFormVisible(false);
+            setEditingPriceList(null);
+          }}
+        />
+      )}
+
+      {/* Price List Detail Modal */}
+      {priceListDetailVisible && viewingPriceList && (
+        <Modal
+          title={
+            <div style={{ textAlign: 'center', fontSize: '18px' }}>
+              Chi tiết bảng giá
+            </div>
+          }
+          open={true}
+          onCancel={() => {
+            setPriceListDetailVisible(false);
+            setViewingPriceList(null);
+          }}
+          footer={null}
+          width={900}
+          centered
+          bodyStyle={{ 
+            maxHeight: '70vh', 
+            overflowY: 'auto',
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // IE/Edge
+          }}
+          className="hide-scrollbar"
+        >
+          <div className="space-y-4">
+            {/* Thông tin cơ bản */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Thông tin cơ bản</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-medium text-gray-600">Tên bảng giá:</span>
+                  <p className="text-gray-800">{viewingPriceList.name}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Trạng thái:</span>
+                  <div className="mt-1">
+                    <Tag color={
+                      viewingPriceList.status === 'active' ? 'green' :
+                      viewingPriceList.status === 'scheduled' ? 'blue' : 'red'
+                    }>
+                      {viewingPriceList.status === 'active' ? 'Đang hoạt động' :
+                       viewingPriceList.status === 'scheduled' ? 'Chờ hiệu lực' : 'Đã hết hạn'}
+                    </Tag>
+                  </div>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Ngày bắt đầu:</span>
+                  <p className="text-gray-800">{new Date(viewingPriceList.startDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Ngày kết thúc:</span>
+                  <p className="text-gray-800">{new Date(viewingPriceList.endDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Danh sách giá */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Danh sách giá</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-200">
+                      <th className="border border-gray-300 p-2 text-left">Loại</th>
+                      <th className="border border-gray-300 p-2 text-left">Sản phẩm / Loại ghế</th>
+                      <th className="border border-gray-300 p-2 text-left">Giá (VNĐ)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewingPriceList.lines.map((line, index) => (
+                      <tr key={index} className="hover:bg-gray-100">
+                        <td className="border border-gray-300 p-2">
+                          <Tag color={
+                            line.type === 'ticket' ? 'blue' :
+                            line.type === 'combo' ? 'green' : 'orange'
+                          }>
+                            {line.type === 'ticket' ? 'Vé xem phim' :
+                             line.type === 'combo' ? 'Combo' : 'Sản phẩm'}
+                          </Tag>
+                        </td>
+                        <td className="border border-gray-300 p-2">
+                          {line.type === 'ticket' ? (
+                            <span className="font-medium">
+                              {line.seatType === 'normal' ? 'Ghế thường' :
+                               line.seatType === 'vip' ? 'Ghế VIP' :
+                               line.seatType === 'couple' ? 'Ghế cặp đôi' : 'Ghế 4DX'}
+                            </span>
+                          ) : (
+                            <span className="font-medium">{line.productName}</span>
+                          )}
+                        </td>
+                        <td className="border border-gray-300 p-2">
+                          <span className="font-semibold text-green-600">
+                            {line.price.toLocaleString('vi-VN')} VNĐ
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Tách phiên bản */}
+      {splitVersionModalVisible && editingPriceList && (
+        <Modal
+          title={
+            <div style={{ textAlign: 'center', fontSize: '18px' }}>
+              Tách phiên bản
+            </div>
+          }
+          open={true}
+          onCancel={() => {
+            setSplitVersionModalVisible(false);
+            setEditingPriceList(null);
+          }}
+          footer={null}
+          width={900}
+          centered
+          bodyStyle={{ 
+            maxHeight: '70vh', 
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+          className="hide-scrollbar"
+        >
+          <div className="space-y-6">
+            {/* Thông tin bảng giá hiện tại */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá hiện tại (sẽ kết thúc)</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-medium text-gray-600">Tên:</span>
+                  <p className="text-gray-800">{editingPriceList.name}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Trạng thái:</span>
+                  <br />
+                  <Tag color="green">Đang hoạt động</Tag>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Ngày bắt đầu:</span>
+                  <p className="text-gray-800">{new Date(editingPriceList.startDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Ngày kết thúc hiện tại:</span>
+                  <p className="text-gray-800">{new Date(editingPriceList.endDate).toLocaleDateString('vi-VN')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form tạo bảng giá mới */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá mới (sẽ thay thế)</h3>
+              <ConfigProvider locale={viVN}>
+                <Form layout="vertical">
+                  <Form.Item
+                    label="Tên bảng giá mới"
+                    required
+                    tooltip="Tên của bảng giá mới sẽ được tạo"
+                  >
+                    <Input
+                      value={splitVersionData.newName}
+                      onChange={(e) => setSplitVersionData({...splitVersionData, newName: e.target.value})}
+                      placeholder="Nhập tên bảng giá mới"
+                    />
+                  </Form.Item>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <Form.Item
+                      label="Ngày kết thúc bảng giá cũ"
+                      required
+                      tooltip="Ngày mà bảng giá hiện tại sẽ kết thúc (không được chọn ngày trong quá khứ)"
+                    >
+                      <DatePicker
+                        value={splitVersionData.oldEndDate ? dayjs(splitVersionData.oldEndDate) : null}
+                        onChange={(date) => {
+                          const oldEndDate = date ? date.format('YYYY-MM-DD') : '';
+                          const newStartDate = date ? date.add(1, 'day').format('YYYY-MM-DD') : '';
+                          setSplitVersionData({
+                            ...splitVersionData, 
+                            oldEndDate,
+                            newStartDate
+                          });
+                        }}
+                        className="w-full"
+                        placeholder="Chọn ngày kết thúc"
+                        format="DD/MM/YYYY"
+                        disabledDate={(current) => {
+                          // Disable ngày trong quá khứ (trước hôm nay)
+                          return current && current < dayjs().startOf('day');
+                        }}
+                      />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      label="Ngày bắt đầu bảng giá mới"
+                      required
+                      tooltip="Tự động tính từ ngày kết thúc bảng giá cũ + 1 ngày (không thể chỉnh sửa)"
+                    >
+                      <DatePicker
+                        value={splitVersionData.newStartDate ? dayjs(splitVersionData.newStartDate) : null}
+                        onChange={() => {}} // Không cho phép thay đổi
+                        className="w-full"
+                        placeholder="Tự động tính"
+                        format="DD/MM/YYYY"
+                        disabled={true}
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <div className="bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
+                    <div className="flex">
+                      <div className="text-yellow-600 mr-2">⚠️</div>
+                      <div className="text-yellow-800 text-sm">
+                        <strong>Lưu ý:</strong> Bảng giá mới sẽ được tạo với cùng nội dung giá như bảng giá hiện tại. 
+                        Bạn có thể chỉnh sửa giá sau khi tạo.
+                      </div>
+                    </div>
+                  </div>
+                </Form>
+              </ConfigProvider>
+            </div>
+
+            {/* Preview thay đổi */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Xem trước thay đổi</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tên bảng giá mới:</span>
+                  <span className="font-medium">
+                    {splitVersionData.newName || 'Chưa nhập'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Bảng giá cũ sẽ kết thúc:</span>
+                  <span className="font-medium">
+                    {splitVersionData.oldEndDate ? new Date(splitVersionData.oldEndDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Bảng giá mới sẽ bắt đầu:</span>
+                  <span className="font-medium">
+                    {splitVersionData.newStartDate ? new Date(splitVersionData.newStartDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button
+                onClick={() => {
+                  setSplitVersionModalVisible(false);
+                  setEditingPriceList(null);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="primary"
+                onClick={() => {
+                  if (!splitVersionData.newName || !splitVersionData.oldEndDate || !splitVersionData.newStartDate) {
+                    message.error("Vui lòng điền đầy đủ thông tin");
+                    return;
+                  }
+
+                  // Validation ngày
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  
+                  const oldEndDate = new Date(splitVersionData.oldEndDate);
+                  oldEndDate.setHours(0, 0, 0, 0);
+                  
+                  const newStartDate = new Date(splitVersionData.newStartDate);
+                  newStartDate.setHours(0, 0, 0, 0);
+
+                  if (oldEndDate < today) {
+                    message.error(`Ngày kết thúc bảng giá cũ (${oldEndDate.toLocaleDateString('vi-VN')}) không thể là ngày trong quá khứ. Ngày hiện tại là ${today.toLocaleDateString('vi-VN')}`);
+                    return;
+                  }
+
+                  if (newStartDate < today) {
+                    message.error(`Ngày bắt đầu bảng giá mới (${newStartDate.toLocaleDateString('vi-VN')}) không thể là ngày trong quá khứ. Ngày hiện tại là ${today.toLocaleDateString('vi-VN')}`);
+                    return;
+                  }
+
+                  if (oldEndDate >= newStartDate) {
+                    message.error("Ngày kết thúc bảng giá cũ phải trước ngày bắt đầu bảng giá mới");
+                    return;
+                  }
+
+                  // Kiểm tra ngày bắt đầu bảng giá mới không được sau ngày kết thúc ban đầu
+                  const originalEndDate = new Date(editingPriceList.endDate);
+                  originalEndDate.setHours(0, 0, 0, 0);
+                  
+                  if (newStartDate >= originalEndDate) {
+                    message.error(`Ngày bắt đầu bảng giá mới (${newStartDate.toLocaleDateString('vi-VN')}) phải trước ngày kết thúc ban đầu (${originalEndDate.toLocaleDateString('vi-VN')})`);
+                    return;
+                  }
+
+                  // Không cần kiểm tra khoảng trống vì đã tự động tính (luôn cách nhau 1 ngày)
+
+                  handleSplitVersion(splitVersionData);
+                }}
+                style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}
+              >
+                Tạo phiên bản mới
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

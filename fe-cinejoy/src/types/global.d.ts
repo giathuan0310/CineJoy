@@ -303,4 +303,23 @@ declare global {
     returnUrl: string;
     cancelUrl: string;
   }
+
+  interface IPriceListLine {
+    type: 'ticket' | 'combo' | 'single';
+    seatType?: 'normal' | 'vip' | 'couple' | '4dx';
+    productId?: string;
+    productName?: string;
+    price: number;
+  }
+
+  interface IPriceList {
+    _id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    status: 'active' | 'scheduled' | 'expired';
+    lines: IPriceListLine[];
+    createdAt: string;
+    updatedAt: string;
+  }
 }

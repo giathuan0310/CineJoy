@@ -20,6 +20,7 @@ import PaymentRouter from "./routes/PaymentRouter";
 import RoomRouter from "./routes/RoomRouter";
 import SeatRouter from "./routes/SeatRouter";
 import ShowSessionRouter from "./routes/ShowSessionRouter";
+import PriceListRouter from "./routes/PriceListRouter";
 import momoConfig from "./configs/momoConfig";
 
 dotenv.config();
@@ -71,6 +72,7 @@ app.use("/regions", RegionRouter);
 app.use("/rooms", RoomRouter);
 app.use("/seats", SeatRouter);
 app.use("/show-sessions", ShowSessionRouter);
+app.use("/price-lists", PriceListRouter);
 app.use("/chatbot", chatbotRouter);
 
 // Start the server

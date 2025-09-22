@@ -34,17 +34,31 @@ export default class VoucherService {
   async redeemVoucher(userId: string, voucherId: string) {
     const voucher = await Voucher.findById(voucherId);
     if (!voucher) throw new Error("Voucher không tồn tại");
-    if (voucher.quantity <= 0) throw new Error("Voucher đã hết số lượng");
+    // Hỗ trợ cả cấu trúc cũ (quantity/pointToRedeem) và mới (lines[0].condition.quantity/points)
+    const firstLine = Array.isArray(voucher.lines) ? voucher.lines[0] as any : undefined;
+    const legacyQuantity: number | undefined = (voucher as any).quantity;
+    const structuredQuantity: number | undefined = firstLine?.condition?.quantity;
+    const availableQuantity = (legacyQuantity ?? structuredQuantity ?? 0) as number;
+    if (availableQuantity <= 0) throw new Error("Voucher đã hết số lượng");
 
     const user = await User.findById(userId);
     if (!user) throw new Error("User không tồn tại");
-    if ((user.point ?? 0) < voucher.pointToRedeem)
+    const legacyPoints: number | undefined = (voucher as any).pointToRedeem;
+    const structuredPoints: number | undefined = firstLine?.condition?.points;
+    const neededPoints = (legacyPoints ?? structuredPoints ?? 0) as number;
+    if ((user.point ?? 0) < neededPoints)
       throw new Error("Bạn không đủ điểm để đổi voucher này");
-    user.point = (user.point ?? 0) - voucher.pointToRedeem;
+    user.point = (user.point ?? 0) - neededPoints;
     await user.save();
 
-    voucher.quantity -= 1;
-    await voucher.save();
+    if (legacyQuantity !== undefined) {
+      (voucher as any).quantity = Math.max(0, legacyQuantity - 1);
+      await voucher.save();
+    } else if (structuredQuantity !== undefined) {
+      // Giảm quantity trong lines[0].condition.quantity
+      (voucher as any).lines[0].condition.quantity = Math.max(0, structuredQuantity - 1);
+      await voucher.save();
+    }
 
     const code = Math.random().toString(36).substring(2, 10).toUpperCase();
 

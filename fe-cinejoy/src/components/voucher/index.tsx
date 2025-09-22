@@ -197,9 +197,10 @@ const VoucherTab = () => {
                     </div>
                 ) : (() => {
                     const availableVouchers = vouchers.filter(voucher =>
-                        voucher.quantity > 0 &&
-                        dayjs(voucher.validityPeriod.startDate).isBefore(dayjs()) &&
-                        dayjs(voucher.validityPeriod.endDate).isAfter(dayjs())
+                        voucher.quantity! > 0 &&
+                        voucher.status === 'hoạt động' &&
+                        dayjs(voucher.validityPeriod?.startDate).isBefore(dayjs()) &&
+                        dayjs(voucher.validityPeriod?.endDate).isAfter(dayjs())
                     );
                     if (availableVouchers.length === 0) {
                         return <div className="text-center text-lg text-gray-400 py-6">Hiện chưa có voucher nào khả dụng.</div>;
@@ -221,7 +222,7 @@ const VoucherTab = () => {
                                         </div>
                                         <div className="flex items-center gap-2 text-sm mb-1">
                                             <span className="font-semibold">Thời hạn:</span>
-                                            <span>{dayjs(voucher.validityPeriod.startDate).format('DD/MM/YYYY')} - {dayjs(voucher.validityPeriod.endDate).format('DD/MM/YYYY')}</span>
+                                            <span>{dayjs(voucher.validityPeriod?.startDate).format('DD/MM/YYYY')} - {dayjs(voucher.validityPeriod?.endDate).format('DD/MM/YYYY')}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm mb-1">
                                             <span className="font-semibold">Điểm cần:</span>
@@ -229,11 +230,11 @@ const VoucherTab = () => {
                                         </div>
                                         <div className="flex-1" />
                                         <button
-                                            disabled={!enoughPoint || voucher.quantity <= 0}
+                                            disabled={!enoughPoint || voucher.quantity! <= 0}
                                             onClick={() => handleRedeemVoucher(voucher)}
                                             className={clsx(
                                                 'mt-2 px-4 py-2 rounded font-bold transition',
-                                                enoughPoint && voucher.quantity > 0
+                                                enoughPoint && voucher.quantity! > 0
                                                     ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white hover:brightness-110 shadow-lg cursor-pointer'
                                                     : 'bg-gray-300 dark:bg-gray-700 text-gray-400 cursor-not-allowed')
                                             }

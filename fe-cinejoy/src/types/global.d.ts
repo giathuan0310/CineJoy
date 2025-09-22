@@ -132,13 +132,44 @@ declare global {
   interface IVoucher {
     _id: string;
     name: string;
-    validityPeriod: {
-      startDate: string;
-      endDate: string;
+    validityPeriod?: {
+        startDate: Date;
+        endDate: Date;
     };
-    quantity: number;
-    discountPercent: number;
-    pointToRedeem: number;
+    status: 'hoạt động' | 'không hoạt động';
+    applyType: 'voucher' | 'combo' | 'ticket';
+    lines: {
+      description: string;
+      condition: {
+        // Cho voucher/combo
+        points?: number;
+        quantity?: number;
+        // Cho ticket
+        seatType?: 'normal' | 'vip' | 'couple' | '4dx';
+        // Cho combo
+        comboName?: string;
+        comboId?: string, 
+      };
+      discount: {
+        type: 'percent' | 'amount';
+        value: number;
+        maxValue?: number; // Chỉ có cho voucher
+      };
+      details: Array<{
+        // Cho ticket và combo
+        buyItem?: string;
+        buyQuantity?: number;
+        rewardItem?: string;
+        rewardItemId?: string;
+        rewardQuantity?: number;
+        rewardType?: 'free' | 'discount';
+        rewardDiscountPercent?: number;
+      }>;
+    }[];
+    // Các trường cũ để tương thích ngược (chỉ cho voucher)
+    quantity?: number;
+    discountPercent?: number;
+    pointToRedeem?: number;
   }
 
   interface IUserVoucher {

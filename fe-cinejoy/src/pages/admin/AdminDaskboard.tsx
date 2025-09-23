@@ -1128,20 +1128,20 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Poster</th>
-                      <th className="p-3 text-left">Tên phim</th>
-                      <th className="p-3 text-left">Ngày khởi chiếu</th>
-                      <th className="p-3 text-left">Ngày kết thúc</th>
-                      <th className="p-3 text-left">Thời lượng</th>
-                      <th className="p-3 text-left">Diễn Viên</th>
-                      <th className="p-3 text-left">Thể loại</th>
-                      <th className="p-3 text-left">Đạo diễn</th>
-                      <th className="p-3 text-left">Trạng thái</th>
-                      <th className="p-3 text-left">Ngôn Ngữ</th>
-                      <th className="p-3 text-left">Hành Động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Poster</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên phim</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày khởi chiếu</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày kết thúc</th>
+                      <th className="p-3 text-left font-semibold text-black">Thời lượng</th>
+                      <th className="p-3 text-left font-semibold text-black">Diễn Viên</th>
+                      <th className="p-3 text-left font-semibold text-black">Thể loại</th>
+                      <th className="p-3 text-left font-semibold text-black">Đạo diễn</th>
+                      <th className="p-3 text-left font-semibold text-black">Trạng thái</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngôn Ngữ</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành Động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1256,13 +1256,13 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tiêu đề</th>
-                      <th className="p-3 text-left">Ngày đăng</th>
-                      <th className="p-3 text-left">Nội dung</th>
-                      <th className="p-3 text-left">Ảnh</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Tiêu đề</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày đăng</th>
+                      <th className="p-3 text-left font-semibold text-black">Nội dung</th>
+                      <th className="p-3 text-left font-semibold text-black">Ảnh</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1335,15 +1335,15 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Loại</th>
-                      <th className="p-3 text-left">Tên</th>
-                      <th className="p-3 text-left">Giá</th>
-                      <th className="p-3 text-left">Mô tả</th>
-                      <th className="p-3 text-left">Số lượng</th>
-                      <th className="p-3 text-left">Hành động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Loại</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên</th>
+                      <th className="p-3 text-left font-semibold text-black">Giá</th>
+                      <th className="p-3 text-left font-semibold text-black">Mô tả</th>
+                      <th className="p-3 text-left font-semibold text-black">Số lượng</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1459,11 +1459,11 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên Khu vực</th>
-                      <th className="p-3 text-left">Hành Động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên Khu vực</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành Động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1567,14 +1567,14 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên rạp</th>
-                      <th className="p-3 text-left">Thành phố</th>
-                      <th className="p-3 text-left">Địa chỉ</th>
-                      <th className="p-3 text-left">Số phòng</th>
-                      <th className="p-3 text-left">Hành động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên rạp</th>
+                      <th className="p-3 text-left font-semibold text-black">Thành phố</th>
+                      <th className="p-3 text-left font-semibold text-black">Địa chỉ</th>
+                      <th className="p-3 text-left font-semibold text-black">Số phòng</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1912,17 +1912,17 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Avatar</th>
-                      <th className="p-3 text-left">Họ tên</th>
-                      <th className="p-3 text-left">Email</th>
-                      <th className="p-3 text-left">SĐT</th>
-                      <th className="p-3 text-left">Vai trò</th>
-                      <th className="p-3 text-left">Trạng thái</th>
-                      <th className="p-3 text-left">Điểm</th>
-                      <th className="p-3 text-left">Hành động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Avatar</th>
+                      <th className="p-3 text-left font-semibold text-black">Họ tên</th>
+                      <th className="p-3 text-left font-semibold text-black">Email</th>
+                      <th className="p-3 text-left font-semibold text-black">SĐT</th>
+                      <th className="p-3 text-left font-semibold text-black">Vai trò</th>
+                      <th className="p-3 text-left font-semibold text-black">Trạng thái</th>
+                      <th className="p-3 text-left font-semibold text-black">Điểm</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2032,15 +2032,15 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên ca chiếu</th>
-                      <th className="p-3 text-left">Thời gian bắt đầu</th>
-                      <th className="p-3 text-left">Thời gian kết thúc</th>
-                      <th className="p-3 text-left">Thời lượng</th>
-                      <th className="p-3 text-left">Ngày tạo</th>
-                      <th className="p-3 text-left">Hành động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên ca chiếu</th>
+                      <th className="p-3 text-left font-semibold text-black">Thời gian bắt đầu</th>
+                      <th className="p-3 text-left font-semibold text-black">Thời gian kết thúc</th>
+                      <th className="p-3 text-left font-semibold text-black">Thời lượng</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày tạo</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2171,16 +2171,16 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Phim</th>
-                      <th className="p-3 text-left">Rạp</th>
-                      <th className="p-3 text-left">Ngày chiếu đầu tiên</th>
-                      <th className="p-3 text-left">Ngày chiếu cuối cùng</th>
-                      <th className="p-3 text-left">Số suất chiếu</th>
-                      <th className="p-3 text-left">Chi tiết suất chiếu</th>
-                      <th className="p-3 text-left">Hành Động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Phim</th>
+                      <th className="p-3 text-left font-semibold text-black">Rạp</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày chiếu đầu tiên</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày chiếu cuối cùng</th>
+                      <th className="p-3 text-left font-semibold text-black">Số suất chiếu</th>
+                      <th className="p-3 text-left font-semibold text-black">Chi tiết suất chiếu</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành Động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2303,14 +2303,14 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="bg-white rounded-lg shadow-md overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-black text-white">
+                  <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
-                      <th className="p-3 text-left">STT</th>
-                      <th className="p-3 text-left">Tên bảng giá</th>
-                      <th className="p-3 text-left">Ngày bắt đầu</th>
-                      <th className="p-3 text-left">Ngày kết thúc</th>
-                      <th className="p-3 text-left">Trạng thái</th>
-                      <th className="p-3 text-left">Hành động</th>
+                      <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Tên bảng giá</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày bắt đầu</th>
+                      <th className="p-3 text-left font-semibold text-black">Ngày kết thúc</th>
+                      <th className="p-3 text-left font-semibold text-black">Trạng thái</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>

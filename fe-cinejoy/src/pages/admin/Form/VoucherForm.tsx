@@ -300,10 +300,10 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                                     if (!value || !startDate) {
                                         return Promise.resolve();
                                     }
-                                    if (value.isAfter(startDate)) {
+                                    if (value.isSame(startDate, 'day') || value.isAfter(startDate)) {
                                         return Promise.resolve();
                                     }
-                                    return Promise.reject(new Error('Ngày kết thúc phải sau ngày bắt đầu!'));
+                                    return Promise.reject(new Error('Ngày kết thúc không được trước ngày bắt đầu!'));
                                 },
                             }),
                         ]}
@@ -315,7 +315,7 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                             format="DD/MM/YYYY"
                             disabledDate={(current) => {
                                 const startDate = form.getFieldValue('startDate');
-                                return current && (current < dayjs().startOf('day') || (startDate && current <= startDate));
+                                return current && (current < dayjs().startOf('day') || (startDate && current < startDate));
                             }}
                         />
                     </Form.Item>

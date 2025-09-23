@@ -1,16 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import useAppStore from "@/store/app.store";
 import { getSeatsForShowtimeApi } from "@/apiservice/apiShowTime";
 
 interface SeatProps {
-  selectedSeats: string[];
-  soldSeats: string[];
+  selectedSeats: string[]; // UI checked
+  soldSeats: string[]; // already selected (reserved/sold)
   onSelect: (seat: string) => void;
+  onSelectMultiple?: (seats: string[]) => void; // For couple seats
   showtimeId?: string;
   date?: string;
   startTime?: string;
   room?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSeatsLoaded?: (seatData: any) => void;
 }
 
@@ -27,27 +28,14 @@ interface SeatLayout {
 // // Ghế đã chọn (ví dụ)
 // const selectedSeats = ["C3", "D4", "E3", "G4"];
 
-// Hàm xác định trạng thái ghế (cứng dữ liệu mẫu)
-// const getSeatStatus = (seatName: string) => {
-//     if (selectedSeats.includes(seatName)) return "selected";
-//     // Ví dụ: ghế đã bán
-//     if (seatName === "C4" || seatName === "D5") return "sold";
-//     // Ví dụ: ghế đang giữ
-//     if (seatName === "F6") return "holding";
-//     return "empty";
-// };
-
-const seatImages: Record<string, string> = {
-  empty:
-    "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809663/seat-unselect-normal_hygw6w.png",
-  holding:
-    "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-process-normal_lzfigz.png",
-  sold: "https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-buy-normal_ryk3xl.png",
-};
+type SeatType = 'normal' | 'vip' | 'couple' | '4dx';
+type SeatStatus = 'available' | 'maintenance';
 
 const Seat: React.FC<SeatProps> = ({
+  selectedSeats,
   soldSeats,
   onSelect,
+  onSelectMultiple,
   showtimeId,
   date,
   startTime,
@@ -56,12 +44,68 @@ const Seat: React.FC<SeatProps> = ({
 }) => {
   const { isDarkMode } = useAppStore();
   const [seatLayout, setSeatLayout] = useState<SeatLayout | null>(null);
+  const [seatMap, setSeatMap] = useState<Record<string, { type: SeatType; status: SeatStatus }>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Use ref to store the callback to avoid re-renders
   const onSeatsLoadedRef = useRef(onSeatsLoaded);
   onSeatsLoadedRef.current = onSeatsLoaded;
+
+  // Helper function to handle seat selection (including couple seats)
+  const handleSeatSelection = (seatName: string) => {
+    console.log("handleSeatSelection called with seatName:", seatName);
+    const seatType = seatMap[seatName]?.type;
+    
+    if (seatType === 'couple') {
+      // For couple seats, find the pair and select both
+      const row = seatName.charAt(0);
+      const col = parseInt(seatName.substring(1));
+      
+      // Find the pair seat (next seat in the same row)
+      const pairCol = col % 2 === 1 ? col + 1 : col - 1;
+      const pairSeatName = `${row}${pairCol}`;
+      
+      // Check if both seats are available
+      const isMaintenance = seatMap[seatName]?.status === 'maintenance';
+      const isPairMaintenance = seatMap[pairSeatName]?.status === 'maintenance';
+      const isSelectedFromServer = soldSeats.includes(seatName) || soldSeats.includes(pairSeatName);
+      
+      if (!isSelectedFromServer && !isMaintenance && !isPairMaintenance) {
+        // Check if either seat is already selected
+        const isSeatSelected = selectedSeats.includes(seatName);
+        const isPairSelected = selectedSeats.includes(pairSeatName);
+        
+        if (isSeatSelected || isPairSelected) {
+          // If either is selected, deselect both
+          if (onSelectMultiple) {
+            console.log("Calling onSelectMultiple for deselection:", [seatName, pairSeatName]);
+            onSelectMultiple([seatName, pairSeatName]);
+          } else {
+            // Fallback to individual selection if onSelectMultiple is not provided
+            // Only call onSelect once to avoid duplicate validation
+            console.log("Calling onSelect for deselection:", seatName);
+            onSelect(seatName);
+          }
+        } else {
+          // If neither is selected, select both
+          if (onSelectMultiple) {
+            console.log("Calling onSelectMultiple for selection:", [seatName, pairSeatName]);
+            onSelectMultiple([seatName, pairSeatName]);
+          } else {
+            // Fallback to individual selection if onSelectMultiple is not provided
+            // Only call onSelect once to avoid duplicate validation
+            console.log("Calling onSelect for selection:", seatName);
+            onSelect(seatName);
+          }
+        }
+      }
+    } else {
+      // For non-couple seats, use normal selection
+      console.log("Calling onSelect for non-couple seat:", seatName);
+      onSelect(seatName);
+    }
+  };
 
   // Load seats from API
   useEffect(() => {
@@ -105,8 +149,42 @@ const Seat: React.FC<SeatProps> = ({
             rows: apiSeatLayout.rows,
             cols: apiSeatLayout.cols,
           };
-
           setSeatLayout(typedSeatLayout);
+          
+          // Build seat map from API seats data
+          const map: Record<string, { type: SeatType; status: SeatStatus }> = {};
+          const seatsData = response.data.seats || [];
+          
+          // Create a mapping from seat position to seat info (status and type)
+          const seatInfoMap: Record<string, { status: string; type: string }> = {};
+          seatsData.forEach((seatItem: any, index: number) => {
+            // Calculate seat position based on index
+            const row = Math.floor(index / apiSeatLayout.cols);
+            const col = index % apiSeatLayout.cols;
+            const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
+            
+            seatInfoMap[seatId] = {
+              status: seatItem.status,
+              type: seatItem.type || 'normal'
+            };
+            
+          });
+          
+          // Generate seat layout with proper types and statuses
+          for (let row = 0; row < apiSeatLayout.rows; row++) {
+            for (let col = 0; col < apiSeatLayout.cols; col++) {
+              const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
+              
+              // Get seat info from mapping
+              const seatInfo = seatInfoMap[seatId];
+              const status = seatInfo?.status || 'available';
+              const seatType = (seatInfo?.type as SeatType) || 'normal';
+              
+              map[seatId] = { type: seatType, status: status as SeatStatus };
+            }
+          }
+          
+          setSeatMap(map);
           if (onSeatsLoadedRef.current) {
             onSeatsLoadedRef.current(response.data);
           }
@@ -124,12 +202,8 @@ const Seat: React.FC<SeatProps> = ({
     loadSeats();
   }, [showtimeId, date, startTime, room]); // Removed onSeatsLoaded from dependencies
 
-  const getSeatStatus = (seatName: string) => {
-    // Check if seat is sold
-    if (soldSeats.includes(seatName)) return "sold";
 
-    return "empty";
-  };
+
 
   // Determine which rows and seats to render based on backend data
   const renderRows = seatLayout
@@ -138,13 +212,49 @@ const Seat: React.FC<SeatProps> = ({
   
   const renderSeatsForRow = (row: string) => {
     const cols = seatLayout?.cols || 10;
-    return Array.from({ length: cols }, (_, i) => ({
-      seatId: `${row}${i + 1}`,
-      number: i + 1,
-      status: "available" as const,
-      type: "standard" as const,
-      price: 90000,
-    }));
+    return Array.from({ length: cols }, (_, i) => {
+      const seatId = `${row}${i + 1}`;
+      // Nếu có dữ liệu từ API, dùng dữ liệu đó
+      if (seatMap[seatId]) {
+        return {
+          seatId,
+          number: i + 1,
+          status: seatMap[seatId].status,
+          type: seatMap[seatId].type,
+          price: 90000,
+        };
+      }
+      // Fallback: tạo template theo pattern như ảnh
+      const rowIndex = row.charCodeAt(0) - 65; // A=0, B=1, etc.
+      let seatType: SeatType = 'normal';
+      
+      // Pattern theo ảnh: A-C (0-2) = normal, D-I (3-8) = vip/couple, J-L (9-11) = 4dx
+      if (rowIndex < 3) {
+        seatType = 'normal';
+      } else if (rowIndex < 9) {
+        // D-I: VIP ở giữa (cột 4-7), normal ở ngoài
+        if (i >= 3 && i <= 6) {
+          seatType = 'vip';
+        } else {
+          seatType = 'normal';
+        }
+      } else {
+        // J-L: 4DX ở giữa (cột 4-7), normal ở ngoài
+        if (i >= 3 && i <= 6) {
+          seatType = '4dx';
+        } else {
+          seatType = 'normal';
+        }
+      }
+      
+      return {
+        seatId,
+        number: i + 1,
+        status: "available" as const,
+        type: seatType,
+        price: 90000,
+      };
+    });
   };
 
   if (loading) {
@@ -180,54 +290,126 @@ const Seat: React.FC<SeatProps> = ({
     <div className="flex flex-col items-center gap-2">
       {renderRows.map((row) => {
         const rowSeats = renderSeatsForRow(row);
-        return (
-          <div key={row} className="flex flex-row items-center gap-6 mb-2">
-            {rowSeats.map((seatData) => {
-              const seatName = seatData.seatId;
-              const status = getSeatStatus(seatName);
-              return (
-                <button
-                  key={seatName}
-                  className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded-full transition-all duration-200 cursor-pointer
-                                        ${
-                                          status === "empty"
-                                            ? "hover:scale-110"
-                                            : ""
-                                        }
-                                    `}
-                  onClick={() => {
-                    if (status !== "sold") {
-                      onSelect(seatName);
+        const isCoupleRow = rowSeats.some(seat => seat.type === 'couple');
+        
+        if (isCoupleRow) {
+          // Render couple seats grouped in pairs
+          return (
+            <div key={row} className="w-full flex justify-center gap-3 mb-2">
+              {Array.from({ length: Math.ceil(rowSeats.length / 2) }, (_, pairIndex) => (
+                <div key={`pair-${pairIndex}`} className="flex gap-1">
+                  {[0, 1].map(seatInPair => {
+                    const seatIndex = pairIndex * 2 + seatInPair;
+                    const seatData = rowSeats[seatIndex];
+                    
+                    if (!seatData) {
+                      return null; // Don't render missing seat
                     }
-                  }}
-                  disabled={status === "sold"}
-                  type="button"
-                >
-                  <img
-                    src={seatImages[status]}
-                    alt={seatName}
-                    className="w-8 h-8"
-                  />
-                  <span
-                    className={`absolute top-1 left-1/2 -translate-x-1/2 text-[10px] font-semibold pointer-events-none
-                                            ${
-                                              isDarkMode
-                                                ? "text-gray-200"
-                                                : "text-gray-700"
-                                            }`}
-                    style={{
-                      textShadow: isDarkMode
-                        ? "0 1px 2px #222"
-                        : "0 1px 2px #fff",
+                    
+                    const seatName = seatData.seatId;
+                    const isMaintenance = seatData.status === 'maintenance';
+                    const isSelectedFromServer = soldSeats.includes(seatName);
+                    const isChecked = selectedSeats.includes(seatName);
+                    
+                    // Use seatData.type directly
+                    let baseColor: string;
+                    switch (seatData.type) {
+                      case 'vip': baseColor = 'bg-yellow-400 border-yellow-600'; break;
+                      case 'couple': baseColor = 'bg-pink-400 border-pink-600'; break;
+                      case '4dx': baseColor = 'bg-purple-400 border-purple-600'; break;
+                      default: baseColor = 'bg-gray-300 border-gray-500';
+                    }
+                    
+                    const colorClass = isMaintenance
+                      ? 'bg-gray-600 border-gray-800'
+                      : isChecked
+                        ? 'bg-[#b3210e] border-transparent'
+                        : baseColor;
+                    
+                    return (
+                      <button
+                        key={seatName}
+                        className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer`}
+                        onClick={() => {
+                          if (!isSelectedFromServer && !isMaintenance) {
+                            handleSeatSelection(seatName);
+                          }
+                        }}
+                        disabled={isSelectedFromServer || isMaintenance}
+                        type="button"
+                      >
+                        <div
+                          className={`w-8 h-8 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative
+                            ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}
+                          `}
+                          title={seatName}
+                        >
+                          {seatName}
+                          {isMaintenance && (
+                            <div className="absolute inset-0 flex items-center justify-center text-red-600 text-lg font-bold pointer-events-none">✕</div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              ))}
+            </div>
+          );
+        } else {
+          // Render normal rows
+          return (
+            <div key={row} className="flex flex-row items-center gap-6 mb-2">
+              {rowSeats.map((seatData) => {
+                const seatName = seatData.seatId;
+                const isMaintenance = seatData.status === 'maintenance';
+                const isSelectedFromServer = soldSeats.includes(seatName);
+                const isChecked = selectedSeats.includes(seatName);
+                
+                // Use seatData.type directly
+                let baseColor: string;
+                switch (seatData.type) {
+                  case 'vip': baseColor = 'bg-yellow-400 border-yellow-600'; break;
+                  case 'couple': baseColor = 'bg-pink-400 border-pink-600'; break;
+                  case '4dx': baseColor = 'bg-purple-400 border-purple-600'; break;
+                  default: baseColor = 'bg-gray-300 border-gray-500';
+                }
+                
+                const colorClass = isMaintenance
+                  ? 'bg-gray-600 border-gray-800'
+                  : isChecked
+                    ? 'bg-[#b3210e] border-transparent'
+                    : baseColor;
+                
+                return (
+                  <button
+                    key={seatName}
+                    className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer`}
+                    onClick={() => {
+                      if (!isSelectedFromServer && !isMaintenance) {
+                        handleSeatSelection(seatName);
+                      }
                     }}
+                    disabled={isSelectedFromServer || isMaintenance}
+                    type="button"
                   >
-                    {seatName}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        );
+                    <div
+                      className={`w-8 h-8 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative
+                        ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}
+                      `}
+                      title={seatName}
+                    >
+                      {seatName}
+                      {isMaintenance && (
+                        <div className="absolute inset-0 flex items-center justify-center text-red-600 text-lg font-bold pointer-events-none">✕</div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
       })}
     </div>
   );

@@ -7,6 +7,7 @@ interface SeatLayoutProps {
   selectedSeats: string[];
   soldSeats: string[];
   onSelect: (seat: string) => void;
+  onSelectMultiple?: (seats: string[]) => void;
   selectedSeatPrice: number;
   showtimeId?: string;
   date?: string;
@@ -20,6 +21,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
   selectedSeats,
   soldSeats,
   onSelect,
+  onSelectMultiple,
   selectedSeatPrice,
   showtimeId,
   date,
@@ -117,6 +119,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
           selectedSeats={selectedSeats}
           soldSeats={soldSeats}
           onSelect={onSelect}
+          onSelectMultiple={onSelectMultiple}
           showtimeId={showtimeId}
           date={date}
           startTime={startTime}
@@ -124,47 +127,47 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
           onSeatsLoaded={handleSeatsLoaded}
         />
       </div>
-      {/* Trạng thái ghế */}
-      <div className="flex flex-row justify-center gap-8 mt-6 mb-2">
-        <div className="flex flex-col items-center text-xs">
-          <img
-            src="https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809663/seat-unselect-normal_hygw6w.png"
-            alt="Ghế trống"
-            className="w-7 h-7"
-          />
-          <span className={`mt-1 ${isDarkMode ? "text-gray-300" : ""}`}>
-            Ghế trống
-          </span>
+      {/* Legend - Loại ghế */}
+      <div className="mt-6 mb-3">
+        <h4 className={`text-sm font-semibold mb-2 text-left md:text-center ${isDarkMode ? "text-white" : "text-[#2d3748]"}`}>Loại ghế:</h4>
+        <div className="flex flex-row flex-wrap gap-6 md:justify-center">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-gray-300 border border-gray-400 shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế thường</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-yellow-400 border border-yellow-600 shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế VIP</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-pink-400 border border-pink-600 shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đôi</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-purple-400 border border-purple-600 shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế 4DX</span>
+          </div>
         </div>
-        <div className="flex flex-col items-center text-xs">
-          <img
-            src="https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-select-normal_nfev6o.png"
-            alt="Ghế đang chọn"
-            className="w-7 h-7"
-          />
-          <span className={`mt-1 ${isDarkMode ? "text-gray-300" : ""}`}>
-            Ghế đang chọn
-          </span>
-        </div>
-        <div className="flex flex-col items-center text-xs">
-          <img
-            src="https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-process-normal_lzfigz.png"
-            alt="Ghế đang giữ"
-            className="w-7 h-7"
-          />
-          <span className={`mt-1 ${isDarkMode ? "text-gray-300" : ""}`}>
-            Ghế đang giữ
-          </span>
-        </div>
-        <div className="flex flex-col items-center text-xs">
-          <img
-            src="https://res.cloudinary.com/dcoviwlpx/image/upload/v1731809662/seat-buy-normal_ryk3xl.png"
-            alt="Ghế đã bán"
-            className="w-7 h-7"
-          />
-          <span className={`mt-1 ${isDarkMode ? "text-gray-300" : ""}`}>
-            Ghế đã bán
-          </span>
+      </div>
+
+      {/* Legend - Trạng thái ghế */}
+      <div className="mb-2">
+        <h4 className={`text-sm font-semibold mb-2 text-left md:text-center ${isDarkMode ? "text-white" : "text-[#2d3748]"}`}>Trạng thái ghế:</h4>
+        <div className="flex flex-row flex-wrap gap-6 md:justify-center">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-[#b3210e] shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đang chọn</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-[#ffe5e0] border border-[#b91c1c] shadow-inner" />
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đã chọn</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-6 h-6 rounded-md bg-gray-600 border border-gray-800 relative shadow-inner">
+              <div className="absolute inset-0 flex items-center justify-center text-red-600 text-base font-bold pointer-events-none">✕</div>
+            </div>
+            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Bảo trì</span>
+          </div>
         </div>
       </div>
       {/* Thời gian và giá vé */}

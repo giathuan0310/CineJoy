@@ -469,7 +469,7 @@ class ShowtimeService {
       let seatData;
       if (!specificShowtime.seats || specificShowtime.seats.length === 0) {
         // Nếu chưa có ghế trong database, tạo ghế mặc định (all available)
-        seatData = this.generateDefaultSeats();
+        seatData = await this.generateDefaultSeats((specificShowtime.room as any)._id);
 
         // Tự động lưu ghế mặc định vào database
         const showtimeIndex = showtime.showTimes.findIndex((st) => {
@@ -513,6 +513,23 @@ class ShowtimeService {
         seatData = specificShowtime.seats;
       }
 
+      // Get seat layout info for response
+      const roomLayout = await RoomModel.findById((specificShowtime.room as any)._id).select('seatLayout');
+      
+      // Populate seat information with type and other details
+      const populatedSeats = await Promise.all(
+        seatData.map(async (seatItem: any) => {
+          const seatInfo = await SeatModel.findById(seatItem.seat).select('type status row number');
+          
+          return {
+            seat: seatItem.seat,
+            status: seatItem.status,
+            type: seatInfo?.type || 'normal', // Use actual type from database
+            _id: seatItem._id
+          };
+        })
+      );
+
       return {
         showtimeInfo: {
           _id: showtime._id,
@@ -523,24 +540,11 @@ class ShowtimeService {
           endTime: specificShowtime.end,
           room: specificShowtime.room,
         },
-        seats: seatData,
-        seatLayout: await (async () => {
-          const roomLayout = await RoomModel.findById((specificShowtime.room as any)._id).select('seatLayout');
-          
-          // Check if room has seatLayout, if not, use default values
-          if (roomLayout && roomLayout.seatLayout) {
-            return {
-              rows: roomLayout.seatLayout.rows,
-              cols: roomLayout.seatLayout.cols
-            };
-          } else {
-            // Default fallback for old rooms without seatLayout
-            return {
-              rows: 8,
-              cols: 15
-            };
-          }
-        })(),
+        seats: populatedSeats,
+        seatLayout: {
+          rows: roomLayout?.seatLayout?.rows || 12,
+          cols: roomLayout?.seatLayout?.cols || 10
+        },
       };
     } catch (error) {
       throw error;
@@ -815,39 +819,42 @@ class ShowtimeService {
   }
 
   // Tạo dữ liệu ghế mặc định khi seats array rỗng
-  private generateDefaultSeats(): any[] {
+  private async generateDefaultSeats(roomId: string): Promise<any[]> {
     const seats: any[] = [];
-    const rows = ["A", "B", "C", "D", "E", "F", "G", "H"];
-    const seatsPerRow = 10;
-
-    rows.forEach((row) => {
-      for (let i = 1; i <= seatsPerRow; i++) {
-        const seatId = `${row}${i}`;
-        let seatType = "standard";
-        let price = 75000;
-
-        // VIP seats (rows E, F, G, H)
-        if (["E", "F", "G", "H"].includes(row)) {
-          seatType = "vip";
-          price = 100000;
-        }
-
-        // Couple seats (middle seats in VIP rows)
-        if (["F", "G"].includes(row) && [4, 5, 6, 7].includes(i)) {
-          seatType = "couple";
-          price = 150000;
-        }
-
-        seats.push({
-          seatId,
-          status: "available", // available, maintenance
-          type: seatType,
-          price,
-        });
-      }
+    
+    // Get room layout to determine rows and cols
+    const room = await RoomModel.findById(roomId).select('seatLayout');
+    const rows = room?.seatLayout?.rows || 12;
+    const cols = room?.seatLayout?.cols || 10;
+    
+    // Get all seats for this room from database
+    const roomSeats = await SeatModel.find({ room: roomId }).select('_id type status');
+    
+    // Create a map of seat ID to seat info
+    const seatMap = new Map();
+    roomSeats.forEach(seat => {
+      seatMap.set(seat._id.toString(), seat);
     });
 
-    // All seats are available by default
+    // Generate seats based on room layout
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
+        
+        // Find corresponding seat in database by seatId
+        const dbSeat = roomSeats.find((seat: any) => {
+          return seat.seatId === seatId;
+        });
+        
+        seats.push({
+          seat: dbSeat?._id || new mongoose.Types.ObjectId(), // Use actual seat ID from database
+          status: "available",
+          type: dbSeat?.type || 'normal', // Use actual type from database
+          _id: new mongoose.Types.ObjectId()
+        });
+      }
+    }
+
     return seats;
   }
 
@@ -908,7 +915,7 @@ class ShowtimeService {
       }
 
       // Tạo dữ liệu ghế mặc định
-      const defaultSeats = this.generateDefaultSeats();
+      const defaultSeats = await this.generateDefaultSeats(showtime.showTimes[showtimeIndex].room.toString());
       showtime.showTimes[showtimeIndex].seats = defaultSeats;
 
       await showtime.save();

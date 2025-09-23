@@ -72,11 +72,17 @@ const CardInfMovie = () => {
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const { isDarkMode } = useAppStore();
 
-  // Flatten showtimes but keep reference to parent document ID
+  // Flatten showtimes and normalize room to string (same approach as ScheduleList)
   const allShowTimes = showtimes.flatMap((st) =>
     (st.showTimes || []).map((showTime) => ({
       ...showTime,
-      parentId: st._id, // Keep the document ID
+      parentId: st._id,
+      room:
+        typeof showTime.room === "string"
+          ? (showTime.room as string)
+          : ((showTime.room as { name?: string; _id?: string })?.name ||
+              (showTime.room as { name?: string; _id?: string })?._id ||
+              "Unknown Room"),
     }))
   );
 
@@ -113,8 +119,7 @@ const CardInfMovie = () => {
       try {
         if (id) {
           const response = await getMovieById(id);
-          console.log("Phim:", response);
-          setMovie(response || null); // Lấy object phim từ response.data
+          setMovie(response || null);
         }
       } catch (error) {
         console.error("Lỗi khi lấy thông tin phim:", error);
@@ -133,7 +138,6 @@ const CardInfMovie = () => {
     const fetchTheater = async () => {
       try {
         const response = await getTheaters();
-        console.log("All theaters:", response);
         setTheater(Array.isArray(response) ? response : []);
       } catch (error) {
         console.error("Lỗi khi lấy thông tin rạp:", error);
@@ -247,10 +251,6 @@ const CardInfMovie = () => {
             <h2 className="text-4xl font-bold text-lime-300 mb-2">
               {movie?.title}
             </h2>
-            {/* <div className="text-2xl text-[#ff642e] mb-2 flex items-center gap-2">
-                            {"★".repeat(movie?.reviews.find((r) => r.rating)!.rating)}
-                            <span className="text-white text-lg ml-2">{(movie?.reviews.find((r) => r.rating)!.rating)}/5</span>
-                        </div> */}
             <div className="text-lg mb-1">
               <span className="text-yellow-300">Ngày phát hành :</span>{" "}
               {movie?.releaseDate
@@ -575,8 +575,7 @@ const CardInfMovie = () => {
                             isDarkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
-                          Suất chiếu ngày{" "}
-                          {selectedDate.split("-").reverse().join("/")}
+                          Suất chiếu ngày {selectedDate.split("-").reverse().join("/")}
                         </span>
                       </div>
                       <div className="flex gap-3 flex-wrap">
@@ -595,24 +594,23 @@ const CardInfMovie = () => {
                                     ...movie,
                                     title: movie?.title,
                                     poster: movie?.image,
-                                    format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
+                                    format: "2D, Phụ đề Tiếng Việt",
                                     genre: movie?.genre?.join(", "),
                                     duration: movie?.duration,
                                   },
-                                  showtimeId: showtime.parentId, // Use parent document ID
+                                  showtimeId: showtime.parentId,
                                   cinema: filteredCinemas.find(
                                     (c) => c._id === selectedCinemaId
                                   )?.name,
                                   date: selectedDate,
                                   time: formatVNTime(showtime.start),
-                                  room: showtime.room,
-                                  seats: [], // sẽ cập nhật khi chọn ghế
+                                  room: showtime.room, // already normalized to string
+                                  seats: [],
                                 },
                               })
                             }
                           >
-                            {formatVNTime(showtime.start)} -{" "}
-                            {formatVNTime(showtime.end)}
+                            {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
                           </button>
                         ))}
                       </div>

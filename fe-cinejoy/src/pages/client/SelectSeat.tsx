@@ -11,6 +11,7 @@ export const SelectSeat = () => {
   const [selectedSeatType, setSelectedSeatType] = useState<string | null>(null);
   const [seatTypeMap, setSeatTypeMap] = useState<Record<string, string>>({});
   const [layoutCols, setLayoutCols] = useState<number>(10);
+  const [has4dx, setHas4dx] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -134,6 +135,7 @@ export const SelectSeat = () => {
         }
       });
       
+      setHas4dx(Object.values(typeMap).some((t) => t === '4dx'));
       setSoldSeats(occupiedSeats);
       setSeatTypeMap(typeMap);
     }
@@ -169,6 +171,7 @@ export const SelectSeat = () => {
             minAge: movie?.minAge,
             seatCols: layoutCols,
             soldSeats: soldSeats,
+            format: has4dx ? '4DX' : movie?.format,
           }}
           onContinue={() =>
             navigate("/payment", {

@@ -31,7 +31,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
 }) => {
   const { isDarkMode } = useAppStore();
   const navigate = useNavigate();
-  const [timeLeft, setTimeLeft] = useState<number>(600);
+  const [timeLeft, setTimeLeft] = useState<number>(300);
   const [seatPricing, setSeatPricing] = useState<Record<string, number>>({});
 
   // Handle seat data loading

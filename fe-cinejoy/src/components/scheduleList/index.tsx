@@ -568,6 +568,16 @@ const ScheduleList: React.FC = () => {
                                       format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                       genre: movie?.genre?.join(", "),
                                       duration: movie?.duration,
+                                      minAge:
+                                        movie?.ageRating === "T18+"
+                                          ? 18
+                                          : movie?.ageRating === "T16+"
+                                          ? 16
+                                          : movie?.ageRating === "T15+"
+                                          ? 15
+                                          : movie?.ageRating === "T12+"
+                                          ? 12
+                                          : 13,
                                     },
                                     showtimeId: showtime.parentId, // Use parent document ID
                                     cinema: filteredCinemas.find(

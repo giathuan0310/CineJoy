@@ -842,7 +842,7 @@ const Dashboard: React.FC = () => {
             discountType: comboData.discountType,
             discountValue: comboData.discountValue
           });
-          toast.success("Thêm combo thành công!");
+        toast.success("Thêm combo thành công!");
         }
       }
       // Reload dữ liệu sau khi thêm/sửa
@@ -1583,25 +1583,25 @@ const Dashboard: React.FC = () => {
                       
                       return (
                         <tr key={theater._id} className="border-b hover:bg-gray-100">
-                          <td className="p-3">
-                            {(currentPage - 1) * itemsPerPage + idx + 1}
-                          </td>
-                          <td className="p-3 font-medium">{theater.name}</td>
-                          <td className="p-3">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
-                              {theater.location.city}
-                            </span>
-                          </td>
-                          <td className="p-3 max-w-xs truncate" title={theater.location.address}>
-                            {theater.location.address}
-                          </td>
+                        <td className="p-3">
+                          {(currentPage - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="p-3 font-medium">{theater.name}</td>
+                        <td className="p-3">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm">
+                            {theater.location.city}
+                          </span>
+                        </td>
+                        <td className="p-3 max-w-xs truncate" title={theater.location.address}>
+                          {theater.location.address}
+                        </td>
                           <td className="p-3">
                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
                               {theaterRooms.length} phòng
                             </span>
                           </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
+                        <td className="p-3">
+                          <div className="flex gap-2">
                               <motion.button
                                 onClick={() => handleShowRooms(theater)}
                                 className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 cursor-pointer"
@@ -1610,33 +1610,33 @@ const Dashboard: React.FC = () => {
                               >
                                 Xem chi tiết
                               </motion.button>
-                              <motion.button
-                                onClick={() => handleEditTheater(theater)}
+                            <motion.button
+                              onClick={() => handleEditTheater(theater)}
                                 className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 cursor-pointer"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                Sửa
-                              </motion.button>
-                              <Popconfirm
-                                title="Xóa rạp"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xóa rạp"
                                 description="Bạn có chắc chắn muốn xóa rạp này? Tất cả các phòng chiếu trong rạp này cũng sẽ bị xóa!"
-                                onConfirm={() => handleDeleteTheater(theater._id!)}
+                              onConfirm={() => handleDeleteTheater(theater._id!)}
                                 okText="Xóa"
                                 cancelText="Hủy"
                                 okButtonProps={{ danger: true }}
+                            >
+                              <motion.button
+                                className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                               >
-                                <motion.button
-                                  className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer"
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  Xóa
-                                </motion.button>
-                              </Popconfirm>
-                            </div>
-                          </td>
-                        </tr>
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
+                        </td>
+                      </tr>
                       );
                     })}
                   </tbody>
@@ -1702,10 +1702,10 @@ const Dashboard: React.FC = () => {
                   >
                     <span className="text-sm font-bold">
                       {allExpanded ? '▲' : '▼'}
-                    </span>
+                          </span>
                     <span>
                       {allExpanded ? 'Thu gọn tất cả' : 'Mở rộng tất cả'}
-                    </span>
+                          </span>
                   </motion.button>
                 </div>
                 
@@ -1764,35 +1764,35 @@ const Dashboard: React.FC = () => {
                             {voucher.applyType || 'voucher'}
                           </span>
                         </div>
-                        <div className="flex gap-2">
-                          <motion.button
+                          <div className="flex gap-2">
+                            <motion.button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditVoucher(voucher);
                             }}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer transition-colors"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            Sửa
-                          </motion.button>
-                          <Popconfirm
-                            title="Xóa voucher"
-                            description="Bạn có chắc chắn muốn xóa voucher này?"
-                            onConfirm={() => handleDeleteVoucher(voucher._id!)}
-                            okText="Có"
-                            cancelText="Không"
-                          >
-                            <motion.button
-                              onClick={(e) => e.stopPropagation()}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer transition-colors"
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              Xóa
+                              Sửa
                             </motion.button>
-                          </Popconfirm>
-                        </div>
+                            <Popconfirm
+                              title="Xóa voucher"
+                              description="Bạn có chắc chắn muốn xóa voucher này?"
+                              onConfirm={() => handleDeleteVoucher(voucher._id!)}
+                              okText="Có"
+                              cancelText="Không"
+                            >
+                              <motion.button
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer transition-colors"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
                       </div>
                       
                       {/* Expandable Content */}
@@ -2410,10 +2410,10 @@ const Dashboard: React.FC = () => {
                                   </button>
                                 </Popconfirm>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

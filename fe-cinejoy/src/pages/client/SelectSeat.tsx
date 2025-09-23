@@ -10,6 +10,7 @@ export const SelectSeat = () => {
   const [soldSeats, setSoldSeats] = useState<string[]>([]);
   const [selectedSeatType, setSelectedSeatType] = useState<string | null>(null);
   const [seatTypeMap, setSeatTypeMap] = useState<Record<string, string>>({});
+  const [layoutCols, setLayoutCols] = useState<number>(10);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -111,6 +112,7 @@ export const SelectSeat = () => {
     if (seatData?.seats && seatData?.seatLayout) {
       const apiSeatLayout = seatData.seatLayout;
       const seatsData = seatData.seats || [];
+      setLayoutCols(apiSeatLayout.cols || 10);
       
       // Tạo map loại ghế sử dụng cùng logic với Seat component
       const typeMap: Record<string, string> = {};
@@ -164,6 +166,9 @@ export const SelectSeat = () => {
             time: displayTime,
             room: room,
             seats: selectedSeats,
+            minAge: movie?.minAge,
+            seatCols: layoutCols,
+            soldSeats: soldSeats,
           }}
           onContinue={() =>
             navigate("/payment", {

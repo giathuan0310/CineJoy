@@ -594,18 +594,28 @@ const CardInfMovie = () => {
                                     ...movie,
                                     title: movie?.title,
                                     poster: movie?.image,
-                                    format: "2D, Phụ đề Tiếng Việt",
+                                    format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                     genre: movie?.genre?.join(", "),
                                     duration: movie?.duration,
+                                    minAge:
+                                      movie?.ageRating === "T18+"
+                                        ? 18
+                                        : movie?.ageRating === "T16+"
+                                        ? 16
+                                        : movie?.ageRating === "T15+"
+                                        ? 15
+                                        : movie?.ageRating === "T12+"
+                                        ? 12
+                                        : 13,
                                   },
-                                  showtimeId: showtime.parentId,
+                                  showtimeId: showtime.parentId, // Use parent document ID
                                   cinema: filteredCinemas.find(
                                     (c) => c._id === selectedCinemaId
                                   )?.name,
                                   date: selectedDate,
                                   time: formatVNTime(showtime.start),
-                                  room: showtime.room, // already normalized to string
-                                  seats: [],
+                                  room: showtime.room,
+                                  seats: [], // sẽ cập nhật khi chọn ghế
                                 },
                               })
                             }

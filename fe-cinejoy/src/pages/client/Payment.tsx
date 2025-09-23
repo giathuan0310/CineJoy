@@ -39,7 +39,7 @@ const PaymentPage = () => {
     phoneNumber: user?.phoneNumber || "",
     email: user?.email || "",
   });
-  const [timeLeft, setTimeLeft] = useState<number>(600);
+  const [timeLeft, setTimeLeft] = useState<number>(300);
   const [voucherCode, setVoucherCode] = useState<string>("");
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import useAppStore from "@/store/app.store";
+import { Modal, Button, message } from "antd";
 
 interface MovieInfoProps {
   movie: {
@@ -13,13 +14,79 @@ interface MovieInfoProps {
     time: string;
     room: string;
     seats: string[];
+    minAge?: number;
+    seatCols?: number;
+    soldSeats?: string[];
   };
   onContinue: () => void;
 }
 
 const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
-  const { isDarkMode } = useAppStore();
+  const { isDarkMode, setIsModalOpen } = useAppStore();
   const hasSelectedSeats = movie.seats.length > 0;
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Format ngày chiếu theo chuẩn Việt Nam DD/MM/YYYY
+  const displayDate = movie.date
+    ? new Date(movie.date).toLocaleDateString("vi-VN")
+    : movie.date;
+
+  const seatCols = movie.seatCols || 10;
+  const soldSet = new Set(movie.soldSeats || []);
+  const selectedSet = new Set(movie.seats);
+
+  const toCoord = (sid: string) => {
+    const rowChar = sid[0];
+    const colNum = parseInt(sid.slice(1), 10);
+    return { row: rowChar.charCodeAt(0) - 65, col: colNum - 1 };
+  };
+  const toSeatId = (row: number, col: number) => `${String.fromCharCode(65 + row)}${col + 1}`;
+
+  const violatesSingleGapRule = (): boolean => {
+    if (movie.seats.length === 0) return false;
+
+    const isOccupied = (sid: string | null): boolean => {
+      if (!sid) return true; // ngoài biên coi như chiếm chỗ (tường)
+      return selectedSet.has(sid) || soldSet.has(sid);
+    };
+
+    for (const sid of movie.seats) {
+      const { row, col } = toCoord(sid);
+
+      // Kiểm tra bên trái
+      const left = col - 1 >= 0 ? toSeatId(row, col - 1) : null; // ghế kề trái
+      const leftFar = col - 2 >= 0 ? toSeatId(row, col - 2) : null; // ghế cách 2 bên trái hoặc null nếu tường
+      const leftEmpty = left && !selectedSet.has(left) && !soldSet.has(left);
+      if (leftEmpty && isOccupied(leftFar)) return true;
+
+      // Kiểm tra bên phải
+      const right = col + 1 < seatCols ? toSeatId(row, col + 1) : null; // ghế kề phải
+      const rightFar = col + 2 < seatCols ? toSeatId(row, col + 2) : null; // ghế cách 2 bên phải hoặc null nếu tường
+      const rightEmpty = right && !selectedSet.has(right) && !soldSet.has(right);
+      if (rightEmpty && isOccupied(rightFar)) return true;
+    }
+    return false;
+  };
+
+  const handleClickContinue = () => {
+    if (!hasSelectedSeats) return;
+
+    if (violatesSingleGapRule()) {
+      message.warning("Vui lòng không chừa 1 ghế trống bên trái hoặc bên phải của các ghế bạn đã chọn.");
+      return;
+    }
+
+    setConfirmOpen(true);
+    setIsModalOpen(true);
+  };
+
+  const handleConfirm = () => {
+    setConfirmOpen(false);
+    setIsModalOpen(false);
+    onContinue();
+  };
+
+  const minAge = movie.minAge ?? 13;
 
   return (
     <div
@@ -78,7 +145,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
           }`}
         >
           <span className="font-bold">Ngày chiếu:</span>
-          <span>{movie.date}</span>
+          <span>{displayDate}</span>
         </div>
         <div
           className={`flex justify-between text-sm ${
@@ -131,11 +198,28 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
                   : "bg-gray-300 text-gray-500"
               }`
         }`}
-        onClick={hasSelectedSeats ? onContinue : undefined}
+        onClick={handleClickContinue}
         disabled={!hasSelectedSeats}
       >
         Tiếp tục
       </button>
+
+      <Modal centered open={confirmOpen} width={380} onCancel={() => setConfirmOpen(false)} footer={null} getContainer={false} closeIcon={null}>
+        <div className="text-center mb-4 text-xl font-semibold">Thông tin vé</div>
+        <div className="text-sm leading-6 mb-6 text-justify">
+          Tôi xác nhận mua vé cho người xem từ đủ {minAge} tuổi trở lên và đồng ý cung cấp giấy tờ tùy thân để xác thực độ tuổi người xem, tham khảo <span className="font-bold text-red-500 cursor-pointer">quy định</span> của Bộ Văn Hóa, Thể Thao và Du Lịch,{" "}
+          {minAge <= 16 && (
+            <>
+              CNJ không được phép phục vụ khách hàng dưới 16 tuổi cho các suất chiếu kết thúc sau 23:00. {""}
+            </>
+          )}
+          CNJ sẽ không hoàn tiền nếu người xem không đáp ứng đủ điều kiện.
+        </div>
+        <div className="flex justify-center gap-3">
+          <Button onClick={() => setConfirmOpen(false)}>Hủy</Button>
+          <Button type="primary" danger onClick={handleConfirm}>Đồng ý</Button>
+        </div>
+      </Modal>
     </div>
   );
 };

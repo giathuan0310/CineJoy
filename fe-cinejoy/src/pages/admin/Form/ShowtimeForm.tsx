@@ -41,7 +41,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                 const [moviesRes, theatersRes, regionsRes, sessionsRes] = await Promise.all([
                     getMovies(),
                     getTheaters(),
-                    getRegions(),   
+                    getRegions(),
                     axiosClient.get('/show-sessions')
                 ]);
                 setMovies(Array.isArray(moviesRes) ? moviesRes : []);

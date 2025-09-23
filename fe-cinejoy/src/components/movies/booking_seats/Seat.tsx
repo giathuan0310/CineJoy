@@ -247,10 +247,10 @@ const Seat: React.FC<SeatProps> = ({
       
       return {
         seatId,
-        number: i + 1,
-        status: "available" as const,
+      number: i + 1,
+      status: "available" as const,
         type: seatType,
-        price: 90000,
+      price: 90000,
       };
     });
   };
@@ -291,10 +291,15 @@ const Seat: React.FC<SeatProps> = ({
         const isCoupleRow = rowSeats.some((s) => s.type === 'couple');
 
         if (isCoupleRow) {
+          // Nếu số cột là số lẻ, bỏ ghế cuối để đảm bảo số ghế chẵn cho cặp đôi
+          const totalCols = seatLayout?.cols || rowSeats.length;
+          const displayCols = totalCols % 2 === 0 ? totalCols : totalCols - 1;
+          const numPairs = Math.floor(displayCols / 2);
+
           // Render hàng ghế cặp đôi: chia từng cặp, giữa hai ghế trong cặp gap-1.5, giữa các cặp gap-4
-          return (
+        return (
             <div key={row} className="w-full flex justify-center gap-4">
-              {Array.from({ length: Math.ceil(rowSeats.length / 2) }, (_, pairIndex) => (
+              {Array.from({ length: numPairs }, (_, pairIndex) => (
                 <div key={`pair-${pairIndex}`} className="flex gap-1.5">
                   {[0, 1].map((seatInPair) => {
                     const idx = pairIndex * 2 + seatInPair;
@@ -327,9 +332,9 @@ const Seat: React.FC<SeatProps> = ({
                         ? 'bg-[#b3210e] border-transparent'
                         : baseColor;
 
-                    return (
-                      <button
-                        key={seatName}
+              return (
+                <button
+                  key={seatName}
                         className="relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer"
                         onClick={() => {
                           if (!isSelectedFromServer && !isMaintenance) {
@@ -360,7 +365,13 @@ const Seat: React.FC<SeatProps> = ({
         // Các hàng còn lại: tăng gap giữa các ghế
         return (
           <div key={row} className="flex flex-row items-center gap-5">
-            {rowSeats.map((seat) => {
+            {rowSeats.map((seat, i) => {
+              // Nếu là hàng cặp đôi nhưng vì lý do nào đó lọt qua đây và tổng cột lẻ, ẩn ghế cuối
+              const totalCols = seatLayout?.cols || rowSeats.length;
+              if (isCoupleRow && totalCols % 2 !== 0 && i === totalCols - 1) {
+                return null;
+              }
+
               const seatName = seat.seatId;
               const isMaintenance = seat.status === 'maintenance';
               const isSelectedFromServer = soldSeats.includes(seatName);

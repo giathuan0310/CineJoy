@@ -15,6 +15,7 @@ interface SeatLayoutProps {
   room?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSeatsLoaded?: (seatData: any) => void;
+  is4dxRoom?: boolean;
 }
 
 const SeatLayout: React.FC<SeatLayoutProps> = ({
@@ -28,6 +29,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
   startTime,
   room,
   onSeatsLoaded,
+  is4dxRoom,
 }) => {
   const { isDarkMode } = useAppStore();
   const navigate = useNavigate();
@@ -131,22 +133,28 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
       <div className="mt-6 mb-3">
         <h4 className={`text-sm font-semibold mb-2 text-left md:text-center ${isDarkMode ? "text-white" : "text-[#2d3748]"}`}>Loại ghế:</h4>
         <div className="flex flex-row flex-wrap gap-6 md:justify-center">
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-gray-300 border border-gray-400 shadow-inner" />
-            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế thường</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-yellow-400 border border-yellow-600 shadow-inner" />
-            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế VIP</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-pink-400 border border-pink-600 shadow-inner" />
-            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đôi</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-purple-400 border border-purple-600 shadow-inner" />
-            <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế 4DX</span>
-          </div>
+          {!is4dxRoom && (
+            <>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-6 h-6 rounded-md bg-gray-300 border border-gray-400 shadow-inner" />
+                <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế thường</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-6 h-6 rounded-md bg-yellow-400 border border-yellow-600 shadow-inner" />
+                <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế VIP</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-6 h-6 rounded-md bg-pink-400 border border-pink-600 shadow-inner" />
+                <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đôi</span>
+              </div>
+            </>
+          )}
+          {is4dxRoom && (
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-6 h-6 rounded-md bg-purple-400 border border-purple-600 shadow-inner" />
+              <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế 4DX</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -206,7 +214,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
               isDarkMode ? "text-gray-400" : "text-gray-500"
             }`}
           >
-            ({selectedSeats.length} ghế x {selectedSeatPrice.toLocaleString()}{" "}
+            ({selectedSeats.length} ghế x {selectedSeatPrice.toLocaleString()} {" "}
             VNĐ)
           </p>
         </div>

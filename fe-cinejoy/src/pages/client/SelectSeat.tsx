@@ -159,6 +159,7 @@ export const SelectSeat = () => {
           startTime={apiTime}
           room={room}
           onSeatsLoaded={handleSeatsLoaded}
+          is4dxRoom={has4dx}
         />
         <MovieInfo
           movie={{

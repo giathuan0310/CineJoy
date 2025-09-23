@@ -155,31 +155,29 @@ const Seat: React.FC<SeatProps> = ({
           const map: Record<string, { type: SeatType; status: SeatStatus }> = {};
           const seatsData = response.data.seats || [];
           
-          // Create a mapping from seat position to seat info (status and type)
+          // Create a mapping from seatId to seat info (status and type). Prefer API seatId if provided
           const seatInfoMap: Record<string, { status: string; type: string }> = {};
           seatsData.forEach((seatItem: any, index: number) => {
-            // Calculate seat position based on index
-            const row = Math.floor(index / apiSeatLayout.cols);
-            const col = index % apiSeatLayout.cols;
-            const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
-            
+            let seatId: string | undefined = seatItem.seatId;
+            if (!seatId) {
+              // Fallback: Calculate seatId based on index if API doesn't provide seatId
+              const row = Math.floor(index / apiSeatLayout.cols);
+              const col = index % apiSeatLayout.cols;
+              seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
+            }
             seatInfoMap[seatId] = {
               status: seatItem.status,
               type: seatItem.type || 'normal'
             };
-            
           });
           
           // Generate seat layout with proper types and statuses
           for (let row = 0; row < apiSeatLayout.rows; row++) {
             for (let col = 0; col < apiSeatLayout.cols; col++) {
               const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
-              
-              // Get seat info from mapping
               const seatInfo = seatInfoMap[seatId];
               const status = seatInfo?.status || 'available';
               const seatType = (seatInfo?.type as SeatType) || 'normal';
-              
               map[seatId] = { type: seatType, status: status as SeatStatus };
             }
           }
@@ -275,61 +273,64 @@ const Seat: React.FC<SeatProps> = ({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-8">
-        <p className={`text-sm text-red-500 mb-2`}>{error}</p>
         <p
-          className={`text-xs ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
+          className={`mt-2 text-sm ${
+            isDarkMode ? "text-gray-300" : "text-gray-600"
           }`}
         >
-          Sử dụng sơ đồ ghế mặc định
+          {error}
         </p>
       </div>
     );
   }
+
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-3">
       {renderRows.map((row) => {
         const rowSeats = renderSeatsForRow(row);
-        const isCoupleRow = rowSeats.some(seat => seat.type === 'couple');
-        
+        const isCoupleRow = rowSeats.some((s) => s.type === 'couple');
+
         if (isCoupleRow) {
-          // Render couple seats grouped in pairs
+          // Render hàng ghế cặp đôi: chia từng cặp, giữa hai ghế trong cặp gap-1.5, giữa các cặp gap-4
           return (
-            <div key={row} className="w-full flex justify-center gap-3 mb-2">
+            <div key={row} className="w-full flex justify-center gap-4">
               {Array.from({ length: Math.ceil(rowSeats.length / 2) }, (_, pairIndex) => (
-                <div key={`pair-${pairIndex}`} className="flex gap-1">
-                  {[0, 1].map(seatInPair => {
-                    const seatIndex = pairIndex * 2 + seatInPair;
-                    const seatData = rowSeats[seatIndex];
-                    
-                    if (!seatData) {
-                      return null; // Don't render missing seat
-                    }
-                    
-                    const seatName = seatData.seatId;
-                    const isMaintenance = seatData.status === 'maintenance';
+                <div key={`pair-${pairIndex}`} className="flex gap-1.5">
+                  {[0, 1].map((seatInPair) => {
+                    const idx = pairIndex * 2 + seatInPair;
+                    const seat = rowSeats[idx];
+                    if (!seat) return null;
+
+                    const seatName = seat.seatId;
+                    const isMaintenance = seat.status === 'maintenance';
                     const isSelectedFromServer = soldSeats.includes(seatName);
                     const isChecked = selectedSeats.includes(seatName);
-                    
-                    // Use seatData.type directly
-                    let baseColor: string;
-                    switch (seatData.type) {
-                      case 'vip': baseColor = 'bg-yellow-400 border-yellow-600'; break;
-                      case 'couple': baseColor = 'bg-pink-400 border-pink-600'; break;
-                      case '4dx': baseColor = 'bg-purple-400 border-purple-600'; break;
-                      default: baseColor = 'bg-gray-300 border-gray-500';
+
+                    let baseColor = '';
+                    switch (seat.type) {
+                      case 'vip':
+                        baseColor = 'bg-yellow-400 border-yellow-600';
+                        break;
+                      case 'couple':
+                        baseColor = 'bg-pink-400 border-pink-600';
+                        break;
+                      case '4dx':
+                        baseColor = 'bg-purple-400 border-purple-600';
+                        break;
+                      default:
+                        baseColor = 'bg-gray-300 border-gray-500';
                     }
-                    
+
                     const colorClass = isMaintenance
                       ? 'bg-gray-600 border-gray-800'
                       : isChecked
                         ? 'bg-[#b3210e] border-transparent'
                         : baseColor;
-                    
+
                     return (
                       <button
                         key={seatName}
-                        className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer`}
+                        className="relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer"
                         onClick={() => {
                           if (!isSelectedFromServer && !isMaintenance) {
                             handleSeatSelection(seatName);
@@ -337,12 +338,10 @@ const Seat: React.FC<SeatProps> = ({
                         }}
                         disabled={isSelectedFromServer || isMaintenance}
                         type="button"
+                        title={seatName}
                       >
                         <div
-                          className={`w-8 h-8 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative
-                            ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}
-                          `}
-                          title={seatName}
+                          className={`w-8.5 h-8.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
                         >
                           {seatName}
                           {isMaintenance && (
@@ -351,65 +350,69 @@ const Seat: React.FC<SeatProps> = ({
                         </div>
                       </button>
                     );
-                  }).filter(Boolean)}
+                  })}
                 </div>
               ))}
             </div>
           );
-        } else {
-          // Render normal rows
-          return (
-            <div key={row} className="flex flex-row items-center gap-6 mb-2">
-              {rowSeats.map((seatData) => {
-                const seatName = seatData.seatId;
-                const isMaintenance = seatData.status === 'maintenance';
-                const isSelectedFromServer = soldSeats.includes(seatName);
-                const isChecked = selectedSeats.includes(seatName);
-                
-                // Use seatData.type directly
-                let baseColor: string;
-                switch (seatData.type) {
-                  case 'vip': baseColor = 'bg-yellow-400 border-yellow-600'; break;
-                  case 'couple': baseColor = 'bg-pink-400 border-pink-600'; break;
-                  case '4dx': baseColor = 'bg-purple-400 border-purple-600'; break;
-                  default: baseColor = 'bg-gray-300 border-gray-500';
-                }
-                
-                const colorClass = isMaintenance
-                  ? 'bg-gray-600 border-gray-800'
-                  : isChecked
-                    ? 'bg-[#b3210e] border-transparent'
-                    : baseColor;
-                
-                return (
-                  <button
-                    key={seatName}
-                    className={`relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer`}
-                    onClick={() => {
-                      if (!isSelectedFromServer && !isMaintenance) {
-                        handleSeatSelection(seatName);
-                      }
-                    }}
-                    disabled={isSelectedFromServer || isMaintenance}
-                    type="button"
-                  >
-                    <div
-                      className={`w-8 h-8 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative
-                        ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}
-                      `}
-                      title={seatName}
-                    >
-                      {seatName}
-                      {isMaintenance && (
-                        <div className="absolute inset-0 flex items-center justify-center text-red-600 text-lg font-bold pointer-events-none">✕</div>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          );
         }
+
+        // Các hàng còn lại: tăng gap giữa các ghế
+        return (
+          <div key={row} className="flex flex-row items-center gap-5">
+            {rowSeats.map((seat) => {
+              const seatName = seat.seatId;
+              const isMaintenance = seat.status === 'maintenance';
+              const isSelectedFromServer = soldSeats.includes(seatName);
+              const isChecked = selectedSeats.includes(seatName);
+
+              let baseColor = '';
+              switch (seat.type) {
+                case 'vip':
+                  baseColor = 'bg-yellow-400 border-yellow-600';
+                  break;
+                case 'couple':
+                  baseColor = 'bg-pink-400 border-pink-600';
+                  break;
+                case '4dx':
+                  baseColor = 'bg-purple-400 border-purple-600';
+                  break;
+                default:
+                  baseColor = 'bg-gray-300 border-gray-500';
+              }
+
+              const colorClass = isMaintenance
+                ? 'bg-gray-600 border-gray-800'
+                : isChecked
+                  ? 'bg-[#b3210e] border-transparent'
+                  : baseColor;
+
+              return (
+                <button
+                  key={seatName}
+                  className="relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer"
+                  onClick={() => {
+                    if (!isSelectedFromServer && !isMaintenance) {
+                      handleSeatSelection(seatName);
+                    }
+                  }}
+                  disabled={isSelectedFromServer || isMaintenance}
+                  type="button"
+                  title={seatName}
+                >
+                  <div
+                    className={`w-8.5 h-8.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
+                  >
+                    {seatName}
+                    {isMaintenance && (
+                      <div className="absolute inset-0 flex items-center justify-center text-red-600 text-lg font-bold pointer-events-none">✕</div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        );
       })}
     </div>
   );

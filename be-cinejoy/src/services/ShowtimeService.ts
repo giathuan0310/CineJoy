@@ -58,7 +58,8 @@ class ShowtimeService {
         (showtimeData.showTimes as any[]).map(async (st: any) => {
           if (!st.seats || st.seats.length === 0) {
             const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
-            st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: "available" }));
+            // Giữ nguyên trạng thái ghế từ DB (bảo trì, v.v.)
+            st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
           }
           return st;
         })
@@ -514,17 +515,55 @@ class ShowtimeService {
       }
 
       // Get seat layout info for response
-      const roomLayout = await RoomModel.findById((specificShowtime.room as any)._id).select('seatLayout');
+      const roomId: any = (specificShowtime.room as any)?._id || (specificShowtime.room as any);
+      const roomLayout = await RoomModel.findById(roomId).select('seatLayout').lean();
+      
+      // Build quick lookup from roomLayout: seatId -> { type, status }
+      const roomSeatMap: Record<string, { type?: string; status?: string }> = {};
+      const rl = (roomLayout as any)?.seatLayout;
+      if (rl && rl.seats) {
+        Object.keys(rl.seats).forEach((sid: string) => {
+          roomSeatMap[sid] = { type: rl.seats[sid].type, status: rl.seats[sid].status };
+        });
+      }
+      
+      // Fallback: If roomSeatMap is empty, build it from SeatModel by room (seatId -> type/status)
+      if (Object.keys(roomSeatMap).length === 0) {
+        const seatsByRoom = await SeatModel.find({ room: roomId }).select('seatId type status').lean();
+        seatsByRoom.forEach((s: any) => {
+          if (s.seatId) {
+            roomSeatMap[s.seatId] = { type: s.type, status: s.status };
+          }
+        });
+      }
       
       // Populate seat information with type and other details
       const populatedSeats = await Promise.all(
-        seatData.map(async (seatItem: any) => {
-          const seatInfo = await SeatModel.findById(seatItem.seat).select('type status row number');
+        seatData.map(async (seatItem: any, index: number) => {
+          const seatInfo = await SeatModel.findById(seatItem.seat).select('type status seatId');
+          
+          // Compute seatId by index as fallback (row-major order)
+          const cols = (roomLayout as any)?.seatLayout?.cols || 10;
+          const rowIndex = Math.floor(index / cols);
+          const colIndex = index % cols;
+          const computedSeatId = `${String.fromCharCode(65 + rowIndex)}${colIndex + 1}`;
+          
+          const sid = seatInfo?.seatId || computedSeatId;
+          const fromRoom = roomSeatMap[sid];
+          
+          // Status priority: SeatModel.maintenance -> RoomLayout.maintenance -> seatItem.status
+          const finalStatus = (seatInfo?.status === 'maintenance' || fromRoom?.status === 'maintenance')
+            ? 'maintenance'
+            : seatItem.status;
+          
+          // Type priority: RoomLayout.type (most up-to-date from admin) -> SeatModel.type -> 'normal'
+          const finalType = fromRoom?.type || seatInfo?.type || 'normal';
           
           return {
             seat: seatItem.seat,
-            status: seatItem.status,
-            type: seatInfo?.type || 'normal', // Use actual type from database
+            seatId: sid,
+            status: finalStatus,
+            type: finalType,
             _id: seatItem._id
           };
         })
@@ -822,34 +861,22 @@ class ShowtimeService {
   private async generateDefaultSeats(roomId: string): Promise<any[]> {
     const seats: any[] = [];
     
-    // Get room layout to determine rows and cols
     const room = await RoomModel.findById(roomId).select('seatLayout');
     const rows = room?.seatLayout?.rows || 12;
     const cols = room?.seatLayout?.cols || 10;
     
-    // Get all seats for this room from database
-    const roomSeats = await SeatModel.find({ room: roomId }).select('_id type status');
-    
-    // Create a map of seat ID to seat info
-    const seatMap = new Map();
-    roomSeats.forEach(seat => {
-      seatMap.set(seat._id.toString(), seat);
-    });
+    // Get all seats for this room from database, include seatId to match by position
+    const roomSeats = await SeatModel.find({ room: roomId }).select('_id type status seatId');
 
-    // Generate seats based on room layout
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
-        
+        const seatIdLabel = `${String.fromCharCode(65 + row)}${col + 1}`;
         // Find corresponding seat in database by seatId
-        const dbSeat = roomSeats.find((seat: any) => {
-          return seat.seatId === seatId;
-        });
-        
+        const dbSeat = roomSeats.find((seat: any) => seat.seatId === seatIdLabel);
         seats.push({
-          seat: dbSeat?._id || new mongoose.Types.ObjectId(), // Use actual seat ID from database
-          status: "available",
-          type: dbSeat?.type || 'normal', // Use actual type from database
+          seat: dbSeat?._id || new mongoose.Types.ObjectId(),
+          status: dbSeat?.status || "available",
+          type: dbSeat?.type || 'normal',
           _id: new mongoose.Types.ObjectId()
         });
       }

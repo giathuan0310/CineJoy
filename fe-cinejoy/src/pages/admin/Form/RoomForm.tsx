@@ -167,17 +167,12 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
         if (selectedRegion) {
             const region = regions.find(r => r._id === selectedRegion);
             if (region) {
-                console.log('Selected region:', region);
-                console.log('All theaters:', theaters);
-                
                 const regionTheaters = theaters.filter(theater => {
                     // Check if theater belongs to selected region by regionId
                     const regionMatch = theater.regionId === selectedRegion;
-                    console.log(`Theater: ${theater.name}, Theater RegionId: ${theater.regionId}, Selected Region: ${selectedRegion}, Match: ${regionMatch}`);
                     return regionMatch;
                 });
-                
-                console.log('Filtered theaters:', regionTheaters);
+            
                 setFilteredTheaters(regionTheaters);
             }
         } else {
@@ -214,17 +209,11 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
     // Load seats for a room
     const loadRoomSeats = async (roomId: string) => {
         try {
-            console.log('Loading seats for room:', roomId);
-            console.log('Full room object:', room);
             const response = await getSeatsByRoomApi(roomId);
-            console.log('API Response:', response);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const seats = (response as any).data || [];
-            console.log('Parsed seats:', seats);
             
             if (seats.length > 0) {
-                console.log('Found existing seats:', seats.length);
-                
                 // Convert seats array to seat layout format
                 const existingSeats: { [key: string]: { type: 'normal' | 'vip' | 'couple' | '4dx'; status: 'available' | 'maintenance' } } = {};
                 
@@ -246,65 +235,40 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
                     maxCol = Math.max(maxCol, col);
                 });
                 
-                // Lọc bỏ ghế lẻ cuối cùng trong tất cả các hàng cặp đôi
-                console.log('=== DEBUG: Filtering odd seats from couple rows ===');
-                const coupleRows = new Set<string>();
-                Object.keys(existingSeats).forEach(seatId => {
-                    if (existingSeats[seatId].type === 'couple') {
-                        coupleRows.add(seatId.charAt(0));
-                    }
+                // Enforce rule for 2D rooms: last row must be couple seats and even count
+                const lastRowChar = String.fromCharCode(65 + maxRow);
+                const lastRowSeatIds = Object.keys(existingSeats).filter(id => id.charAt(0) === lastRowChar);
+                
+                // Force all seats in last row to 'couple'
+                lastRowSeatIds.forEach(id => {
+                    existingSeats[id] = { ...existingSeats[id], type: 'couple' } as typeof existingSeats[string];
                 });
                 
-                console.log('Couple rows found:', Array.from(coupleRows));
-                
-                coupleRows.forEach(rowChar => {
-                    const seatsInRow = Object.keys(existingSeats).filter(seatId => 
-                        seatId.charAt(0) === rowChar && existingSeats[seatId].type === 'couple'
-                    );
-                    
-                    console.log(`Row ${rowChar} couple seats:`, seatsInRow);
-                    
-                    if (seatsInRow.length > 0) {
-                        // Tìm ghế có số cột cao nhất trong hàng này
-                        const maxColInRow = Math.max(...seatsInRow.map(seatId => parseInt(seatId.substring(1))));
-                        console.log(`Row ${rowChar} max column:`, maxColInRow);
-                        
-                        // Nếu số cột lẻ và có ghế ở vị trí cuối cùng
-                        if (maxColInRow % 2 !== 0) {
-                            const oddSeatId = `${rowChar}${maxColInRow}`;
-                            console.log(`Found odd seat: ${oddSeatId}, exists:`, !!existingSeats[oddSeatId]);
-                            if (existingSeats[oddSeatId]) {
-                                console.log(`Removing odd seat ${oddSeatId} from couple row ${rowChar}`);
-                                delete existingSeats[oddSeatId];
-                            }
-                        } else {
-                            console.log(`Row ${rowChar} has even number of seats, no removal needed`);
+                // If last row has odd number of seats, remove the last (highest column) one (e.g., I11)
+                if (lastRowSeatIds.length > 0) {
+                    const maxColInLastRow = Math.max(...lastRowSeatIds.map(id => parseInt(id.substring(1))));
+                    if (maxColInLastRow % 2 !== 0) {
+                        const oddSeatId = `${lastRowChar}${maxColInLastRow}`;
+                        if (existingSeats[oddSeatId]) {
+                            delete existingSeats[oddSeatId];
                         }
                     }
-                });
+                }
                 
-                console.log('=== END DEBUG ===');
-                
-                // Tính lại maxCol sau khi đã lọc bỏ ghế lẻ
+                // Recompute maxCol after enforcing last row rules
                 let newMaxCol = 0;
                 Object.keys(existingSeats).forEach(seatId => {
                     const col = parseInt(seatId.substring(1)) - 1; // 1=0, 2=1, etc.
                     newMaxCol = Math.max(newMaxCol, col);
                 });
                 
-                console.log('Original maxCol:', maxCol, 'New maxCol after filtering:', newMaxCol);
-                
                 setSeatLayout({
                     rows: maxRow + 1,
                     cols: newMaxCol + 1,
                     seats: existingSeats
                 });
-                
-                console.log('Loaded seat layout:', maxRow + 1, 'rows,', newMaxCol + 1, 'cols,', Object.keys(existingSeats).length, 'seats');
-                console.log('Final seatLayout.cols will be:', newMaxCol + 1);
             } else {
                 // No existing seats, create default layout
-                console.log('No existing seats found, creating default layout');
                 const defaultSeats = createDefaultSeatTemplate(8, 10);
                 setSeatLayout({ 
                     rows: 8, 
@@ -530,6 +494,20 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
             newSeats[seatId] = { ...newSeats[seatId], status };
         }
         
+        // Nếu là ghế cặp đôi thì áp dụng cho ghế còn lại trong cặp
+        const seatType = getSeatType(seatId);
+        if (seatType === 'couple') {
+            const rowLetter = seatId.charAt(0);
+            const colNum = parseInt(seatId.substring(1), 10);
+            const pairCol = colNum % 2 === 1 ? colNum + 1 : colNum - 1;
+            if (pairCol >= 1) {
+                const pairSeatId = `${rowLetter}${pairCol}`;
+                if (newSeats[pairSeatId]) {
+                    newSeats[pairSeatId] = { ...newSeats[pairSeatId], status };
+                }
+            }
+        }
+        
         setSeatLayout(prev => ({ ...prev, seats: newSeats }));
         setContextMenu({ visible: false, x: 0, y: 0, seatId: '' });
     };
@@ -623,7 +601,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
         
         try {
             setIsSubmitting(true);
-            console.log('RoomForm: Starting submit process');
             
             // Auto-calculate capacity from seat layout (considering last row adjustment)
             let capacity = seatLayout.rows * seatLayout.cols;
@@ -642,14 +619,6 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
                 description: values.description,
                 seatLayout: seatLayout
             };
-            
-            console.log('RoomForm: Calling onSubmit with data:', submitData);
-            console.log('SeatLayout details:', {
-                rows: seatLayout.rows,
-                cols: seatLayout.cols,
-                seatsCount: Object.keys(seatLayout.seats).length,
-                sampleSeats: Object.keys(seatLayout.seats).slice(0, 5)
-            });
             onSubmit(submitData);
             
         } catch (error) {

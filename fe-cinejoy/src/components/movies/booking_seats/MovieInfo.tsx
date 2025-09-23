@@ -208,7 +208,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
         <div className="text-center mb-4 text-xl font-semibold">Thông tin vé</div>
         <div className="text-sm leading-6 mb-6 text-justify">
           Tôi xác nhận mua vé cho người xem từ đủ {minAge} tuổi trở lên và đồng ý cung cấp giấy tờ tùy thân để xác thực độ tuổi người xem, tham khảo <span className="font-bold text-red-500 cursor-pointer">quy định</span> của Bộ Văn Hóa, Thể Thao và Du Lịch,{" "}
-          {minAge <= 16 && (
+          {minAge < 16 && (
             <>
               CNJ không được phép phục vụ khách hàng dưới 16 tuổi cho các suất chiếu kết thúc sau 23:00. {""}
             </>

@@ -154,6 +154,9 @@ const Dashboard: React.FC = () => {
     startDate: '',
     endDate: ''
   });
+  const [editEndDateModalVisible, setEditEndDateModalVisible] = useState(false);
+  const [editingEndDatePriceList, setEditingEndDatePriceList] = useState<IPriceList | null>(null);
+  const [newEndDateValue, setNewEndDateValue] = useState<string>('');
   
   
   const { user } = useAppStore();
@@ -1610,7 +1613,7 @@ const Dashboard: React.FC = () => {
                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
                               {theaterRooms.length} phòng
                             </span>
-                          </td>
+                        </td>
                         <td className="p-3">
                           <div className="flex gap-2">
                               <motion.button
@@ -2380,6 +2383,18 @@ const Dashboard: React.FC = () => {
                               </button>
                               {priceList.status === "active" && (
                                 <button
+                                  onClick={() => {
+                                    setEditingEndDatePriceList(priceList);
+                                    setNewEndDateValue(dayjs(priceList.endDate).format('YYYY-MM-DD'));
+                                    setEditEndDateModalVisible(true);
+                                  }}
+                                  className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
+                                >
+                                  Sửa
+                                </button>
+                              )}  
+                              {priceList.status === "active" && (
+                                <button
                                     onClick={() => {
                                       setEditingPriceList(priceList);
                                       setSplitVersionData({
@@ -3030,6 +3045,101 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Edit End Date Modal */}
+      {editEndDateModalVisible && editingEndDatePriceList && (
+        <Modal
+          title={<div style={{ textAlign: 'center', fontSize: '18px' }}>Sửa bảng giá</div>}
+          open
+          onCancel={() => {
+            setEditEndDateModalVisible(false);
+            setEditingEndDatePriceList(null);
+            setNewEndDateValue('');
+          }}
+          footer={null}
+          centered
+        >
+          <ConfigProvider locale={viVN}>
+            <Form layout="vertical" onFinish={async () => {
+              if (!newEndDateValue) {
+                message.error('Vui lòng chọn ngày kết thúc mới');
+                return;
+              }
+
+              // Validate: endDate >= today và > startDate
+              const today = dayjs().startOf('day');
+              const start = dayjs(editingEndDatePriceList.startDate).startOf('day');
+              const end = dayjs(newEndDateValue).startOf('day');
+              if (end.isBefore(today)) {
+                message.error(`Ngày kết thúc phải từ hôm nay trở đi`);
+                return;
+              }
+              if (!end.isAfter(start)) {
+                message.error('Ngày kết thúc phải sau ngày bắt đầu');
+                return;
+              }
+
+              try {
+                await updatePriceList(editingEndDatePriceList._id, { endDate: end.format('YYYY-MM-DD') });
+                toast.success('Cập nhật ngày kết thúc thành công!');
+                await loadPriceLists();
+                setEditEndDateModalVisible(false);
+                setEditingEndDatePriceList(null);
+                setNewEndDateValue('');
+              } catch (e: any) {
+                console.error('Error updating end date', e);
+                toast.error(e?.message || 'Cập nhật ngày kết thúc thất bại!');
+              }
+            }}>
+              <Form.Item label="Tên bảng giá">
+                <Input value={editingEndDatePriceList.name} disabled />
+              </Form.Item>
+              <Form.Item label="Ngày bắt đầu">
+                <DatePicker
+                  className="w-full"
+                  format="DD/MM/YYYY"
+                  value={dayjs(editingEndDatePriceList.startDate)}
+                  disabled
+                />
+              </Form.Item>
+              <Form.Item label="Ngày kết thúc mới" required>
+                <DatePicker
+                  className="w-full"
+                  format="DD/MM/YYYY"
+                  value={newEndDateValue ? dayjs(newEndDateValue) : null}
+                  onChange={(d) => setNewEndDateValue(d ? d.format('YYYY-MM-DD') : '')}
+                  disabledDate={(current) => {
+                    if (!current) return false;
+                    const todayStart = dayjs().startOf('day');
+                    const startFixed = dayjs(editingEndDatePriceList.startDate).startOf('day');
+                    const cur = current.startOf('day');
+
+                    // Không cho chọn quá khứ hoặc trước ngày bắt đầu
+                    if (cur.isBefore(todayStart) || cur.isBefore(startFixed)) return true;
+
+                    // Chặn ngày gây trùng khoảng với các bảng giá khác: [startFixed, cur] overlaps [s,e]
+                    const hasOverlap = priceLists.some((pl) => {
+                      if (pl._id === editingEndDatePriceList._id) return false; // bỏ qua bản đang sửa
+                      const s = dayjs(pl.startDate).startOf('day');
+                      const e = dayjs(pl.endDate).endOf('day');
+                      return startFixed.isSameOrBefore(e) && cur.isSameOrAfter(s);
+                    });
+                    return hasOverlap;
+                  }}
+                />
+              </Form.Item>
+              <div className="flex justify-end gap-2">
+                <Button onClick={() => {
+                  setEditEndDateModalVisible(false);
+                  setEditingEndDatePriceList(null);
+                  setNewEndDateValue('');
+                }}>Hủy</Button>
+                <Button type="primary" htmlType="submit">Lưu</Button>
+              </div>
+            </Form>
+          </ConfigProvider>
         </Modal>
       )}
 

@@ -537,13 +537,32 @@ class ShowtimeService {
         });
       }
       
+      // Derive rows/cols from actual seat ids in roomSeatMap (fallback to roomLayout if needed)
+      const deriveLayout = () => {
+        let maxRowCharCode = -1;
+        let maxColNumber = 0;
+        Object.keys(roomSeatMap).forEach((sid) => {
+          if (sid && typeof sid === 'string' && /^[A-Z]\d+$/i.test(sid)) {
+            const rowChar = sid.charAt(0).toUpperCase();
+            const colNum = parseInt(sid.substring(1), 10) || 0;
+            maxRowCharCode = Math.max(maxRowCharCode, rowChar.charCodeAt(0));
+            maxColNumber = Math.max(maxColNumber, colNum);
+          }
+        });
+        const layoutRows = maxRowCharCode >= 65 ? (maxRowCharCode - 65 + 1) : ((roomLayout as any)?.seatLayout?.rows || 12);
+        const layoutCols = maxColNumber > 0 ? maxColNumber : ((roomLayout as any)?.seatLayout?.cols || 10);
+        return { layoutRows, layoutCols };
+      };
+
+      const { layoutRows: derivedRows, layoutCols: derivedCols } = deriveLayout();
+
       // Populate seat information with type and other details
       const populatedSeats = await Promise.all(
         seatData.map(async (seatItem: any, index: number) => {
           const seatInfo = await SeatModel.findById(seatItem.seat).select('type status seatId');
           
           // Compute seatId by index as fallback (row-major order)
-          const cols = (roomLayout as any)?.seatLayout?.cols || 10;
+          const cols = derivedCols;
           const rowIndex = Math.floor(index / cols);
           const colIndex = index % cols;
           const computedSeatId = `${String.fromCharCode(65 + rowIndex)}${colIndex + 1}`;
@@ -581,8 +600,8 @@ class ShowtimeService {
         },
         seats: populatedSeats,
         seatLayout: {
-          rows: roomLayout?.seatLayout?.rows || 12,
-          cols: roomLayout?.seatLayout?.cols || 10
+          rows: derivedRows,
+          cols: derivedCols
         },
       };
     } catch (error) {

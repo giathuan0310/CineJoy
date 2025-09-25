@@ -86,7 +86,16 @@ export const checkTimeGaps = async (): Promise<{ hasGap: boolean; message?: stri
   return response.data as { hasGap: boolean; message?: string; gaps?: string[] };
 };
 
-// Split version bảng giá
+// Sao chép bảng giá
+export const duplicatePriceList = async (
+  id: string,
+  data: { newName: string; startDate: string; endDate: string }
+): Promise<IPriceList> => {
+  const response = await axiosClient.post(`/price-lists/${id}/duplicate`, data);
+  return response.data as IPriceList;
+};
+
+// Split version bảng giá (endpoint hiện có trên backend)
 export const splitPriceListVersion = async (id: string, splitData: {
   newName: string;
   oldEndDate: string;

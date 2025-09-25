@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import useAppStore from "@/store/app.store";
 import { getSeatsForShowtimeApi } from "@/apiservice/apiShowTime";
-
 interface SeatProps {
   selectedSeats: string[]; // UI checked
   soldSeats: string[]; // already selected (reserved/sold)
@@ -14,7 +13,6 @@ interface SeatProps {
   room?: string;
   onSeatsLoaded?: (seatData: any) => void;
 }
-
 
 interface SeatLayout {
   rows: number;
@@ -298,7 +296,7 @@ const Seat: React.FC<SeatProps> = ({
 
           // Render hàng ghế cặp đôi: chia từng cặp, giữa hai ghế trong cặp gap-1.5, giữa các cặp gap-4
         return (
-            <div key={row} className="w-full flex justify-center gap-4">
+            <div key={row} className="w-full flex justify-center gap-2">
               {Array.from({ length: numPairs }, (_, pairIndex) => (
                 <div key={`pair-${pairIndex}`} className="flex gap-1.5">
                   {[0, 1].map((seatInPair) => {
@@ -346,7 +344,7 @@ const Seat: React.FC<SeatProps> = ({
                         title={seatName}
                       >
                         <div
-                          className={`w-8.5 h-8.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
+                          className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
                         >
                           {seatName}
                           {isMaintenance && (
@@ -364,7 +362,7 @@ const Seat: React.FC<SeatProps> = ({
 
         // Các hàng còn lại: tăng gap giữa các ghế
         return (
-          <div key={row} className="flex flex-row items-center gap-5">
+          <div key={row} className="flex flex-row items-center gap-2">
             {rowSeats.map((seat, i) => {
               // Nếu là hàng cặp đôi nhưng vì lý do nào đó lọt qua đây và tổng cột lẻ, ẩn ghế cuối
               const totalCols = seatLayout?.cols || rowSeats.length;
@@ -412,7 +410,7 @@ const Seat: React.FC<SeatProps> = ({
                   title={seatName}
                 >
                   <div
-                    className={`w-8.5 h-8.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
+                    className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
                   >
                     {seatName}
                     {isMaintenance && (

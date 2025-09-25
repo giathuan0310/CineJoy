@@ -212,7 +212,7 @@ const Header = () => {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center">
               <img
-                className="w-[90px] object-cover inline-block"
+                className="w-[65px] object-cover inline-block"
                 src={Logo}
                 alt="Logo"
               />
@@ -227,10 +227,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Trang chủ
@@ -241,10 +241,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Phim
@@ -255,10 +255,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Tin tức
@@ -269,10 +269,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Thành viên
@@ -283,10 +283,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Liên hệ
@@ -314,9 +314,9 @@ const Header = () => {
                 onClick={handleDarkMode}
               >
                 {isDarkMode ? (
-                  <MdDarkMode color="white" size={35} />
+                  <MdDarkMode color="white" size={30} />
                 ) : (
-                  <MdDarkMode size={35} />
+                  <MdDarkMode size={30} />
                 )}
               </div>
               <Dropdown
@@ -328,10 +328,10 @@ const Header = () => {
                   <img
                     src={user?.avatar}
                     alt="User Avatar"
-                    className="w-9 h-9 mr-3 rounded-full object-cover"
+                    className="w-7.5 h-7.5 mr-3 rounded-full object-cover"
                   />
                   <span
-                    className={`text-md font-medium ${
+                    className={`text-[15.5px] font-medium ${
                       isDarkMode ? "text-white" : ""
                     }`}
                   >
@@ -361,9 +361,9 @@ const Header = () => {
                   onClick={handleDarkMode}
                 >
                   {isDarkMode ? (
-                    <MdDarkMode color="white" size={35} />
+                    <MdDarkMode color="white" size={30} />
                   ) : (
-                    <MdDarkMode size={35} />
+                    <MdDarkMode size={30} />
                   )}
                 </div>
                 <button

@@ -35,7 +35,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       <div className="fixed inset-0 z-[3000] bg-black/50 backdrop-blur-sm transition-all" onClick={closeSearch} />
     )}
     <button
-      className={`text-gray-700 hover:text-gray-900 bg-white rounded-full border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250 ${showSearch ? 'z-[4001] p-2' : 'p-2.5'}`}
+      className={`text-gray-700 hover:text-gray-900 bg-white rounded-full border border-gray-200 cursor-pointer hover:scale-110 transition-all duration-250 ${showSearch ? 'z-[4001] p-2' : 'p-2'}`}
       style={{ position: 'relative', zIndex: showSearch ? 4001 : 'auto' }}
       tabIndex={showSearch ? -1 : 0}
       onClick={() => {
@@ -46,7 +46,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
         }, 200);
       }}
     >
-      <FaSearch size={14} />
+      <FaSearch size={9} />
     </button>
     {/* Input search expand */}
     <div
@@ -54,7 +54,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       style={{ boxShadow: '0 4px 32px 0 rgba(0,0,0,0.10)' }}
     >
       <div className="text-gray-700 mx-1">
-        <FaSearch size={14} />
+        <FaSearch size={9} />
       </div>
       <input
         ref={searchInputRef}

@@ -23,14 +23,21 @@ import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { Popconfirm, Modal, Table, Tag, Space, Descriptions, Form, Input, DatePicker, Button, message, ConfigProvider } from "antd";
 import dayjs from "dayjs";
+import isBetween from 'dayjs/plugin/isBetween';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import viVN from 'antd/locale/vi_VN';
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addSingleProduct, addCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
-import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, checkTimeGaps, splitPriceListVersion } from "@/apiservice/apiPriceList";
+import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, checkTimeGaps } from "@/apiservice/apiPriceList";
 import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
 import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
 import createInstanceAxios from "@/services/axios.customize";
+
+dayjs.extend(isBetween);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 const axios = createInstanceAxios(import.meta.env.VITE_BACKEND_URL);
 import {
@@ -144,8 +151,8 @@ const Dashboard: React.FC = () => {
   const [splitVersionModalVisible, setSplitVersionModalVisible] = useState(false);
   const [splitVersionData, setSplitVersionData] = useState({
     newName: '',
-    oldEndDate: '',
-    newStartDate: ''
+    startDate: '',
+    endDate: ''
   });
   
   
@@ -640,26 +647,30 @@ const Dashboard: React.FC = () => {
     setPriceListDetailVisible(true);
   };
 
-  const handleSplitVersion = async (splitData: {
+  const handleDuplicatePriceList = async (dupData: {
     newName: string;
-    oldEndDate: string;
-    newStartDate: string;
+    startDate: string;
+    endDate: string;
   }) => {
     if (!editingPriceList) return;
-    
+
     try {
-      await splitPriceListVersion(editingPriceList._id, splitData);
-      toast.success("Tạo split version thành công!");
-      
-      // Reload price lists
+      // Tạo mới 1 bảng giá từ dữ liệu bảng gốc, KHÔNG chạm vào bảng gốc
+      await createPriceList({
+        name: dupData.newName,
+        startDate: dupData.startDate,
+        endDate: dupData.endDate,
+        lines: editingPriceList.lines,
+      } as any);
+
+      toast.success("Sao chép bảng giá thành công!");
+
       await loadPriceLists();
-      
-      // Close modal
       setSplitVersionModalVisible(false);
       setEditingPriceList(null);
     } catch (error: any) {
-      console.error("Error splitting price list version:", error);
-      toast.error(error?.message || "Tạo split version thất bại!");
+      console.error("Error duplicating price list:", error);
+      toast.error(error?.message || "Sao chép bảng giá thất bại!");
     }
   };
 
@@ -2369,18 +2380,18 @@ const Dashboard: React.FC = () => {
                               </button>
                               {priceList.status === "active" && (
                                 <button
-                                  onClick={() => {
-                                    setEditingPriceList(priceList);
-                                    setSplitVersionData({
-                                      newName: `${priceList.name} - Cập nhật`,
-                                      oldEndDate: '',
-                                      newStartDate: ''
+                                    onClick={() => {
+                                      setEditingPriceList(priceList);
+                                      setSplitVersionData({
+                                      newName: `${priceList.name} - Bản sao`,
+                                      startDate: '',
+                                      endDate: ''
                                     });
                                     setSplitVersionModalVisible(true);
                                   }}
                                   className="bg-purple-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-purple-600 mr-2"
                                 >
-                                  Tách phiên bản
+                                  Sao chép
                                 </button>
                               )}
                               {priceList.status === "scheduled" && (
@@ -3098,12 +3109,12 @@ const Dashboard: React.FC = () => {
         </Modal>
       )}
 
-      {/* Modal Tách phiên bản */}
+      {/* Modal Sao chép */}
       {splitVersionModalVisible && editingPriceList && (
         <Modal
           title={
             <div style={{ textAlign: 'center', fontSize: '18px' }}>
-              Tách phiên bản
+              Sao chép
             </div>
           }
           open={true}
@@ -3125,7 +3136,7 @@ const Dashboard: React.FC = () => {
           <div className="space-y-6">
             {/* Thông tin bảng giá hiện tại */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá hiện tại (sẽ kết thúc)</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá nguồn (bản gốc)</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="font-medium text-gray-600">Tên:</span>
@@ -3147,15 +3158,15 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Form tạo bảng giá mới */}
+            {/* Form sao chép bảng giá */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá mới (sẽ thay thế)</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá mới (bản sao)</h3>
               <ConfigProvider locale={viVN}>
                 <Form layout="vertical">
                   <Form.Item
                     label="Tên bảng giá mới"
                     required
-                    tooltip="Tên của bảng giá mới sẽ được tạo"
+                    tooltip="Tên của bảng giá được sao chép"
                   >
                     <Input
                       value={splitVersionData.newName}
@@ -3164,49 +3175,44 @@ const Dashboard: React.FC = () => {
                     />
                   </Form.Item>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <Form.Item
-                      label="Ngày kết thúc bảng giá cũ"
-                      required
-                      tooltip="Ngày mà bảng giá hiện tại sẽ kết thúc (không được chọn ngày trong quá khứ)"
-                    >
-                      <DatePicker
-                        value={splitVersionData.oldEndDate ? dayjs(splitVersionData.oldEndDate) : null}
-                        onChange={(date) => {
-                          const oldEndDate = date ? date.format('YYYY-MM-DD') : '';
-                          const newStartDate = date ? date.add(1, 'day').format('YYYY-MM-DD') : '';
-                          setSplitVersionData({
-                            ...splitVersionData, 
-                            oldEndDate,
-                            newStartDate
-                          });
-                        }}
-                        className="w-full"
-                        placeholder="Chọn ngày kết thúc"
-                        format="DD/MM/YYYY"
-                        disabledDate={(current) => {
-                          // Disable ngày trong quá khứ (trước hôm nay)
-                          return current && current < dayjs().startOf('day');
-                        }}
-                      />
-                    </Form.Item>
-                    
-                    <Form.Item
-                      label="Ngày bắt đầu bảng giá mới"
-                      required
-                      tooltip="Tự động tính từ ngày kết thúc bảng giá cũ + 1 ngày (không thể chỉnh sửa)"
-                    >
-                      <DatePicker
-                        value={splitVersionData.newStartDate ? dayjs(splitVersionData.newStartDate) : null}
-                        onChange={() => {}} // Không cho phép thay đổi
-                        className="w-full"
-                        placeholder="Tự động tính"
-                        format="DD/MM/YYYY"
-                        disabled={true}
-                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-                      />
-                    </Form.Item>
-                  </div>
+                  <Form.Item
+                    label="Khoảng thời gian hiệu lực"
+                    required
+                    tooltip="Chọn khoảng ngày bắt đầu/kết thúc cho bản sao. Không được trùng với các khoảng đã có."
+                  >
+                    <DatePicker.RangePicker
+                      value={
+                        splitVersionData.startDate && splitVersionData.endDate
+                          ? [dayjs(splitVersionData.startDate), dayjs(splitVersionData.endDate)]
+                          : null
+                      }
+                      onChange={(dates) => {
+                        const [start, end] = dates || [];
+                        setSplitVersionData({
+                          ...splitVersionData,
+                          startDate: start ? start.format('YYYY-MM-DD') : '',
+                          endDate: end ? end.format('YYYY-MM-DD') : ''
+                        });
+                      }}
+                      className="w-full"
+                      format="DD/MM/YYYY"
+                      allowClear
+                      disabledDate={(current) => {
+                        if (!current) return false;
+                        // Không cho chọn hôm nay và quá khứ
+                        const isPastOrToday = current <= dayjs().startOf('day');
+                        if (isPastOrToday) return true;
+                        // Không cho chọn vào bất kỳ khoảng thời gian đã tồn tại (bao gồm cả bảng gốc)
+                        const ts = current.startOf('day');
+                        const overlap = priceLists.some((pl) => {
+                          const s = dayjs(pl.startDate).startOf('day');
+                          const e = dayjs(pl.endDate).endOf('day');
+                          return (ts.isAfter(s) && ts.isBefore(e)) || ts.isSame(s, 'day') || ts.isSame(e, 'day');
+                        });
+                        return overlap;
+                      }}
+                    />
+                  </Form.Item>
 
                   <div className="bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
                     <div className="flex">
@@ -3221,7 +3227,7 @@ const Dashboard: React.FC = () => {
               </ConfigProvider>
             </div>
 
-            {/* Preview thay đổi */}
+            {/* Preview */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-3 text-gray-800">Xem trước thay đổi</h3>
               <div className="space-y-2 text-sm">
@@ -3232,15 +3238,15 @@ const Dashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Bảng giá cũ sẽ kết thúc:</span>
+                  <span className="text-gray-600">Ngày bắt đầu:</span>
                   <span className="font-medium">
-                    {splitVersionData.oldEndDate ? new Date(splitVersionData.oldEndDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
+                    {splitVersionData.startDate ? new Date(splitVersionData.startDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Bảng giá mới sẽ bắt đầu:</span>
+                  <span className="text-gray-600">Ngày kết thúc:</span>
                   <span className="font-medium">
-                    {splitVersionData.newStartDate ? new Date(splitVersionData.newStartDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
+                    {splitVersionData.endDate ? new Date(splitVersionData.endDate).toLocaleDateString('vi-VN') : 'Chưa chọn'}
                   </span>
                 </div>
               </div>
@@ -3259,52 +3265,50 @@ const Dashboard: React.FC = () => {
               <Button
                 type="primary"
                 onClick={() => {
-                  if (!splitVersionData.newName || !splitVersionData.oldEndDate || !splitVersionData.newStartDate) {
+                  if (!splitVersionData.newName || !splitVersionData.startDate || !splitVersionData.endDate) {
                     message.error("Vui lòng điền đầy đủ thông tin");
                     return;
                   }
-
                   // Validation ngày
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  
-                  const oldEndDate = new Date(splitVersionData.oldEndDate);
-                  oldEndDate.setHours(0, 0, 0, 0);
-                  
-                  const newStartDate = new Date(splitVersionData.newStartDate);
-                  newStartDate.setHours(0, 0, 0, 0);
+                  const start = new Date(splitVersionData.startDate);
+                  const end = new Date(splitVersionData.endDate);
+                  start.setHours(0,0,0,0); end.setHours(0,0,0,0);
 
-                  if (oldEndDate < today) {
-                    message.error(`Ngày kết thúc bảng giá cũ (${oldEndDate.toLocaleDateString('vi-VN')}) không thể là ngày trong quá khứ. Ngày hiện tại là ${today.toLocaleDateString('vi-VN')}`);
+                  if (start <= today) {
+                    message.error(`Ngày bắt đầu (${start.toLocaleDateString('vi-VN')}) phải sau hôm nay (${today.toLocaleDateString('vi-VN')})`);
+                    return;
+                  }
+                  if (end <= start) {
+                    message.error("Ngày kết thúc phải sau ngày bắt đầu");
                     return;
                   }
 
-                  if (newStartDate < today) {
-                    message.error(`Ngày bắt đầu bảng giá mới (${newStartDate.toLocaleDateString('vi-VN')}) không thể là ngày trong quá khứ. Ngày hiện tại là ${today.toLocaleDateString('vi-VN')}`);
+                  // Chặn trùng với bất kỳ khoảng thời gian đã tồn tại
+                  const startD = dayjs(splitVersionData.startDate).startOf('day');
+                  const endD = dayjs(splitVersionData.endDate).endOf('day');
+                  const conflicts = priceLists.filter((pl) => {
+                    const s = dayjs(pl.startDate).startOf('day');
+                    const e = dayjs(pl.endDate).endOf('day');
+                    // overlap nếu start <= e && end >= s
+                    return (startD.isSame(e, 'day') || startD.isBefore(e)) && (endD.isSame(s, 'day') || endD.isAfter(s));
+                  });
+                  if (conflicts.length > 0) {
+                    const names = conflicts.map((c) => `${c.name} (${dayjs(c.startDate).format('DD/MM/YYYY')} - ${dayjs(c.endDate).format('DD/MM/YYYY')})`).join(', ');
+                    message.error(`Khoảng thời gian bị trùng với: ${names}`);
                     return;
                   }
 
-                  if (oldEndDate >= newStartDate) {
-                    message.error("Ngày kết thúc bảng giá cũ phải trước ngày bắt đầu bảng giá mới");
-                    return;
-                  }
-
-                  // Kiểm tra ngày bắt đầu bảng giá mới không được sau ngày kết thúc ban đầu
-                  const originalEndDate = new Date(editingPriceList.endDate);
-                  originalEndDate.setHours(0, 0, 0, 0);
-                  
-                  if (newStartDate >= originalEndDate) {
-                    message.error(`Ngày bắt đầu bảng giá mới (${newStartDate.toLocaleDateString('vi-VN')}) phải trước ngày kết thúc ban đầu (${originalEndDate.toLocaleDateString('vi-VN')})`);
-                    return;
-                  }
-
-                  // Không cần kiểm tra khoảng trống vì đã tự động tính (luôn cách nhau 1 ngày)
-
-                  handleSplitVersion(splitVersionData);
+                  handleDuplicatePriceList({
+                    newName: splitVersionData.newName,
+                    startDate: splitVersionData.startDate,
+                    endDate: splitVersionData.endDate,
+                  });
                 }}
                 style={{ backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}
               >
-                Tạo phiên bản mới
+                Tạo bản sao
               </Button>
             </div>
           </div>

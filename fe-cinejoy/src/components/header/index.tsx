@@ -314,9 +314,9 @@ const Header = () => {
                 onClick={handleDarkMode}
               >
                 {isDarkMode ? (
-                  <MdDarkMode color="white" size={30} />
+                  <MdDarkMode color="white" size={32} />
                 ) : (
-                  <MdDarkMode size={30} />
+                  <MdDarkMode size={32} />
                 )}
               </div>
               <Dropdown
@@ -361,15 +361,15 @@ const Header = () => {
                   onClick={handleDarkMode}
                 >
                   {isDarkMode ? (
-                    <MdDarkMode color="white" size={30} />
+                    <MdDarkMode color="white" size={32} />
                   ) : (
-                    <MdDarkMode size={30} />
+                    <MdDarkMode size={32} />
                   )}
                 </div>
                 <button
                   className={`${
                     isDarkMode ? "bg-blue-700" : "bg-[#061b4b]"
-                  } text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
+                  } text-white px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
                   onClick={() => handleOpenLoginModal(false)}
                 >
                   Đăng nhập

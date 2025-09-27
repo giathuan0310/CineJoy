@@ -78,15 +78,15 @@ const PriceListSchema = new Schema<IPriceList>({
   },
   lines: {
     type: [PriceListLineSchema],
-    required: [true, 'Danh sách giá là bắt buộc'],
+    default: [],
     validate: {
       validator: function(lines: IPriceListLine[]) {
-        // Kiểm tra phải có ít nhất 1 line
+        // Nếu không có lines hoặc lines rỗng thì cho phép (để tạo bảng giá rỗng)
         if (!lines || lines.length === 0) {
-          return false;
+          return true;
         }
         
-        // Kiểm tra phải có đầy đủ 4 loại ghế
+        // Nếu có lines thì kiểm tra phải có đầy đủ 4 loại ghế
         const seatTypes = lines.filter(line => line.type === 'ticket').map(line => line.seatType);
         const requiredSeatTypes = ['normal', 'vip', 'couple', '4dx'];
         const hasAllSeatTypes = requiredSeatTypes.every(seatType => seatTypes.includes(seatType as any));
@@ -97,7 +97,7 @@ const PriceListSchema = new Schema<IPriceList>({
         
         return true;
       },
-      message: 'Bảng giá phải có đầy đủ 4 loại ghế (normal, vip, couple, 4dx) và ít nhất 1 sản phẩm/combo'
+      message: 'Bảng giá phải có đầy đủ 4 loại ghế (normal, vip, couple, 4dx) khi có danh sách giá'
     }
   }
 }, {

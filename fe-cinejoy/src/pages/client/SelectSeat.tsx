@@ -153,7 +153,6 @@ export const SelectSeat = () => {
           soldSeats={soldSeats}
           onSelect={handleSelectSeat}
           onSelectMultiple={handleSelectMultipleSeats}
-          selectedSeatPrice={90000}
           showtimeId={showtimeId}
           date={date}
           startTime={apiTime}
@@ -174,6 +173,7 @@ export const SelectSeat = () => {
             soldSeats: soldSeats,
             format: has4dx ? '4DX' : movie?.format,
           }}
+          totalPrice={selectedSeats.length * 90000}
           onContinue={() =>
             navigate("/payment", {
               state: {

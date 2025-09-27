@@ -46,7 +46,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
         }, 200);
       }}
     >
-      <FaSearch size={9} />
+      <FaSearch size={14} />
     </button>
     {/* Input search expand */}
     <div
@@ -54,7 +54,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
       style={{ boxShadow: '0 4px 32px 0 rgba(0,0,0,0.10)' }}
     >
       <div className="text-gray-700 mx-1">
-        <FaSearch size={9} />
+        <FaSearch size={14} />
       </div>
       <input
         ref={searchInputRef}

@@ -23,7 +23,8 @@ export interface ICreatePriceListData {
   name: string;
   startDate: string;
   endDate: string;
-  lines: IPriceListLine[];
+  // lines có thể bỏ trống khi tạo mới header, sẽ thêm sau trong chi tiết
+  lines?: IPriceListLine[];
 }
 
 export interface IUpdatePriceListData {

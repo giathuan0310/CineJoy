@@ -296,9 +296,9 @@ const Seat: React.FC<SeatProps> = ({
 
           // Render hàng ghế cặp đôi: chia từng cặp, giữa hai ghế trong cặp gap-1.5, giữa các cặp gap-4
         return (
-            <div key={row} className="w-full flex justify-center gap-2">
+            <div key={row} className="w-full flex justify-center gap-1.5">
               {Array.from({ length: numPairs }, (_, pairIndex) => (
-                <div key={`pair-${pairIndex}`} className="flex gap-1.5">
+                <div key={`pair-${pairIndex}`} className="flex gap-1">
                   {[0, 1].map((seatInPair) => {
                     const idx = pairIndex * 2 + seatInPair;
                     const seat = rowSeats[idx];
@@ -362,7 +362,7 @@ const Seat: React.FC<SeatProps> = ({
 
         // Các hàng còn lại: tăng gap giữa các ghế
         return (
-          <div key={row} className="flex flex-row items-center gap-2">
+          <div key={row} className="flex flex-row items-center gap-1.5">
             {rowSeats.map((seat, i) => {
               // Nếu là hàng cặp đôi nhưng vì lý do nào đó lọt qua đây và tổng cột lẻ, ẩn ghế cuối
               const totalCols = seatLayout?.cols || rowSeats.length;

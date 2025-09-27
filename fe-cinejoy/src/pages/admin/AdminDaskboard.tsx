@@ -22,6 +22,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { Popconfirm, Modal, Table, Tag, Space, Descriptions, Form, Input, DatePicker, Button, message, ConfigProvider } from "antd";
+import { Select, InputNumber } from "antd";
 import dayjs from "dayjs";
 import isBetween from 'dayjs/plugin/isBetween';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
@@ -30,7 +31,7 @@ import viVN from 'antd/locale/vi_VN';
 import { getVouchers, addVoucher, updateVoucher, deleteVoucher } from "@/apiservice/apiVoucher";
 import { getFoodCombos, addSingleProduct, addCombo, updateFoodCombo, deleteFoodCombo } from "@/apiservice/apiFoodCombo";
 import { getTheaters, addTheater, updateTheater, deleteTheater } from "@/apiservice/apiTheater";
-import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, checkTimeGaps } from "@/apiservice/apiPriceList";
+import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, checkTimeGaps, getProductsForPriceList } from "@/apiservice/apiPriceList";
 import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
 import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
 import createInstanceAxios from "@/services/axios.customize";
@@ -148,6 +149,7 @@ const Dashboard: React.FC = () => {
   const [timeGaps, setTimeGaps] = useState<string[]>([]);
   const [viewingPriceList, setViewingPriceList] = useState<IPriceList | null>(null);
   const [priceListDetailVisible, setPriceListDetailVisible] = useState(false);
+  const [showPriceListDetailInline, setShowPriceListDetailInline] = useState(false);
   const [splitVersionModalVisible, setSplitVersionModalVisible] = useState(false);
   const [splitVersionData, setSplitVersionData] = useState({
     newName: '',
@@ -157,7 +159,30 @@ const Dashboard: React.FC = () => {
   const [editEndDateModalVisible, setEditEndDateModalVisible] = useState(false);
   const [editingEndDatePriceList, setEditingEndDatePriceList] = useState<IPriceList | null>(null);
   const [newEndDateValue, setNewEndDateValue] = useState<string>('');
+  const [priceListSubmitting, setPriceListSubmitting] = useState<boolean>(false);
+  const [editEndDateSubmitting, setEditEndDateSubmitting] = useState<boolean>(false);
+  // Edit all price lines modal states
+  const [editPriceLinesModalVisible, setEditPriceLinesModalVisible] = useState(false);
+  const [editingPriceLines, setEditingPriceLines] = useState<any[]>([]);
+  const [products, setProducts] = useState<{combos: any[], singleProducts: any[]}>({ combos: [], singleProducts: [] });
+  const [editPriceLinesSubmitting, setEditPriceLinesSubmitting] = useState(false);
   
+  // Load products when edit modal opens
+  useEffect(() => {
+    if (editPriceLinesModalVisible) {
+      const loadProducts = async () => {
+        try {
+          const productsData = await getProductsForPriceList();
+          setProducts(productsData);
+        } catch (error) {
+          console.error("Error loading products:", error);
+          message.error("Lỗi khi tải danh sách sản phẩm");
+        }
+      };
+      
+      loadProducts();
+    }
+  }, [editPriceLinesModalVisible]);
   
   const { user } = useAppStore();
 
@@ -610,6 +635,7 @@ const Dashboard: React.FC = () => {
   // Price List handlers
   const handlePriceListSubmit = async (priceListData: any) => {
     try {
+      setPriceListSubmitting(true);
       if (editingPriceList) {
         // Update
         await updatePriceList(editingPriceList._id, priceListData);
@@ -629,6 +655,8 @@ const Dashboard: React.FC = () => {
       console.error("Error submitting price list:", error);
       // Hiển thị lỗi từ backend
       toast.error(error?.message || "Có lỗi xảy ra!");
+    } finally {
+      setPriceListSubmitting(false);
     }
   };
 
@@ -647,7 +675,8 @@ const Dashboard: React.FC = () => {
 
   const handleViewPriceList = (priceList: IPriceList) => {
     setViewingPriceList(priceList);
-    setPriceListDetailVisible(true);
+    setPriceListDetailVisible(false);
+    setShowPriceListDetailInline(true);
   };
 
   const handleDuplicatePriceList = async (dupData: {
@@ -2267,9 +2296,103 @@ const Dashboard: React.FC = () => {
           {/* Price Lists Tab */}
           {activeTab === "priceLists" && (
             <div>
-              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
-                Quản lý bảng giá
-              </h2>
+              {!showPriceListDetailInline && (
+                <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                  Quản lý bảng giá
+                </h2>
+              )}
+              {showPriceListDetailInline && viewingPriceList ? (
+                <div className="bg-white rounded-lg shadow p-4 mb-4">
+                  <div className="mb-3">
+                    <Button onClick={() => setShowPriceListDetailInline(false)} className="bg-white">← Quay lại danh sách</Button>
+                  </div>
+                  <div className="mb-4 border border-gray-200 rounded-md bg-gray-100 px-4 py-3">
+                    <div className="flex items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl md:text-2xl font-bold text-gray-900">{viewingPriceList.name}</span>
+                        <Tag className="text-sm md:text-base" color={viewingPriceList.status === 'active' ? 'green' : viewingPriceList.status === 'scheduled' ? 'blue' : 'red'}>
+                          {viewingPriceList.status === 'active' ? 'Đang hoạt động' : viewingPriceList.status === 'scheduled' ? 'Chờ hiệu lực' : 'Đã hết hạn'}
+                        </Tag>
+                      </div>
+                      <div className="flex-1" />
+                      <div className="text-sm md:text-base font-semibold text-gray-800">
+                        {new Date(viewingPriceList.startDate).toLocaleDateString('vi-VN')} → {new Date(viewingPriceList.endDate).toLocaleDateString('vi-VN')}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Nội dung chi tiết */}
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-gray-800">Danh sách giá</h3>
+                        {viewingPriceList.status === 'scheduled' && (
+                          <div className="flex gap-2">
+                            {(!viewingPriceList.lines || viewingPriceList.lines.length === 0) && (
+                              <Button type="primary" onClick={() => {
+                                // Mở modal để thêm danh sách giá với 1 dòng trống sẵn
+                                setEditingPriceLines([{
+                                  type: '',
+                                  productName: '',
+                                  productId: '',
+                                  price: 0
+                                }]);
+                                setEditPriceLinesModalVisible(true);
+                              }}>Thêm danh sách giá</Button>
+                            )}
+                            {(viewingPriceList.lines && viewingPriceList.lines.length > 0) && (
+                              <Button 
+                                type="primary" 
+                                style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
+                                onClick={() => {
+                                  setEditingPriceLines(viewingPriceList.lines || []);
+                                  setEditPriceLinesModalVisible(true);
+                                }}
+                              >
+                                Sửa
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse border border-gray-300">
+                          <thead>
+                            <tr className="bg-gray-200">
+                              <th className="border border-gray-300 p-2 text-left">Loại</th>
+                              <th className="border border-gray-300 p-2 text-left">Sản phẩm / Loại ghế</th>
+                              <th className="border border-gray-300 p-2 text-left">Giá (VNĐ)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {viewingPriceList.lines.map((line, index) => (
+                              <tr key={index} className="hover:bg-gray-100">
+                                <td className="border border-gray-300 p-2">
+                                  <Tag color={line.type === 'ticket' ? 'blue' : line.type === 'combo' ? 'green' : 'orange'}>
+                                    {line.type === 'ticket' ? 'Vé xem phim' : line.type === 'combo' ? 'Combo' : 'Sản phẩm'}
+                                  </Tag>
+                                </td>
+                                <td className="border border-gray-300 p-2">
+                                  {line.type === 'ticket' ? (
+                                    <span className="font-medium">
+                                      {line.seatType === 'normal' ? 'Ghế thường' : line.seatType === 'vip' ? 'Ghế VIP' : line.seatType === 'couple' ? 'Ghế cặp đôi' : 'Ghế 4DX'}
+                                    </span>
+                                  ) : (
+                                    <span className="font-medium">{line.productName}</span>
+                                  )}
+                                </td>
+                                <td className="border border-gray-300 p-2">
+                                  <span className="font-semibold text-green-600">{line.price.toLocaleString('vi-VN')} VNĐ</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+              <>
               
               {/* Time Gap Warning */}
               {timeGapWarning && (
@@ -2346,7 +2469,8 @@ const Dashboard: React.FC = () => {
                       .map((priceList, idx) => (
                         <tr
                           key={priceList._id}
-                          className="border-b hover:bg-gray-100"
+                          className="border-b hover:bg-gray-100 cursor-pointer"
+                          onClick={() => handleViewPriceList(priceList)}
                         >
                           <td className="p-3">{idx + 1}</td>
                           <td className="p-3 font-medium">{priceList.name}</td>
@@ -2374,13 +2498,7 @@ const Dashboard: React.FC = () => {
                             </Tag>
                           </td>
                           <td className="p-3">
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleViewPriceList(priceList)}
-                                className="bg-blue-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-blue-600 mr-2"
-                              >
-                                Xem chi tiết
-                              </button>
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               {priceList.status === "active" && (
                                 <button
                                   onClick={() => {
@@ -2443,6 +2561,8 @@ const Dashboard: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
             </div>
           )}
         </main>
@@ -2934,6 +3054,7 @@ const Dashboard: React.FC = () => {
       {priceListFormVisible && (
         <PriceListForm
           priceList={editingPriceList || undefined}
+          loading={priceListSubmitting}
           onSubmit={handlePriceListSubmit}
           onCancel={() => {
             setPriceListFormVisible(false);
@@ -3082,6 +3203,7 @@ const Dashboard: React.FC = () => {
               }
 
               try {
+                setEditEndDateSubmitting(true);
                 await updatePriceList(editingEndDatePriceList._id, { endDate: end.format('YYYY-MM-DD') });
                 toast.success('Cập nhật ngày kết thúc thành công!');
                 await loadPriceLists();
@@ -3091,6 +3213,8 @@ const Dashboard: React.FC = () => {
               } catch (e: any) {
                 console.error('Error updating end date', e);
                 toast.error(e?.message || 'Cập nhật ngày kết thúc thất bại!');
+              } finally {
+                setEditEndDateSubmitting(false);
               }
             }}>
               <Form.Item label="Tên bảng giá">
@@ -3136,7 +3260,7 @@ const Dashboard: React.FC = () => {
                   setEditingEndDatePriceList(null);
                   setNewEndDateValue('');
                 }}>Hủy</Button>
-                <Button type="primary" htmlType="submit">Lưu</Button>
+                <Button type="primary" htmlType="submit" loading={editEndDateSubmitting}>Lưu</Button>
               </div>
             </Form>
           </ConfigProvider>
@@ -3421,6 +3545,319 @@ const Dashboard: React.FC = () => {
                 Tạo bản sao
               </Button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal sửa tất cả các dòng giá */}
+      {editPriceLinesModalVisible && viewingPriceList && (
+        <Modal
+          title={
+            <div style={{ textAlign: 'center', fontSize: '20px' }}>
+              {(!viewingPriceList.lines || viewingPriceList.lines.length === 0) 
+                ? "Thêm danh sách giá" 
+                : "Sửa danh sách giá"
+              }
+            </div>
+          }
+          open={true}
+          onCancel={() => {
+            setEditPriceLinesModalVisible(false);
+            setEditingPriceLines([]);
+          }}
+          onOk={async () => {
+            try {
+              setEditPriceLinesSubmitting(true);
+              
+              // Validate that all lines have required fields
+              const incompleteLines = [];
+              for (let i = 0; i < editingPriceLines.length; i++) {
+                const line = editingPriceLines[i];
+                
+                if (line.type === 'ticket') {
+                  if (!line.seatType) {
+                    incompleteLines.push(`Dòng ${i + 1}: Chưa chọn loại ghế`);
+                  }
+                } else if (line.type === 'combo' || line.type === 'single') {
+                  if (!line.productId) {
+                    incompleteLines.push(`Dòng ${i + 1}: Chưa chọn ${line.type === 'combo' ? 'combo' : 'sản phẩm'}`);
+                  }
+                }
+                
+                if (!line.price || line.price <= 0) {
+                  incompleteLines.push(`Dòng ${i + 1}: Giá phải lớn hơn 0`);
+                }
+              }
+              
+              if (incompleteLines.length > 0) {
+                message.error(`Vui lòng hoàn thiện thông tin:\n${incompleteLines.join('\n')}`);
+                setEditPriceLinesSubmitting(false);
+                return;
+              }
+
+              // Check for duplicates
+              const duplicates = [];
+              for (let i = 0; i < editingPriceLines.length; i++) {
+                for (let j = i + 1; j < editingPriceLines.length; j++) {
+                  const line1 = editingPriceLines[i];
+                  const line2 = editingPriceLines[j];
+                  
+                  if (line1.type === 'ticket' && line2.type === 'ticket' && line1.seatType === line2.seatType) {
+                    duplicates.push(`Loại ghế ${line1.seatType} bị trùng lặp`);
+                  } else if (line1.type === 'combo' && line2.type === 'combo' && line1.productId === line2.productId) {
+                    duplicates.push(`Combo ${line1.productName} bị trùng lặp`);
+                  } else if (line1.type === 'single' && line2.type === 'single' && line1.productId === line2.productId) {
+                    duplicates.push(`Sản phẩm ${line1.productName} bị trùng lặp`);
+                  }
+                }
+              }
+              
+              if (duplicates.length > 0) {
+                message.error(`Có sản phẩm/loại ghế bị trùng lặp: ${duplicates.join(', ')}`);
+                setEditPriceLinesSubmitting(false);
+                return;
+              }
+
+              await updatePriceList(viewingPriceList._id, { lines: editingPriceLines as any });
+              await loadPriceLists();
+              const refreshed = (await getAllPriceLists()).find(p => p._id === viewingPriceList._id);
+              if (refreshed) setViewingPriceList(refreshed as any);
+              message.success('Cập nhật danh sách giá thành công!');
+              setEditPriceLinesModalVisible(false);
+              setEditingPriceLines([]);
+            } catch (error) {
+              console.error('Error updating price lines:', error);
+              message.error('Có lỗi xảy ra khi cập nhật danh sách giá');
+            } finally {
+              setEditPriceLinesSubmitting(false);
+            }
+          }}
+          width={800}
+          okText="Lưu"
+          cancelText="Hủy"
+          confirmLoading={editPriceLinesSubmitting}
+          centered
+          bodyStyle={{ 
+            maxHeight: '70vh', 
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+          className="hide-scrollbar"
+        >
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Danh sách giá hiện tại:</span>
+            </div>
+            
+            {products.combos.length === 0 && products.singleProducts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div>Đang tải danh sách sản phẩm...</div>
+              </div>
+            ) : (
+              <>
+                <Table
+              columns={[
+                {
+                  title: 'Loại',
+                  dataIndex: 'type',
+                  key: 'type',
+                  width: 120,
+                  render: (type: string, _: any, index: number) => (
+                    <Select
+                      value={type || undefined}
+                      onChange={(value) => {
+                        const newLines = [...editingPriceLines];
+                        newLines[index] = { ...newLines[index], type: value, productName: '', seatType: undefined, productId: '' };
+                        setEditingPriceLines(newLines);
+                      }}
+                      style={{ width: '100%' }}
+                      placeholder="Chọn loại"
+                    >
+                      <Select.Option value="ticket">Vé</Select.Option>
+                      <Select.Option value="combo">Combo</Select.Option>
+                      <Select.Option value="single">Sản phẩm</Select.Option>
+                    </Select>
+                  ),
+                },
+                {
+                  title: 'Sản phẩm / Loại ghế',
+                  dataIndex: 'productName',
+                  key: 'productName',
+                  render: (_: string, record: any, index: number) => {
+                    // Nếu chưa chọn loại thì disable và hiển thị placeholder
+                    if (!record.type || record.type === '') {
+                      return (
+                        <Select
+                          disabled={true}
+                          style={{ width: '100%' }}
+                          placeholder="Vui lòng chọn loại trước"
+                        />
+                      );
+                    }
+                    
+                    if (record.type === 'ticket') {
+                      const usedSeatTypes = editingPriceLines
+                        .filter((line, i) => i !== index && line.type === 'ticket')
+                        .map(line => line.seatType);
+                      
+                      return (
+                        <Select
+                          value={record.seatType}
+                          onChange={(value) => {
+                            const newLines = [...editingPriceLines];
+                            newLines[index] = { ...newLines[index], seatType: value };
+                            setEditingPriceLines(newLines);
+                          }}
+                          style={{ width: '100%' }}
+                          placeholder="Chọn loại ghế"
+                        >
+                          <Select.Option value="normal" disabled={usedSeatTypes.includes('normal')}>
+                            Ghế thường
+                          </Select.Option>
+                          <Select.Option value="vip" disabled={usedSeatTypes.includes('vip')}>
+                            Ghế VIP
+                          </Select.Option>
+                          <Select.Option value="couple" disabled={usedSeatTypes.includes('couple')}>
+                            Ghế cặp đôi
+                          </Select.Option>
+                          <Select.Option value="4dx" disabled={usedSeatTypes.includes('4dx')}>
+                            Ghế 4DX
+                          </Select.Option>
+                        </Select>
+                      );
+                    } else {
+                      // Filter products based on type
+                      const filteredProducts = record.type === 'combo' 
+                        ? products.combos 
+                        : products.singleProducts;
+                      
+                      // Get used product IDs from other lines of the same type
+                      const usedProductIds = editingPriceLines
+                        .filter((line, i) => i !== index && line.type === record.type)
+                        .map(line => line.productId);
+                      
+                      return (
+                        <Select
+                          value={record.productId}
+                          onChange={(value) => {
+                            const newLines = [...editingPriceLines];
+                            newLines[index] = { ...newLines[index], productId: value };
+                            // Auto-populate product name when product is selected
+                            const selectedProduct = filteredProducts.find(p => p._id === value);
+                            if (selectedProduct) {
+                              newLines[index].productName = selectedProduct.name;
+                              // Không tự động fill giá, để user nhập tay
+                            }
+                            setEditingPriceLines(newLines);
+                          }}
+                          style={{ width: '100%' }}
+                          placeholder={`Chọn ${record.type === 'combo' ? 'combo' : 'sản phẩm'}`}
+                        >
+                          {filteredProducts.map(product => (
+                            <Select.Option 
+                              key={product._id} 
+                              value={product._id}
+                              disabled={usedProductIds.includes(product._id)}
+                            >
+                              {product.name}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      );
+                    }
+                  },
+                },
+                {
+                  title: 'Giá (VNĐ)',
+                  dataIndex: 'price',
+                  key: 'price',
+                  width: 150,
+                  render: (price: number, record: any, index: number) => {
+                    // Kiểm tra xem đã chọn sản phẩm/loại ghế chưa
+                    const hasSelectedProduct = (record.type === 'ticket' && record.seatType) || 
+                                             ((record.type === 'combo' || record.type === 'single') && record.productId);
+                    
+                    return (
+                      <InputNumber
+                      value={price}
+                      onChange={(value) => {
+                        const newLines = [...editingPriceLines];
+                        newLines[index] = { ...newLines[index], price: value || 0 };
+                        setEditingPriceLines(newLines);
+                      }}
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, ''))}
+                      style={{ width: '100%' }}
+                      min={0}
+                      disabled={!hasSelectedProduct}
+                      placeholder={!hasSelectedProduct ? "Chọn sản phẩm/loại ghế trước" : undefined}
+                    />
+                    );
+                  },
+                },
+                {
+                  title: 'Thao tác',
+                  key: 'action',
+                  width: 80,
+                  render: (_text: any, _record: any, index: number) => (
+                    <Button
+                      type="text"
+                      danger
+                      onClick={() => {
+                        const newLines = editingPriceLines.filter((_, i) => i !== index);
+                        setEditingPriceLines(newLines);
+                      }}
+                      title="Xóa dòng"
+                    >
+                      Xóa
+                    </Button>
+                  ),
+                },
+              ]}
+              dataSource={editingPriceLines}
+              rowKey={(_record: any, index?: number) => index || 0}
+              pagination={false}
+              size="small"
+              scroll={{ y: 300 }}
+            />
+            
+            {(() => {
+              // Check if all required items are present
+              const hasAllSeatTypes = editingPriceLines.filter(line => line.type === 'ticket').length >= 4;
+              const hasAllCombos = editingPriceLines.filter(line => line.type === 'combo').length >= products.combos.length;
+              const hasAllProducts = editingPriceLines.filter(line => line.type === 'single').length >= products.singleProducts.length;
+              const isAllProductsAdded = hasAllSeatTypes && hasAllCombos && hasAllProducts;
+              
+              return !isAllProductsAdded && (
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <Button 
+                    type="dashed" 
+                    onClick={() => {
+                      setEditingPriceLines([...editingPriceLines, {
+                        type: '',
+                        productName: '',
+                        productId: '',
+                        price: 0
+                      }]);
+                      
+                      // Auto scroll to bottom after adding new line
+                      setTimeout(() => {
+                        const tableContainer = document.querySelector('.ant-table-body');
+                        if (tableContainer) {
+                          tableContainer.scrollTop = tableContainer.scrollHeight;
+                        }
+                      }, 100);
+                    }}
+                    style={{ width: '100%' }}
+                  >
+                    Thêm dòng
+                  </Button>
+                </div>
+              );
+            })()}
+              </>
+            )}
           </div>
         </Modal>
       )}

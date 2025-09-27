@@ -19,9 +19,10 @@ interface MovieInfoProps {
     soldSeats?: string[];
   };
   onContinue: () => void;
+  totalPrice: number;
 }
 
-const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
+const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice }) => {
   const { isDarkMode, setIsModalOpen } = useAppStore();
   const hasSelectedSeats = movie.seats.length > 0;
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -170,6 +171,20 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue }) => {
         >
           <span className="font-bold">Ghế ngồi:</span>
           <span>{hasSelectedSeats ? movie.seats.join(", ") : "Chưa chọn"}</span>
+        </div>
+      </div>
+
+      {/* Hiển thị giá vé */}
+      <div className="w-full mb-4 rounded-lg">
+        <div className="flex justify-between items-center">
+          <span className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Giá vé:
+          </span>
+          <div className="text-right">
+            <div className={`text-lg font-bold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+              {totalPrice.toLocaleString()} VNĐ
+            </div>
+          </div>
         </div>
       </div>
 

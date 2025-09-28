@@ -10,6 +10,7 @@ export interface IPriceListLine {
 
 export interface IPriceList {
   _id: string;
+  code: string;
   name: string;
   startDate: string;
   endDate: string;
@@ -20,6 +21,7 @@ export interface IPriceList {
 }
 
 export interface ICreatePriceListData {
+  code: string;
   name: string;
   startDate: string;
   endDate: string;
@@ -28,6 +30,7 @@ export interface ICreatePriceListData {
 }
 
 export interface IUpdatePriceListData {
+  code?: string;
   name?: string;
   startDate?: string;
   endDate?: string;

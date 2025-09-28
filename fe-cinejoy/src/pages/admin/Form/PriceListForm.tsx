@@ -49,7 +49,7 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
   const hasActivePriceList = useMemo(() => existingPriceLists.some(pl => pl.status === 'active'), [existingPriceLists]);
   const today = useMemo(() => dayjs().startOf('day'), []);
   const lockStartToday = useMemo(() => !priceList && !hasActivePriceList, [priceList, hasActivePriceList]);
-  const nameInputRef = useRef<InputRef>(null);
+  const codeInputRef = useRef<InputRef>(null);
 
   // Không tải danh sách sản phẩm tại đây nữa. Việc thêm/sửa chi tiết giá sẽ làm ở trang chi tiết.
 
@@ -74,6 +74,7 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
     if (priceList) {
       // Editing existing price list
       form.setFieldsValue({
+        code: priceList.code,
         name: priceList.name,
         dateRange: [dayjs(priceList.startDate), dayjs(priceList.endDate)],
       });
@@ -82,17 +83,18 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
       const defaultStart = hasActivePriceList ? today.add(1, 'day') : today;
       const defaultEnd = defaultStart.add(1, 'month');
       form.setFieldsValue({
+        code: "",
         name: "",
         dateRange: [defaultStart, defaultEnd],
       });
     }
   }, [priceList, form, hasActivePriceList, today]);
 
-  // Focus tên bảng giá khi mở modal Thêm
+  // Focus mã bảng giá khi mở modal Thêm
   useEffect(() => {
     if (!priceList) {
       const t = setTimeout(() => {
-        nameInputRef.current?.focus();
+        codeInputRef.current?.focus();
       }, 50);
       return () => clearTimeout(t);
     }
@@ -101,6 +103,12 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      
+      // Validate code field
+      if (!values.code || values.code.trim() === '') {
+        message.error("Vui lòng nhập mã bảng giá");
+        return;
+      }
       
       // Validate name field
       if (!values.name || values.name.trim() === '') {
@@ -119,8 +127,11 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
         message.error("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu");
         return;
       }
-      const submitData: { name: string; startDate: string; endDate: string; lines: IPriceListLine[] } = {
-        name: values.name,
+
+
+      const submitData: { code: string; name: string; startDate: string; endDate: string; lines: IPriceListLine[] } = {
+        code: values.code.trim().toUpperCase(),
+        name: values.name.trim(),
         startDate: values.dateRange[0].toISOString(),
         endDate: values.dateRange[1].toISOString(),
         lines: [], // Gửi array rỗng khi tạo mới
@@ -162,11 +173,33 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
     >
       <Form form={form} layout="vertical">
         <Form.Item
+          name="code"
+          label="Mã bảng giá"
+          rules={[
+            { required: true, message: "Vui lòng nhập mã bảng giá" },
+            { min: 6, message: "Mã bảng giá phải có ít nhất 6 ký tự" },
+            { max: 20, message: "Mã bảng giá không được quá 20 ký tự" }
+          ]}
+        >
+          <Input 
+            placeholder="Ví dụ: BG0001" 
+            disabled={!!priceList}
+            style={{ textTransform: 'uppercase' }}
+            onChange={(e) => {
+              if (!priceList) { // Chỉ auto uppercase khi tạo mới
+                e.target.value = e.target.value.toUpperCase();
+              }
+            }}
+            ref={codeInputRef}
+          />
+        </Form.Item>
+
+        <Form.Item
           name="name"
           label="Tên bảng giá"
           rules={[{ required: true, message: "Vui lòng nhập tên bảng giá" }]}
         >
-          <Input placeholder="Ví dụ: Bảng giá T10/2025" ref={nameInputRef} />
+          <Input placeholder="Ví dụ: Bảng giá T10/2025" />
         </Form.Item>
 
         <Form.Item

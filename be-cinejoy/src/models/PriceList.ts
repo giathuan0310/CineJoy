@@ -10,6 +10,7 @@ export interface IPriceListLine {
 
 export interface IPriceList extends Document {
   _id: string;
+  code: string;
   name: string;
   startDate: Date;
   endDate: Date;
@@ -52,6 +53,13 @@ const PriceListLineSchema = new Schema<IPriceListLine>({
 }, { _id: false });
 
 const PriceListSchema = new Schema<IPriceList>({
+  code: {
+    type: String,
+    required: [true, 'Mã bảng giá là bắt buộc'],
+    trim: true,
+    unique: true,
+    uppercase: true
+  },
   name: {
     type: String,
     required: [true, 'Tên bảng giá là bắt buộc'],
@@ -109,6 +117,7 @@ const PriceListSchema = new Schema<IPriceList>({
 // Index để tối ưu hóa truy vấn theo ngày
 PriceListSchema.index({ startDate: 1, endDate: 1 });
 PriceListSchema.index({ status: 1 });
+PriceListSchema.index({ code: 1 });
 
 // Middleware để tự động cập nhật status dựa trên ngày
 PriceListSchema.pre('save', function(next) {

@@ -1,23 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
-
-// CSS để ẩn scrollbar
-const hideScrollbarStyle = `
-  .hide-scrollbar .ant-modal-body::-webkit-scrollbar {
-    display: none;
-  }
-  .hide-scrollbar .ant-modal-body {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-`;
-
-// Thêm CSS vào head
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = hideScrollbarStyle;
-  document.head.appendChild(style);
-}
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
@@ -35,10 +17,6 @@ import { getAllPriceLists, createPriceList, updatePriceList, deletePriceList, ch
 import { getAllUsersApi, createUserApi, updateUserApi, getAllRoomsApi, createRoomApi, updateRoomApi, deleteRoomApi, createSeatApi, updateSeatApi, createMultipleSeatsApi } from "@/services/api";
 import { getAllShowSessionsApi, createShowSessionApi, updateShowSessionApi, deleteShowSessionApi } from "@/apiservice/apiShowSession";
 import createInstanceAxios from "@/services/axios.customize";
-
-dayjs.extend(isBetween);
-dayjs.extend(isSameOrBefore);
-dayjs.extend(isSameOrAfter);
 
 const axios = createInstanceAxios(import.meta.env.VITE_BACKEND_URL);
 import {
@@ -71,6 +49,28 @@ import SeatForm from "./Form/SeatForm";
 import ShowSessionForm from "./Form/ShowSessionForm";
 import PriceListForm from "./Form/PriceListForm";
 import useAppStore from "@/store/app.store";
+
+// CSS để ẩn scrollbar
+const hideScrollbarStyle = `
+  .hide-scrollbar .ant-modal-body::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar .ant-modal-body {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+// Thêm CSS vào head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = hideScrollbarStyle;
+  document.head.appendChild(style);
+}
+
+dayjs.extend(isBetween);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("movies");
@@ -153,6 +153,7 @@ const Dashboard: React.FC = () => {
   const [splitVersionModalVisible, setSplitVersionModalVisible] = useState(false);
   const [splitVersionData, setSplitVersionData] = useState({
     newName: '',
+    newCode: '',
     startDate: '',
     endDate: ''
   });
@@ -636,6 +637,7 @@ const Dashboard: React.FC = () => {
   const handlePriceListSubmit = async (priceListData: any) => {
     try {
       setPriceListSubmitting(true);
+      
       if (editingPriceList) {
         // Update
         await updatePriceList(editingPriceList._id, priceListData);
@@ -654,7 +656,8 @@ const Dashboard: React.FC = () => {
     } catch (error: any) {
       console.error("Error submitting price list:", error);
       // Hiển thị lỗi từ backend
-      toast.error(error?.message || "Có lỗi xảy ra!");
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || "Có lỗi xảy ra!";
+      toast.error(errorMessage);
     } finally {
       setPriceListSubmitting(false);
     }
@@ -681,6 +684,7 @@ const Dashboard: React.FC = () => {
 
   const handleDuplicatePriceList = async (dupData: {
     newName: string;
+    newCode: string;
     startDate: string;
     endDate: string;
   }) => {
@@ -689,6 +693,7 @@ const Dashboard: React.FC = () => {
     try {
       // Tạo mới 1 bảng giá từ dữ liệu bảng gốc, KHÔNG chạm vào bảng gốc
       await createPriceList({
+        code: dupData.newCode,
         name: dupData.newName,
         startDate: dupData.startDate,
         endDate: dupData.endDate,
@@ -700,9 +705,11 @@ const Dashboard: React.FC = () => {
       await loadPriceLists();
       setSplitVersionModalVisible(false);
       setEditingPriceList(null);
+      setSplitVersionData({ newName: '', newCode: '', startDate: '', endDate: '' });
     } catch (error: any) {
       console.error("Error duplicating price list:", error);
-      toast.error(error?.message || "Sao chép bảng giá thất bại!");
+      const errorMessage = error?.response?.data?.error || error?.response?.data?.message || error?.message || "Sao chép bảng giá thất bại!";
+      toast.error(errorMessage);
     }
   };
 
@@ -2310,6 +2317,9 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center">
                       <div className="flex items-center gap-3">
                         <span className="text-xl md:text-2xl font-bold text-gray-900">{viewingPriceList.name}</span>
+                        <span className="text-sm font-mono bg-gray-200 px-2 py-1 rounded text-gray-700">
+                          {viewingPriceList.code || 'N/A'}
+                        </span>
                         <Tag className="text-sm md:text-base" color={viewingPriceList.status === 'active' ? 'green' : viewingPriceList.status === 'scheduled' ? 'blue' : 'red'}>
                           {viewingPriceList.status === 'active' ? 'Đang hoạt động' : viewingPriceList.status === 'scheduled' ? 'Chờ hiệu lực' : 'Đã hết hạn'}
                         </Tag>
@@ -2360,7 +2370,7 @@ const Dashboard: React.FC = () => {
                             <tr className="bg-gray-200">
                               <th className="border border-gray-300 p-2 text-left">Loại</th>
                               <th className="border border-gray-300 p-2 text-left">Sản phẩm / Loại ghế</th>
-                              <th className="border border-gray-300 p-2 text-left">Giá (VNĐ)</th>
+                              <th className="border border-gray-300 p-2 text-left">Giá</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2423,7 +2433,7 @@ const Dashboard: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <input
                   type="text"
-                  placeholder="Tìm kiếm bảng giá..."
+                  placeholder="Tìm kiếm theo tên hoặc mã bảng giá..."
                   className="border border-gray-300 bg-white text-black rounded-lg p-2 w-1/3 focus:outline-none focus:ring-2 focus:ring-black"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -2443,6 +2453,7 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã bảng giá</th>
                       <th className="p-3 text-left font-semibold text-black">Tên bảng giá</th>
                       <th className="p-3 text-left font-semibold text-black">Ngày bắt đầu</th>
                       <th className="p-3 text-left font-semibold text-black">Ngày kết thúc</th>
@@ -2464,7 +2475,8 @@ const Dashboard: React.FC = () => {
                         return bTime - aTime;
                       })
                       .filter((priceList) =>
-                        priceList.name.toLowerCase().includes(searchTerm.toLowerCase())
+                        priceList.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (priceList.code && priceList.code.toLowerCase().includes(searchTerm.toLowerCase()))
                       )
                       .map((priceList, idx) => (
                         <tr
@@ -2473,6 +2485,9 @@ const Dashboard: React.FC = () => {
                           onClick={() => handleViewPriceList(priceList)}
                         >
                           <td className="p-3">{idx + 1}</td>
+                          <td className="p-3 font-medium">
+                            {priceList.code}
+                          </td>
                           <td className="p-3 font-medium">{priceList.name}</td>
                           <td className="p-3">
                             {new Date(priceList.startDate).toLocaleDateString("vi-VN")}
@@ -2517,6 +2532,7 @@ const Dashboard: React.FC = () => {
                                       setEditingPriceList(priceList);
                                       setSplitVersionData({
                                       newName: `${priceList.name} - Bản sao`,
+                                      newCode: '',
                                       startDate: '',
                                       endDate: ''
                                     });
@@ -2539,6 +2555,23 @@ const Dashboard: React.FC = () => {
                                 </button>
                               )}
                               {priceList.status === "scheduled" && (
+                                <button
+                                  onClick={() => {
+                                    setEditingPriceList(priceList);
+                                    setSplitVersionData({
+                                      newName: `${priceList.name} - Bản sao`,
+                                      newCode: '',
+                                      startDate: '',
+                                      endDate: ''
+                                    });
+                                    setSplitVersionModalVisible(true);
+                                  }}
+                                  className="bg-purple-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-purple-600 mr-2"
+                                >
+                                  Sao chép
+                                </button>
+                              )}
+                              {priceList.status === "scheduled" && (
                                 <Popconfirm
                                   title="Xóa bảng giá"
                                   description="Bạn có chắc chắn muốn xóa bảng giá này?"
@@ -2553,6 +2586,23 @@ const Dashboard: React.FC = () => {
                                     Xóa
                                   </button>
                                 </Popconfirm>
+                              )}
+                              {priceList.status === "expired" && (
+                                <button
+                                  onClick={() => {
+                                    setEditingPriceList(priceList);
+                                    setSplitVersionData({
+                                      newName: `${priceList.name} - Bản sao`,
+                                      newCode: '',
+                                      startDate: '',
+                                      endDate: ''
+                                    });
+                                    setSplitVersionModalVisible(true);
+                                  }}
+                                  className="bg-purple-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-purple-600"
+                                >
+                                  Sao chép
+                                </button>
                               )}
                           </div>
                         </td>
@@ -3217,6 +3267,9 @@ const Dashboard: React.FC = () => {
                 setEditEndDateSubmitting(false);
               }
             }}>
+              <Form.Item label="Mã bảng giá">
+                <Input value={editingEndDatePriceList.code || 'N/A'} disabled />
+              </Form.Item>
               <Form.Item label="Tên bảng giá">
                 <Input value={editingEndDatePriceList.name} disabled />
               </Form.Item>
@@ -3355,6 +3408,7 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setSplitVersionModalVisible(false);
             setEditingPriceList(null);
+            setSplitVersionData({ newName: '', newCode: '', startDate: '', endDate: '' });
           }}
           footer={null}
           width={900}
@@ -3371,23 +3425,28 @@ const Dashboard: React.FC = () => {
             {/* Thông tin bảng giá hiện tại */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá nguồn (bản gốc)</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <span className="font-medium text-gray-600">Tên:</span>
-                  <p className="text-gray-800">{editingPriceList.name}</p>
+                  <span className="font-medium text-gray-600">Mã bảng giá:</span>
+                  <p className="text-gray-800 font-mono px-2 py-1 rounded inline-block">
+                    {editingPriceList.code || 'N/A'}
+                  </p>
                 </div>
                 <div>
-                  <span className="font-medium text-gray-600">Trạng thái:</span>
-                  <br />
+                  <span className="font-medium text-gray-600">Tên:</span>
+                  <p className="text-gray-800 px-2 py-1 rounded inline-block">{editingPriceList.name}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600 mr-2">Trạng thái:</span>
                   <Tag color="green">Đang hoạt động</Tag>
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Ngày bắt đầu:</span>
-                  <p className="text-gray-800">{new Date(editingPriceList.startDate).toLocaleDateString('vi-VN')}</p>
+                  <p className="text-gray-800 px-2 py-1 rounded inline-block">{new Date(editingPriceList.startDate).toLocaleDateString('vi-VN')}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Ngày kết thúc hiện tại:</span>
-                  <p className="text-gray-800">{new Date(editingPriceList.endDate).toLocaleDateString('vi-VN')}</p>
+                  <p className="text-gray-800 px-2 py-1 rounded inline-block">{new Date(editingPriceList.endDate).toLocaleDateString('vi-VN')}</p>
                 </div>
               </div>
             </div>
@@ -3397,6 +3456,19 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-semibold mb-3 text-gray-800">Bảng giá mới (bản sao)</h3>
               <ConfigProvider locale={viVN}>
                 <Form layout="vertical">
+                  <Form.Item
+                    label="Mã bảng giá mới"
+                    required
+                    tooltip="Mã định danh cho bảng giá mới"
+                  >
+                    <Input
+                      value={splitVersionData.newCode}
+                      onChange={(e) => setSplitVersionData({...splitVersionData, newCode: e.target.value.toUpperCase()})}
+                      placeholder="Ví dụ: BG0001"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </Form.Item>
+                  
                   <Form.Item
                     label="Tên bảng giá mới"
                     required
@@ -3466,6 +3538,12 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-semibold mb-3 text-gray-800">Xem trước thay đổi</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-gray-600">Mã bảng giá mới:</span>
+                  <span className="font-medium">
+                    {splitVersionData.newCode || 'Chưa nhập'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-gray-600">Tên bảng giá mới:</span>
                   <span className="font-medium">
                     {splitVersionData.newName || 'Chưa nhập'}
@@ -3492,6 +3570,7 @@ const Dashboard: React.FC = () => {
                 onClick={() => {
                   setSplitVersionModalVisible(false);
                   setEditingPriceList(null);
+                  setSplitVersionData({ newName: '', newCode: '', startDate: '', endDate: '' });
                 }}
               >
                 Hủy
@@ -3499,8 +3578,14 @@ const Dashboard: React.FC = () => {
               <Button
                 type="primary"
                 onClick={() => {
-                  if (!splitVersionData.newName || !splitVersionData.startDate || !splitVersionData.endDate) {
+                  if (!splitVersionData.newCode || !splitVersionData.newName || !splitVersionData.startDate || !splitVersionData.endDate) {
                     message.error("Vui lòng điền đầy đủ thông tin");
+                    return;
+                  }
+                  
+                  // Validation mã bảng giá
+                  if (splitVersionData.newCode.length < 3 || splitVersionData.newCode.length > 20) {
+                    message.error("Mã bảng giá phải có từ 3-20 ký tự");
                     return;
                   }
                   // Validation ngày
@@ -3536,6 +3621,7 @@ const Dashboard: React.FC = () => {
 
                   handleDuplicatePriceList({
                     newName: splitVersionData.newName,
+                    newCode: splitVersionData.newCode,
                     startDate: splitVersionData.startDate,
                     endDate: splitVersionData.endDate,
                   });

@@ -3,6 +3,7 @@ import { FoodCombo } from "../models/FoodCombo";
 import mongoose from "mongoose";
 
 export interface ICreatePriceListData {
+  code: string;
   name: string;
   startDate: Date;
   endDate: Date;
@@ -10,6 +11,7 @@ export interface ICreatePriceListData {
 }
 
 export interface IUpdatePriceListData {
+  code?: string;
   name?: string;
   startDate?: Date;
   endDate?: Date;
@@ -67,8 +69,20 @@ class PriceListService {
     return await this.syncStatusIfNeeded(pl);
   }
 
+  // Kiểm tra mã bảng giá có tồn tại không
+  async checkCodeExists(code: string): Promise<boolean> {
+    const existingPriceList = await PriceList.findOne({ code: code.toUpperCase() });
+    return !!existingPriceList;
+  }
+
   // Tạo bảng giá mới
   async createPriceList(priceListData: ICreatePriceListData): Promise<IPriceList> {
+    // Kiểm tra mã bảng giá có trùng lặp không
+    const codeExists = await this.checkCodeExists(priceListData.code);
+    if (codeExists) {
+      throw new Error(`Mã bảng giá "${priceListData.code}" đã tồn tại, vui lòng chọn mã khác`);
+    }
+
     // Kiểm tra xung đột thời gian
     await this.checkTimeConflicts(priceListData.startDate, priceListData.endDate);
     
@@ -77,6 +91,7 @@ class PriceListService {
     
     const priceList = new PriceList({
       ...priceListData,
+      code: priceListData.code.toUpperCase(), // Đảm bảo uppercase
       lines: linesWithPrices
     });
     
@@ -88,6 +103,15 @@ class PriceListService {
     const priceList = await PriceList.findById(id);
     if (!priceList) {
       throw new Error('Bảng giá không tồn tại');
+    }
+
+    // Kiểm tra mã bảng giá có trùng lặp không (nếu có thay đổi code)
+    if (updateData.code && updateData.code !== priceList.code) {
+      const codeExists = await this.checkCodeExists(updateData.code);
+      if (codeExists) {
+        throw new Error(`Mã bảng giá "${updateData.code}" đã tồn tại, vui lòng chọn mã khác`);
+      }
+      updateData.code = updateData.code.toUpperCase(); // Đảm bảo uppercase
     }
 
     // Kiểm tra quy tắc chỉnh sửa

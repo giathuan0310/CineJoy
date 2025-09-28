@@ -345,6 +345,7 @@ declare global {
 
   interface IPriceList {
     _id: string;
+    code: string;
     name: string;
     startDate: string;
     endDate: string;

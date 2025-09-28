@@ -42,15 +42,16 @@ export class PriceListController {
   // Tạo bảng giá mới
   async createPriceList(req: Request, res: Response): Promise<void> {
     try {
-      const { name, startDate, endDate, lines } = req.body;
+      const { code, name, startDate, endDate, lines } = req.body;
       
       // Validation cơ bản
-      if (!name || !startDate || !endDate || !lines || !Array.isArray(lines)) {
+      if (!code || !name || !startDate || !endDate || !lines || !Array.isArray(lines)) {
         res.status(400).json({ message: "Thiếu thông tin bắt buộc" });
         return;
       }
 
       const priceListData = {
+        code,
         name,
         startDate: new Date(startDate),
         endDate: new Date(endDate),

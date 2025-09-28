@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 export interface ICreatePriceListData {
   code: string;
   name: string;
+  description?: string;
   startDate: Date;
   endDate: Date;
   lines: IPriceListLine[];
@@ -13,6 +14,7 @@ export interface ICreatePriceListData {
 export interface IUpdatePriceListData {
   code?: string;
   name?: string;
+  description?: string;
   startDate?: Date;
   endDate?: Date;
   lines?: IPriceListLine[];
@@ -86,16 +88,24 @@ class PriceListService {
     // Kiểm tra xung đột thời gian
     await this.checkTimeConflicts(priceListData.startDate, priceListData.endDate);
     
-    // Lấy giá từ sản phẩm/combo nếu chưa có
-    const linesWithPrices = await this.populatePricesFromProducts(priceListData.lines);
+    // Kiểm tra và filter các line còn tồn tại (cho sao chép bảng giá)
+    const { validLines, skippedCount, skippedItems } = await this.validateAndFilterLines(priceListData.lines);
     
     const priceList = new PriceList({
       ...priceListData,
       code: priceListData.code.toUpperCase(), // Đảm bảo uppercase
-      lines: linesWithPrices
+      lines: validLines
     });
     
-    return await priceList.save();
+    const savedPriceList = await priceList.save();
+    
+    // Thêm thông tin về các item đã bỏ qua vào response
+    (savedPriceList as any).skippedInfo = {
+      skippedCount,
+      skippedItems
+    };
+    
+    return savedPriceList;
   }
 
   // Cập nhật bảng giá
@@ -200,6 +210,39 @@ class PriceListService {
     }));
 
     return populatedLines;
+  }
+
+  // Kiểm tra và filter các line còn tồn tại khi sao chép
+  private async validateAndFilterLines(lines: IPriceListLine[]): Promise<{ validLines: IPriceListLine[], skippedCount: number, skippedItems: string[] }> {
+    const validLines: IPriceListLine[] = [];
+    const skippedItems: string[] = [];
+
+    for (const line of lines) {
+      if (line.type === 'ticket') {
+        // Vé (loại ghế) luôn hợp lệ vì có các loại cố định
+        validLines.push(line);
+      } else if (line.type === 'combo' || line.type === 'single') {
+        if (line.productId) {
+          const product = await FoodCombo.findById(line.productId);
+          if (product) {
+            validLines.push({
+              ...line,
+              productName: product.name,
+              price: line.price || product.price
+            });
+          } else {
+            // Sản phẩm/combo không tồn tại, ghi lại để báo cáo
+            skippedItems.push(line.productName || line.productId);
+          }
+        }
+      }
+    }
+
+    return {
+      validLines,
+      skippedCount: skippedItems.length,
+      skippedItems
+    };
   }
 
   // Kiểm tra quy tắc chỉnh sửa

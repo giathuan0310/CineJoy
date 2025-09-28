@@ -12,6 +12,7 @@ export interface IPriceList extends Document {
   _id: string;
   code: string;
   name: string;
+  description?: string;
   startDate: Date;
   endDate: Date;
   status: 'active' | 'scheduled' | 'expired';
@@ -63,6 +64,10 @@ const PriceListSchema = new Schema<IPriceList>({
   name: {
     type: String,
     required: [true, 'Tên bảng giá là bắt buộc'],
+    trim: true
+  },
+  description: {
+    type: String,
     trim: true
   },
   startDate: {

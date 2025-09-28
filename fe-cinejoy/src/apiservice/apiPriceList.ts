@@ -12,6 +12,7 @@ export interface IPriceList {
   _id: string;
   code: string;
   name: string;
+  description?: string;
   startDate: string;
   endDate: string;
   status: 'active' | 'scheduled' | 'expired';
@@ -23,6 +24,7 @@ export interface IPriceList {
 export interface ICreatePriceListData {
   code: string;
   name: string;
+  description?: string;
   startDate: string;
   endDate: string;
   // lines có thể bỏ trống khi tạo mới header, sẽ thêm sau trong chi tiết
@@ -32,6 +34,7 @@ export interface ICreatePriceListData {
 export interface IUpdatePriceListData {
   code?: string;
   name?: string;
+  description?: string;
   startDate?: string;
   endDate?: string;
   lines?: IPriceListLine[];

@@ -42,7 +42,7 @@ export class PriceListController {
   // Tạo bảng giá mới
   async createPriceList(req: Request, res: Response): Promise<void> {
     try {
-      const { code, name, startDate, endDate, lines } = req.body;
+      const { code, name, description, startDate, endDate, lines } = req.body;
       
       // Validation cơ bản
       if (!code || !name || !startDate || !endDate || !lines || !Array.isArray(lines)) {
@@ -53,6 +53,7 @@ export class PriceListController {
       const priceListData = {
         code,
         name,
+        description,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         lines
@@ -62,15 +63,30 @@ export class PriceListController {
       
       // Kiểm tra khoảng trống sau khi tạo
       const gapCheck = await priceListService.checkTimeGaps();
-      if (gapCheck.hasGap) {
-        res.status(201).json({
-          priceList: newPriceList,
-          warning: gapCheck.message
-        });
-        return;
+      
+      // Chuẩn bị response với thông tin về các item đã bỏ qua
+      const response: any = {
+        priceList: newPriceList,
+        message: "Tạo bảng giá thành công"
+      };
+      
+      // Thêm thông tin về các item đã bỏ qua (nếu có)
+      if ((newPriceList as any).skippedInfo) {
+        const { skippedCount, skippedItems } = (newPriceList as any).skippedInfo;
+        if (skippedCount > 0) {
+          response.warning = `Đã bỏ qua ${skippedCount} sản phẩm/combo không tồn tại trong database`;
+          response.skippedItems = skippedItems;
+        }
+        // Xóa thông tin tạm thời khỏi priceList
+        delete (newPriceList as any).skippedInfo;
       }
       
-      res.status(201).json(newPriceList);
+      // Thêm warning về khoảng trống nếu có
+      if (gapCheck.hasGap) {
+        response.gapWarning = gapCheck.message;
+      }
+      
+      res.status(201).json(response);
     } catch (error: any) {
       if (error.message.includes('xung đột') || error.message.includes('trùng')) {
         res.status(400).json({ message: error.message });

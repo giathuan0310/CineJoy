@@ -347,6 +347,7 @@ declare global {
     _id: string;
     code: string;
     name: string;
+    description?: string;
     startDate: string;
     endDate: string;
     status: 'active' | 'scheduled' | 'expired';

@@ -326,9 +326,11 @@ const Seat: React.FC<SeatProps> = ({
 
                     const colorClass = isMaintenance
                       ? 'bg-gray-600 border-gray-800'
-                      : isChecked
-                        ? 'bg-[#b3210e] border-transparent'
-                        : baseColor;
+                      : isSelectedFromServer
+                        ? 'bg-[#b3210e] border-[#b3210e] text-white'  // Ghế đã chọn (từ server) = đỏ
+                        : isChecked
+                          ? 'bg-blue-600 border-blue-600 text-white'   // Ghế đang chọn (UI) = xanh
+                          : baseColor;
 
               return (
                 <button
@@ -344,7 +346,7 @@ const Seat: React.FC<SeatProps> = ({
                         title={seatName}
                       >
                         <div
-                          className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
+                          className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'cursor-not-allowed' : ''}`}
                         >
                           {seatName}
                           {isMaintenance && (
@@ -392,14 +394,16 @@ const Seat: React.FC<SeatProps> = ({
 
               const colorClass = isMaintenance
                 ? 'bg-gray-600 border-gray-800'
-                : isChecked
-                  ? 'bg-[#b3210e] border-transparent'
-                  : baseColor;
+                : isSelectedFromServer
+                  ? 'bg-[#b3210e] border-[#b3210e] text-white'
+                  : isChecked
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : baseColor;
 
               return (
                 <button
                   key={seatName}
-                  className="relative flex flex-col items-center bg-transparent border-none p-0 rounded transition-all duration-200 cursor-pointer"
+                  className="relative flex flex-col items-center border-none p-0 rounded transition-all duration-200 cursor-pointer"
                   onClick={() => {
                     if (!isSelectedFromServer && !isMaintenance) {
                       handleSeatSelection(seatName);
@@ -409,9 +413,9 @@ const Seat: React.FC<SeatProps> = ({
                   type="button"
                   title={seatName}
                 >
-                  <div
-                    className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'bg-[#ffe5e0] border-[#b91c1c] text-[#b91c1c] cursor-not-allowed' : ''}`}
-                  >
+                <div
+                  className={`w-6.5 h-6.5 ${colorClass} border-2 rounded flex items-center justify-center text-[10px] font-bold relative ${isSelectedFromServer ? 'cursor-not-allowed' : ''}`}
+                >
                     {seatName}
                     {isMaintenance && (
                       <div className="absolute inset-0 flex items-center justify-center text-red-600 text-lg font-bold pointer-events-none">✕</div>

@@ -11,6 +11,8 @@ import MoviesDetail from 'pages/client/MoviesDetail';
 import Select from 'pages/client/SelectSeat';
 import Members from 'pages/client/Members';
 import Payment from 'pages/client/Payment';
+import PaymentSuccess from 'pages/client/PaymentSuccess';
+import PaymentCancel from '@/pages/client/PaymentCancel';
 import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import VoucherDetail from 'pages/admin/VoucherDetail';
@@ -44,6 +46,14 @@ const router = createBrowserRouter([
       {
         path: "/payment",
         element: <Payment />
+      },
+      {
+        path: "/payment/success",
+        element: <PaymentSuccess />
+      },
+      {
+        path: "/payment/cancel",
+        element: <PaymentCancel />
       }
     ]
   },

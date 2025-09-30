@@ -188,11 +188,11 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
         <h4 className={`text-sm font-semibold mb-2 text-left md:text-center ${isDarkMode ? "text-white" : "text-[#2d3748]"}`}>Trạng thái ghế:</h4>
         <div className="flex flex-row flex-wrap gap-6 md:justify-center">
           <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-[#b3210e] shadow-inner" />
+            <div className="w-6 h-6 rounded-md bg-blue-600 border border-blue-600 shadow-inner" />
             <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đang chọn</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <div className="w-6 h-6 rounded-md bg-[#ffe5e0] border border-[#b91c1c] shadow-inner" />
+            <div className="w-6 h-6 rounded-md bg-[#b3210e] border border-[#b3210e] shadow-inner" />
             <span className={isDarkMode ? "text-white" : "text-gray-700"}>Ghế đã chọn</span>
           </div>
           <div className="flex items-center gap-2 text-sm">

@@ -65,7 +65,7 @@ class OrderController {
       const result = await OrderService.createOrder(orderData);
 
       if (!result.success) {
-        res.status(400).json({
+        res.status(200).json({
           status: false,
           error: 400,
           message: result.message,

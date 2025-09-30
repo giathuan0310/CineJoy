@@ -1126,50 +1126,50 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
   }
   
   return updates;
-};
+  };
 
-const handleVoucherSubmit = async (voucherData: Partial<IVoucher>) => {
-  try {
-    if (selectedVoucher) {
-      // Cập nhật
-      await updateVoucher(selectedVoucher._id!, voucherData as IVoucher);
-      toast.success("Cập nhật voucher thành công!");
-    } else {
-      // Thêm mới
-      await addVoucher(voucherData as IVoucher);
-      toast.success("Thêm voucher thành công!");
+  const handleVoucherSubmit = async (voucherData: Partial<IVoucher>) => {
+    try {
+      if (selectedVoucher) {
+        // Cập nhật
+        await updateVoucher(selectedVoucher._id!, voucherData as IVoucher);
+        toast.success("Cập nhật voucher thành công!");
+      } else {
+        // Thêm mới
+        await addVoucher(voucherData as IVoucher);
+        toast.success("Thêm voucher thành công!");
+      }
+      // Reload dữ liệu sau khi thêm/sửa
+      await loadVouchers();
+      setShowVoucherForm(false);
+      setSelectedVoucher(undefined);
+    } catch (error) {
+      console.error("Error submitting voucher:", error);
+      toast.error(selectedVoucher ? "Cập nhật voucher thất bại!" : "Thêm voucher thất bại!");
     }
-    // Reload dữ liệu sau khi thêm/sửa
-    await loadVouchers();
-    setShowVoucherForm(false);
-    setSelectedVoucher(undefined);
-  } catch (error) {
-    console.error("Error submitting voucher:", error);
-    toast.error(selectedVoucher ? "Cập nhật voucher thất bại!" : "Thêm voucher thất bại!");
-  }
-};
+  };
 
-const handleDeleteVoucher = async (voucherId: string) => {
-  try {
-    await deleteVoucher(voucherId);
-    // Reload dữ liệu sau khi xóa
-    await loadVouchers();
+  const handleDeleteVoucher = async (voucherId: string) => {
+    try {
+      await deleteVoucher(voucherId);
+      // Reload dữ liệu sau khi xóa
+      await loadVouchers();
     toast.success("Xóa khuyến mãi thành công!");
-  } catch (error) {
-    console.error("Error deleting voucher:", error);
+    } catch (error) {
+      console.error("Error deleting voucher:", error);
     toast.error("Xóa khuyến mãi thất bại!");
-  }
-};
+    }
+  };
 
-const handleEditVoucher = (voucher: IVoucher) => {
-  setSelectedVoucher(voucher);
-  setShowVoucherForm(true);
-};
+  const handleEditVoucher = (voucher: IVoucher) => {
+    setSelectedVoucher(voucher);
+    setShowVoucherForm(true);
+  };
 
-const handleAddVoucher = () => {
-  setSelectedVoucher(undefined);
-  setShowVoucherForm(true);
-};
+  const handleAddVoucher = () => {
+    setSelectedVoucher(undefined);
+    setShowVoucherForm(true);
+  };
   /////////////////////////////////////////////////////////////////
 
   ////////////////////////Xử lý CRUD phim ////////////////////////
@@ -1289,17 +1289,17 @@ const handleAddVoucher = () => {
               </div>
               {expandedMenus.has('movieManagement') && (
                 <ul className="ml-4 border-l border-gray-700">
-                  {[
-                    { label: "Phim", value: "movies", icon: "🎬" },
-                    { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
-                    { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
+            {[
+              { label: "Phim", value: "movies", icon: "🎬" },
+              { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
+              { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
                     { label: "Bảng giá", value: "priceLists", icon: "💰" },
                   ].map((subItem) => (
                     <li
                       key={subItem.value}
                       className={`px-4 py-2 cursor-pointer flex items-center gap-3 text-sm transition-colors duration-200 ${
                         activeTab === subItem.value
-                          ? "bg-gray-900 text-white"
+                    ? "bg-gray-900 text-white"
                           : "text-gray-300 hover:bg-gray-800"
                       }`}
                       onClick={async () => {
@@ -1355,19 +1355,19 @@ const handleAddVoucher = () => {
                       }`}
                       onClick={async () => {
                         setActiveTab(subItem.value);
-                        setSearchTerm("");
-                        setCurrentPage(1);
+                  setSearchTerm("");
+                  setCurrentPage(1);
                         
                         // Tự động mở dropdown Quản lý Rạp
                         const newExpandedMenus = new Set(expandedMenus);
                         newExpandedMenus.add('theaterManagement');
                         setExpandedMenus(newExpandedMenus);
-                      }}
-                    >
+                }}
+              >
                       <span className="text-sm">{subItem.icon}</span>
                       {subItem.label}
-                    </li>
-                  ))}
+              </li>
+            ))}
                 </ul>
               )}
             </li>
@@ -2067,8 +2067,8 @@ const handleAddVoucher = () => {
             </div>
           )}
 
-         {/* Vouchers Tab */}
-         {activeTab === "vouchers" && (
+          {/* Vouchers Tab */}
+          {activeTab === "vouchers" && (
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-black select-none">
                 Quản lý Khuyến mãi

@@ -589,8 +589,10 @@ const ScheduleList: React.FC = () => {
                                           : movie?.ageRating === "T12+"
                                           ? 12
                                           : 13,
+                                      theaterId: selectedCinemaId, // Thêm theaterId
                                     },
-                                    showtimeId: showtime.parentId, // Use parent document ID
+                                    showtimeId: showtime.parentId,
+                                    theaterId: selectedCinemaId, // Thêm theaterId ở level state
                                     cinema: filteredCinemas.find(
                                       (c) => c._id === selectedCinemaId
                                     )?.name,

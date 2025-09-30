@@ -26,6 +26,9 @@ export interface MoMoPaymentRequest {
   requestType: string;
   signature: string;
   lang: string;
+  // Optional expiration support (MoMo may accept one of these depending on API version)
+  expiredTime?: number; // ms epoch
+  validDuration?: number; // seconds
 }
 
 export interface MoMoPaymentResponse {
@@ -73,6 +76,8 @@ class PaymentService {
       const amount = payment.amount;
       const extraData = "";
       const requestType = "captureWallet";
+      // Set payment expiration to 5 minutes
+      const expiredTime = Date.now() + 5 * 60 * 1000; // milliseconds
 
       // Tạo signature
       const rawSignature = `accessKey=${momoConfig.getAccessKey()}&amount=${amount}&extraData=${extraData}&ipnUrl=${momoConfig.getIpnUrl()}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${momoConfig.getPartnerCode()}&redirectUrl=${
@@ -96,6 +101,8 @@ class PaymentService {
         requestType,
         signature,
         lang: "vi",
+        expiredTime,
+        validDuration: 300,
       };
 
       console.log("MoMo Request:", JSON.stringify(requestBody, null, 2));

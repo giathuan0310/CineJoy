@@ -23,7 +23,10 @@ export const SelectSeat = () => {
   const location = useLocation();
   
   const { isDarkMode } = useAppStore();
-  const { movie, cinema, date, time, room, showtimeId } = location.state || {};
+  const { movie, cinema, date, time, room, showtimeId, theaterId } = location.state || {};
+  
+  // Debug log để kiểm tra dữ liệu nhận được
+  
 
   const displayTime = time;
   const apiTime = time;
@@ -201,15 +204,16 @@ export const SelectSeat = () => {
       // Tạo mapping từ index đến seatId (giống như trong Seat component)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       seatsData.forEach((seatItem: any, index: number) => {
-        const row = Math.floor(index / apiSeatLayout.cols);
-        const col = index % apiSeatLayout.cols;
-        const seatId = `${String.fromCharCode(65 + row)}${col + 1}`;
-        
+        const fallbackRow = Math.floor(index / apiSeatLayout.cols);
+        const fallbackCol = index % apiSeatLayout.cols;
+        const seatId = seatItem.seatId || `${String.fromCharCode(65 + fallbackRow)}${fallbackCol + 1}`;
+
         if (seatItem.type) {
           typeMap[seatId] = seatItem.type;
         }
-        
-        if (seatItem.status === "occupied" || seatItem.status === "reserved") {
+
+        // New statuses: selected | available | maintenance
+        if (seatItem.status === "selected") {
           occupiedSeats.push(seatId);
         }
       });
@@ -254,11 +258,14 @@ export const SelectSeat = () => {
           }}
           totalPrice={totalTicketPrice}
           priceError={hasTicketPriceGap}
-          onContinue={() =>
+          onContinue={() => {
+            
             navigate("/payment", {
               state: {
                 movie: {
                   ...movie,
+                  theaterId: theaterId || movie?.theaterId,
+                  showtimeId: showtimeId,
                 },
                 seats: selectedSeats,
                 seatTypeCounts: selectedSeats.reduce((acc: Record<string, number>, s) => {
@@ -266,13 +273,16 @@ export const SelectSeat = () => {
                   if (t) acc[t] = (acc[t] || 0) + 1;
                   return acc;
                 }, {}),
+                seatTypeMap,
                 cinema,
                 date: date,
                 time: apiTime,
                 room: room,
+                theaterId: theaterId || movie?.theaterId,
+                showtimeId: showtimeId,
               },
-            })
-          }
+            });
+          }}
         />
       </div>
     </div>

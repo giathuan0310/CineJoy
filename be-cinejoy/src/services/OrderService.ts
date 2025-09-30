@@ -54,22 +54,22 @@ class OrderService {
     session.startTransaction();
 
     try {
-      // Bỏ logic xử lý FoodCombo vì đã xóa các trường quantity, price
-      // Chỉ lưu thông tin combo mà không xử lý giá và số lượng
+      // Tính giá combo từ payload (giá đã được frontend gán theo bảng giá hiện hành)
       const combosWithPrice = orderData.foodCombos.map(combo => ({
         comboId: combo.comboId,
         quantity: combo.quantity,
-        price: 0 // Không có giá
+        // Nếu frontend chưa gửi price, mặc định 0
+        // @ts-ignore - interface cũ chưa có price trên orderData.foodCombos
+        price: (combo as any).price || 0,
       }));
-      
-      const comboPrice = 0; // Không tính giá combo
+      const comboPrice = combosWithPrice.reduce((sum, c) => sum + (c.price || 0) * (c.quantity || 0), 0);
 
       // Tính toán giá vé từ seats array
       const ticketPrice = orderData.seats.reduce(
         (total, seat) => total + seat.price,
         0
       );
-      const totalAmount = ticketPrice; // Bỏ comboPrice vì không có giá combo
+      const totalAmount = ticketPrice + comboPrice;
 
       // Tính toán voucher discount
       let voucherDiscount = 0;
@@ -139,26 +139,19 @@ class OrderService {
       // **KIỂM TRA GHẾ TRƯỚC KHI TẠO ORDER**
       const seatIds = orderData.seats.map((seat) => seat.seatId);
 
-      // Convert Vietnam time to UTC for API call
-      const convertVietnamToUTC = (vietnamTime: string) => {
-        const [hour, minute] = vietnamTime.split(":").map(Number);
-        const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
-        return `${utcHour.toString().padStart(2, "0")}:${minute
-          .toString()
-          .padStart(2, "0")}`;
-      };
+      // Sử dụng thời gian trực tiếp từ frontend (Vietnam time)
+      const showTime = orderData.showTime;
 
-      const utcShowTime = convertVietnamToUTC(orderData.showTime);
 
       // Kiểm tra trạng thái ghế trước khi tạo order
       try {
         await showtimeService.bookSeats(
           orderData.showtimeId,
           orderData.showDate,
-          utcShowTime,
+          showTime,
           orderData.room,
           seatIds,
-          "reserved"
+          "selected"
         );
       } catch (seatError: any) {
         // Nếu ghế không available, return error response
@@ -183,7 +176,7 @@ class OrderService {
         voucherId: orderData.voucherId,
         voucherDiscount,
         ticketPrice,
-        comboPrice: 0, // Bỏ comboPrice
+        comboPrice,
         totalAmount,
         finalAmount,
         paymentMethod: orderData.paymentMethod,
@@ -348,16 +341,8 @@ class OrderService {
         try {
           const seatIds = currentOrder.seats.map((seat) => seat.seatId);
 
-          // Convert Vietnam time to UTC for API call
-          const convertVietnamToUTC = (vietnamTime: string) => {
-            const [hour, minute] = vietnamTime.split(":").map(Number);
-            const utcHour = (hour - 7 + 24) % 24; // Subtract 7 hours for UTC
-            return `${utcHour.toString().padStart(2, "0")}:${minute
-              .toString()
-              .padStart(2, "0")}`;
-          };
-
-          const utcShowTime = convertVietnamToUTC(currentOrder.showTime);
+          // Sử dụng thời gian trực tiếp từ order (Vietnam time)
+          const showTime = currentOrder.showTime;
 
           console.log("Attempting to confirm seats for paid order:", {
             orderId: currentOrder._id,
@@ -365,7 +350,6 @@ class OrderService {
             showtimeId: currentOrder.showtimeId.toString(),
             showDate: currentOrder.showDate,
             showTime: currentOrder.showTime,
-            utcShowTime: utcShowTime,
             room: currentOrder.room,
             seatIds: seatIds,
           });
@@ -373,10 +357,19 @@ class OrderService {
           await showtimeService.bookSeats(
             currentOrder.showtimeId.toString(),
             currentOrder.showDate,
-            utcShowTime, // Use UTC time instead of Vietnam time
+            showTime, // Use Vietnam time directly
             currentOrder.room,
             seatIds,
-            "occupied" // Xác nhận ghế đã được đặt khi thanh toán thành công
+            "selected" // Xác nhận ghế đã được đặt khi thanh toán thành công
+          );
+          // Cập nhật thêm trạng thái ghế trong collection showtimes = 'selected'
+          await showtimeService.setSeatsStatus(
+            currentOrder.showtimeId.toString(),
+            currentOrder.showDate,
+            showTime,
+            currentOrder.room,
+            seatIds,
+            "selected"
           );
           console.log(
             "Seats confirmed for paid order:",
@@ -401,6 +394,22 @@ class OrderService {
         .populate("voucherId", "code discountPercent");
 
       await session.commitTransaction();
+      
+      // Sau khi commit (thanh toán thành công), cập nhật trạng thái ghế ở collection seats về 'selected'
+      try {
+        if (updateData.paymentStatus === "PAID") {
+          const Seat = (await import("../models/Seat")).default;
+          if (currentOrder?.seats?.length) {
+            await Seat.updateMany(
+              { seatId: { $in: currentOrder.seats.map((s) => s.seatId) }, room: (currentOrder as any).roomId || undefined },
+              { $set: { status: "selected" } }
+            );
+          }
+        }
+      } catch (e) {
+        // Không làm fail request nếu cập nhật ghế gặp lỗi; chỉ log
+        console.error("Failed to update seat status after payment:", e);
+      }
       return updatedOrder;
     } catch (error) {
       await session.abortTransaction();
@@ -412,11 +421,8 @@ class OrderService {
 
   // Hủy order
   async cancelOrder(orderId: string, reason?: string): Promise<IOrder | null> {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
-      const order = await Order.findById(orderId).session(session);
+      const order = await Order.findById(orderId);
       if (!order) {
         throw new Error("Order không tồn tại");
       }
@@ -434,13 +440,14 @@ class OrderService {
       // Release ghế trong showtime khi hủy order
       try {
         const seatIds = order.seats.map((seat) => seat.seatId);
-        // Cập nhật trạng thái ghế về available
-        await showtimeService.releaseSeats(
+        // Cập nhật trạng thái ghế về available (dùng setSeatsStatus để so khớp theo tên phòng/seatId)
+        await showtimeService.setSeatsStatus(
           order.showtimeId.toString(),
           order.showDate,
           order.showTime,
           order.room,
-          seatIds
+          seatIds,
+          'available'
         );
         console.log("Seats released for cancelled order:", order.orderCode);
       } catch (seatError) {
@@ -457,16 +464,11 @@ class OrderService {
             paymentStatus: "CANCELLED",
           },
         },
-        { new: true, session }
+        { new: true }
       );
-
-      await session.commitTransaction();
       return updatedOrder;
     } catch (error) {
-      await session.abortTransaction();
       throw error;
-    } finally {
-      session.endSession();
     }
   }
 

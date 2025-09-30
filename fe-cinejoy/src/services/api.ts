@@ -180,7 +180,6 @@ export const searchMoviesApi = async (keyword: string) => {
 };
 
 export const validateVoucherApi = async (code: string, userId?: string) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await axios.post<IBackendResponse<any>>(
     "/v1/user-vouchers/validate",
     {
@@ -302,4 +301,76 @@ export const deleteSeatApi = async (seatId: string) => {
 
 export const deleteAllSeatsInRoomApi = async (roomId: string) => {
   await axios.delete(`/seats/room/${roomId}/all`);
+};
+
+// Order APIs
+export const createOrderApi = async (orderData: {
+  userId: string;
+  movieId: string;
+  theaterId: string;
+  showtimeId: string;
+  showDate: string;
+  showTime: string;
+  room: string;
+  seats: Array<{
+    seatId: string;
+    type: string;
+    price: number;
+  }>;
+  foodCombos: Array<{
+    comboId: string;
+    quantity: number;
+    price: number;
+  }>;
+  voucherId?: string | null;
+  paymentMethod: 'MOMO' | 'VNPAY';
+  customerInfo: {
+    fullName: string;
+    phoneNumber: string;
+    email: string;
+  };
+}) => {
+  try {
+    const response = await axios.post<IBackendResponse<any>>(
+      "/v1/api/orders",
+      orderData
+    );
+    return response.data;
+  } catch (error: any) {
+    // Trả object chuẩn để UI luôn có message
+    const status = error?.response?.status ?? 500;
+    const message = error?.response?.data?.message || error?.message || 'Request failed';
+    return {
+      status: false,
+      error: status,
+      message,
+      data: null,
+    } as unknown as IBackendResponse<any>;
+  }
+};
+
+export const processPaymentApi = async (
+  orderId: string,
+  paymentData: {
+    paymentMethod: 'MOMO' | 'VNPAY';
+    returnUrl: string;
+    cancelUrl: string;
+  }
+) => {
+  try {
+    const response = await axios.post<IBackendResponse<any>>(
+      `/v1/api/orders/${orderId}/payment`,
+      paymentData
+    );
+    return response.data;
+  } catch (error: any) {
+    const status = error?.response?.status ?? 500;
+    const message = error?.response?.data?.message || error?.message || 'Request failed';
+    return {
+      status: false,
+      error: status,
+      message,
+      data: null,
+    } as unknown as IBackendResponse<any>;
+  }
 };

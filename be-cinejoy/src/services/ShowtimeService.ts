@@ -53,12 +53,13 @@ class ShowtimeService {
         throw new Error("Thiếu dữ liệu bắt buộc để tạo suất chiếu");
       }
 
-      // Chuẩn hóa mảng showTimes: fill seats nếu thiếu
+      // Chuẩn hóa mảng showTimes: khởi tạo seats tự động nếu thiếu/không hợp lệ
       const normalizedShowTimes = await Promise.all(
         (showtimeData.showTimes as any[]).map(async (st: any) => {
-          if (!st.seats || st.seats.length === 0) {
+          st.start = new Date(st.start);
+          st.end = new Date(st.end);
+          if (!Array.isArray(st.seats) || st.seats.length === 0 || (st.seats[0] && !st.seats[0].seat)) {
             const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
-            // Giữ nguyên trạng thái ghế từ DB (bảo trì, v.v.)
             st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
           }
           return st;
@@ -209,6 +210,12 @@ class ShowtimeService {
           // Bỏ giới hạn tối đa 2 suất/ca/phòng. Vẫn tiếp tục thêm suất chiếu nếu không trùng.
           const totalInSession = inThisSession.length + alsoIncoming.length;
 
+          // Khởi tạo seats tự động nếu thiếu trước khi push
+          if (!Array.isArray(incoming.seats) || incoming.seats.length === 0 || (incoming.seats[0] && !incoming.seats[0].seat)) {
+            const roomSeats = await SeatModel.find({ room: incoming.room }).select("_id status");
+            incoming.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
+          }
+
           doc.showTimes.push(incoming);
       }
 
@@ -345,6 +352,29 @@ class ShowtimeService {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Backfill: khởi tạo lại seats cho toàn bộ showtimes đang thiếu/không hợp lệ
+  async backfillAllShowtimeSeats(force = false): Promise<{ total: number; fixed: number }> {
+    const docs = await Showtime.find({});
+    let fixed = 0;
+    for (const doc of docs) {
+      let changed = false;
+      for (let i = 0; i < doc.showTimes.length; i++) {
+        const st: any = doc.showTimes[i];
+        const invalid = !Array.isArray(st.seats) || st.seats.length === 0 || st.seats.some((x: any) => !x || !x.seat);
+        if (invalid || force) {
+          const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
+          st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
+          changed = true;
+        }
+      }
+      if (changed) {
+        await doc.save();
+        fixed++;
+      }
+    }
+    return { total: docs.length, fixed };
   }
 
   // Lấy danh sách ghế cho suất chiếu cụ thể
@@ -638,7 +668,7 @@ class ShowtimeService {
       totalSeats: seats.length,
       availableSeats: seats.filter((seat) => seat.status === "available")
         .length,
-      occupiedSeats: seats.filter((seat) => seat.status === "occupied").length,
+      occupiedSeats: seats.filter((seat) => seat.status === "selected").length,
     };
     
     
@@ -680,10 +710,19 @@ class ShowtimeService {
     startTime: string,
     room: string,
     seatIds: string[],
-    status: "reserved" | "occupied" = "reserved"
+    status: "available" | "selected" = "selected"
   ): Promise<any> {
     try {
-      const showtime = await Showtime.findById(showtimeId);
+      // showtimeId là parentId (ID của document cha)
+      const showtime = await Showtime.findById(showtimeId)
+        .populate({
+          path: "showTimes.room",
+          select: "name"
+        })
+        .populate({
+          path: "showTimes.seats.seat",
+          select: "seatId type status"
+        });
       if (!showtime) {
         throw new Error("Không tìm thấy suất chiếu");
       }
@@ -691,10 +730,14 @@ class ShowtimeService {
       // Tìm suất chiếu cụ thể
       const targetDate = new Date(date);
 
+
       const showtimeIndex = showtime.showTimes.findIndex((st) => {
-        const showDate = new Date(st.date).toDateString();
-        const targetDateStr = targetDate.toDateString();
-        const dateMatch = showDate === targetDateStr;
+        // So sánh ngày - convert UTC sang Vietnam time (UTC + 7)
+        const showDate = new Date(st.date);
+        const showDateVietnam = new Date(showDate.getTime() + 7 * 60 * 60 * 1000);
+        const showDateStr = showDateVietnam.toISOString().split('T')[0];
+        const targetDateStr = date; // Frontend đã gửi format YYYY-MM-DD
+        const dateMatch = showDateStr === targetDateStr;
 
         // So sánh thời gian
         let timeMatch = false;
@@ -716,31 +759,76 @@ class ShowtimeService {
         } else {
           // Nếu startTime chỉ là thời gian (HH:mm) 24-hour format
           const showStartTime = new Date(st.start);
-          const showTimeHour = showStartTime.getUTCHours();
-          const showTimeMin = showStartTime.getUTCMinutes();
+          // Convert UTC time to Vietnam time (UTC + 7)
+          const vietnamHour = (showStartTime.getUTCHours() + 7) % 24;
+          const vietnamMin = showStartTime.getUTCMinutes();
           const [targetHour, targetMin] = startTime.split(":").map(Number);
-          timeMatch = showTimeHour === targetHour && showTimeMin === targetMin;
+          timeMatch = vietnamHour === targetHour && vietnamMin === targetMin;
         }
 
-        const roomMatch = st.room.toString() === room;
+        // So sánh room - sử dụng tên phòng đã được populate
+        const roomMatch = (st.room as any)?.name === room;
+
 
         return dateMatch && timeMatch && roomMatch;
       });
+
 
       if (showtimeIndex === -1) {
         throw new Error("Không tìm thấy suất chiếu cụ thể");
       }
 
-      // Kiểm tra ghế có sẵn không
+      // Kiểm tra ghế có sẵn không (map seatId -> _id theo room)
       const specificShowtime = showtime.showTimes[showtimeIndex];
       const unavailableSeats: string[] = [];
+      const Seat = (await import("../models/Seat")).default;
+      const roomId = ((specificShowtime.room as any)?._id) || specificShowtime.room;
+      const seatDocs = await Seat.find({
+        room: roomId,
+        seatId: { $in: seatIds.map((s) => s.toUpperCase().trim()) },
+      })
+        .select("_id seatId")
+        .lean();
 
-      seatIds.forEach((seatId) => {
-        const seat = specificShowtime.seats.find((s) => s.seat.toString() === seatId);
-        if (!seat) {
-          unavailableSeats.push(seatId + " (không tồn tại)");
-        } else if (seat.status !== "available") {
-          unavailableSeats.push(seatId + " (đã được đặt)");
+      // DEBUG: log dữ liệu đầu vào và mapping ghế tìm được từ collection Seat
+      try {
+        console.log("[BookSeats][DEBUG] Input:", {
+          showtimeId,
+          date,
+          startTime,
+          room,
+          seatIds,
+          roomId: roomId?.toString?.() || roomId,
+        });
+        console.log("[BookSeats][DEBUG] Seat docs from collection:", seatDocs.map((d: any) => ({ id: d?._id?.toString?.(), seatId: d?.seatId })));
+        console.log("[BookSeats][DEBUG] specificShowtime seats length:", specificShowtime?.seats?.length);
+        console.log("[BookSeats][DEBUG] First 5 seats in specificShowtime:", (specificShowtime?.seats || []).slice(0, 5).map((s: any) => ({ seat: s?.seat?.toString?.(), status: s?.status })));
+      } catch {}
+
+      const requestedSet = new Set(seatIds.map((s) => s.toUpperCase().trim()));
+      const foundSet = new Set(seatDocs.map((d: any) => d.seatId));
+      const missing = [...requestedSet].filter((s) => !foundSet.has(s));
+      if (missing.length > 0) {
+        console.log("[BookSeats][DEBUG] Missing in Seat collection:", missing);
+        throw new Error(`Ghế không tồn tại trong phòng: ${missing.join(", ")}`);
+      }
+
+      // kiểm tra trạng thái trong showtime theo _id ghế (thêm nhiều nhánh so khớp)
+      seatDocs.forEach((doc: any) => {
+        const targetId = doc._id.toString();
+        const entry = specificShowtime.seats.find((s: any) => {
+          const seatField = s?.seat;
+          const matchById = seatField && typeof seatField === 'object' && typeof seatField.toString === 'function' && !seatField._id && seatField.toString() === targetId;
+          const matchByObjId = seatField && seatField._id && typeof seatField._id.toString === 'function' && seatField._id.toString() === targetId;
+          const matchByStr = typeof seatField === 'string' && seatField === targetId;
+          const matchBySeatId = (seatField && seatField.seatId === doc.seatId) || (s as any)?.seatId === doc.seatId;
+          return matchById || matchByObjId || matchByStr || matchBySeatId;
+        });
+        if (!entry) {
+          console.log("[BookSeats][DEBUG] Seat entry not found in showtime for seatId:", doc.seatId, "(seat _id:", doc._id?.toString?.(), ")");
+          unavailableSeats.push(`${doc.seatId} (không tồn tại)`);
+        } else if (entry.status !== "available") {
+          unavailableSeats.push(`${doc.seatId} (đã được đặt)`);
         }
       });
 
@@ -749,12 +837,24 @@ class ShowtimeService {
       }
 
       // Cập nhật trạng thái ghế thành 'reserved' (tạm giữ) hoặc 'occupied' (đã đặt)
-      seatIds.forEach((seatId) => {
-        const seatIndex = specificShowtime.seats.findIndex(
-          (s) => s.seat.toString() === seatId
-        );
+      seatDocs.forEach((doc: any) => {
+        const targetId = doc._id.toString();
+        const seatIndex = specificShowtime.seats.findIndex((s: any) => {
+          const seatField = s?.seat;
+          const matchById = seatField && typeof seatField === 'object' && typeof seatField.toString === 'function' && !seatField._id && seatField.toString() === targetId;
+          const matchByObjId = seatField && seatField._id && typeof seatField._id.toString === 'function' && seatField._id.toString() === targetId;
+          const matchByStr = typeof seatField === 'string' && seatField === targetId;
+          const matchBySeatId = (seatField && seatField.seatId === doc.seatId) || (s as any)?.seatId === doc.seatId;
+          return matchById || matchByObjId || matchByStr || matchBySeatId;
+        });
         if (seatIndex !== -1) {
           showtime.showTimes[showtimeIndex].seats[seatIndex].status = status as any;
+          // hold 5 minutes when selected
+          if (status === 'selected') {
+            (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = new Date(Date.now() + 5 * 60 * 1000);
+          } else {
+            (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = undefined;
+          }
         }
       });
 
@@ -769,6 +869,7 @@ class ShowtimeService {
         reservationExpires: new Date(Date.now() + 10 * 60 * 1000),
       };
     } catch (error) {
+      console.error("Error booking seats:", error);
       throw error;
     }
   }
@@ -789,7 +890,7 @@ class ShowtimeService {
 
       // Tìm suất chiếu cụ thể
       const targetDate = new Date(date);
-      const targetStartTime = new Date(startTime);
+      const targetStartTime = startTime.includes('T') ? new Date(startTime) : new Date(`${date} ${startTime}`);
 
       const showtimeIndex = showtime.showTimes.findIndex((st) => {
         const showDate = new Date(st.date).toDateString();
@@ -799,7 +900,7 @@ class ShowtimeService {
 
         const dateMatch = showDate === targetDateStr;
         const timeMatch = Math.abs(showStartTime - targetTimeMs) < 60000;
-        const roomMatch = st.room.toString() === room;
+        const roomMatch = ((st.room as any)?.name || st.room.toString()) === room;
 
         return dateMatch && timeMatch && roomMatch;
       });
@@ -811,12 +912,14 @@ class ShowtimeService {
       // Cập nhật trạng thái ghế về 'available'
       const specificShowtime = showtime.showTimes[showtimeIndex];
       seatIds.forEach((seatId) => {
-        const seatIndex = specificShowtime.seats.findIndex(
-          (s) => s.seat.toString() === seatId
-        );
+        const seatIndex = specificShowtime.seats.findIndex((s: any) => {
+          const seatField = s?.seat;
+          return (seatField && (seatField as any).seatId === seatId) || (s as any)?.seatId === seatId || (typeof seatField === 'object' && typeof (seatField as any).toString === 'function' && (seatField as any).toString() === seatId);
+        });
         if (seatIndex !== -1) {
           showtime.showTimes[showtimeIndex].seats[seatIndex].status =
             "available";
+          (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = undefined;
         }
       });
 
@@ -829,8 +932,89 @@ class ShowtimeService {
         releaseTime: new Date(),
       };
     } catch (error) {
+      console.error("Error releasing seats:", error);
       throw error;
     }
+  }
+
+  // Cập nhật trạng thái ghế trong collection showtimes (ví dụ: selected sau khi thanh toán thành công)
+  async setSeatsStatus(
+    showtimeId: string,
+    date: string,
+    startTime: string,
+    room: string,
+    seatIds: string[],
+    status: "selected" | "available" | "maintenance"
+  ): Promise<void> {
+    const showtime = await Showtime.findById(showtimeId)
+      .populate({ path: "showTimes.room", select: "name" })
+      .populate({ path: "showTimes.seats.seat", select: "seatId" });
+    if (!showtime) throw new Error("Không tìm thấy suất chiếu");
+
+    const showtimeIndex = showtime.showTimes.findIndex((st) => {
+      const showDate = new Date(st.date);
+      const showDateVietnam = new Date(showDate.getTime() + 7 * 60 * 60 * 1000);
+      const showDateStr = showDateVietnam.toISOString().split("T")[0];
+      const dateMatch = showDateStr === date;
+
+      let timeMatch = false;
+      if (startTime.includes("T")) {
+        const showStartTime = new Date(st.start);
+        const targetStartTime = new Date(startTime);
+        timeMatch = Math.abs(showStartTime.getTime() - targetStartTime.getTime()) < 60000;
+      } else if (startTime.includes(" ")) {
+        const showStartTime = new Date(st.start);
+        const targetTimeStr = `${date} ${startTime}`;
+        const targetStartTime = new Date(targetTimeStr);
+        timeMatch = Math.abs(showStartTime.getTime() - targetStartTime.getTime()) < 60000;
+      } else {
+        const showStartTime = new Date(st.start);
+        const vietnamHour = (showStartTime.getUTCHours() + 7) % 24;
+        const vietnamMin = showStartTime.getUTCMinutes();
+        const [targetHour, targetMin] = startTime.split(":").map(Number);
+        timeMatch = vietnamHour === targetHour && vietnamMin === targetMin;
+      }
+
+      const roomMatch = (st.room as any)?.name === room;
+      return dateMatch && timeMatch && roomMatch;
+    });
+
+    if (showtimeIndex === -1) throw new Error("Không tìm thấy suất chiếu cụ thể");
+
+    const specificShowtime = showtime.showTimes[showtimeIndex];
+    seatIds.forEach((seatId) => {
+      const seatIndex = specificShowtime.seats.findIndex(
+        (s) => ((s.seat as any)?.seatId === seatId) || ((s as any)?.seatId === seatId)
+        );
+        if (seatIndex !== -1) {
+        specificShowtime.seats[seatIndex].status = status as any;
+        (specificShowtime.seats[seatIndex] as any).reservedUntil = status === 'selected' ? new Date(Date.now() + 5 * 60 * 1000) : undefined;
+      }
+    });
+
+    await showtime.save();
+  }
+
+  // Release all expired reservations (selected but exceed reservedUntil)
+  async releaseExpiredReservations(): Promise<{ released: number }> {
+    const docs = await Showtime.find({});
+    let released = 0;
+    const now = new Date();
+    for (const doc of docs) {
+      let changed = false;
+      for (const st of (doc.showTimes as any[])) {
+        for (const seat of st.seats) {
+          if (seat.status === 'selected' && seat.reservedUntil && new Date(seat.reservedUntil) < now) {
+            seat.status = 'available';
+            seat.reservedUntil = undefined;
+            released++;
+            changed = true;
+          }
+        }
+      }
+      if (changed) await doc.save();
+    }
+    return { released };
   }
 
   // Tạo dữ liệu ghế mặc định khi seats array rỗng

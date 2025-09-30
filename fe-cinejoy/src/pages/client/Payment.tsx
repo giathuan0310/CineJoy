@@ -1,11 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Modal, Button, Typography, Row, Col } from "antd";
-import { validateVoucherApi, applyVoucherApi } from "@/services/api";
+import { Modal, Button, Typography, Row, Col, message } from "antd";
+import { validateVoucherApi, applyVoucherApi, createOrderApi, processPaymentApi } from "@/services/api";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
 import type { IPriceList, IPriceListLine } from "@/apiservice/apiPriceList";
 import useAppStore from "@/store/app.store";
+import momoLogo from "@/assets/momo.png";
+import vnpayLogo from "@/assets/vnpay.png";
 
 const { Title, Text } = Typography;
 
@@ -29,11 +32,15 @@ const PaymentPage = () => {
     movie = {},
     seats = [],
     seatTypeCounts = {},
+    seatTypeMap = {},
     cinema = "",
     date = "",
     time = "",
     room = "",
+    theaterId = "",
+    showtimeId = "",
   } = location.state || {};
+  
   // Kiểu dữ liệu hiển thị cho Dịch vụ kèm (tên/mô tả từ FoodCombo, giá từ bảng giá)
   interface UIComboItem {
     _id: string;
@@ -64,6 +71,7 @@ const PaymentPage = () => {
   const [voucherError, setVoucherError] = useState<string>("");
   const [isModalPaymentOpen, setIsModalPaymentOpen] = useState<boolean>(false);
   const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
+  const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'VNPAY'>('MOMO');
 
   useEffect(() => {
     const loadServicesFromPriceList = async () => {
@@ -220,15 +228,15 @@ const PaymentPage = () => {
 
   const handleOpenModal = () => {
     if (!editableUserInfo.fullName.trim()) {
-      alert("Vui lòng nhập họ tên");
+      message.warning("Vui lòng nhập họ tên");
       return;
     }
     if (!editableUserInfo.phoneNumber.trim()) {
-      alert("Vui lòng nhập số điện thoại");
+      message.warning("Vui lòng nhập số điện thoại");
       return;
     }
     if (!editableUserInfo.email.trim()) {
-      alert("Vui lòng nhập email");
+      message.warning("Vui lòng nhập email");
       return;
     }
     setIsModalOpen(true);
@@ -243,29 +251,103 @@ const PaymentPage = () => {
     setIsPaymentLoading(true);
 
     try {
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Chuẩn bị dữ liệu cho API tạo order
+      const orderData = {
+        userId: user?._id || "",
+        movieId: movie._id,
+        theaterId: theaterId || movie.theaterId,
+        showtimeId: showtimeId || movie.showtimeId,
+        showDate: date,
+        showTime: time,
+        room: room,
+          seats: seats.map((seatId: string) => ({
+            seatId,
+            type: (seatTypeMap as Record<string, string>)[seatId] || "normal",
+            // Giá lấy từ bảng giá đang hoạt động theo loại ghế; fallback 0
+            price: (() => {
+              const type = (seatTypeMap as Record<string, string>)[seatId];
+              // Map giá theo loại ghế đã được tính ở dưới: ticketPriceMap
+              return ticketPriceMap[type || ""] || 0;
+            })()
+          })),
+        foodCombos: Object.entries(comboCounts)
+          .filter(([, count]) => count > 0)
+          .map(([comboId, count]) => {
+            const combo = combos.find(c => c._id === comboId);
+            return {
+              comboId,
+              quantity: count,
+              price: combo?.price || 0
+            };
+          }),
+        voucherId: appliedVoucher?.code || null,
+        paymentMethod: paymentMethod,
+        customerInfo: {
+          fullName: editableUserInfo.fullName,
+          phoneNumber: editableUserInfo.phoneNumber,
+          email: editableUserInfo.email
+        }
+      };
 
-      // TODO: Implement actual payment logic here
-      console.log("Payment processing...", {
-        movie,
-        seats,
-        cinema,
-        date,
-        time,
-        room,
-        combos: comboCounts,
-        userInfo: editableUserInfo,
-        voucher: appliedVoucher,
-        total,
-      });
 
-      alert("Thanh toán thành công!");
-      setIsModalOpen(false);
-      setIsModalPaymentOpen(false);
+      // Gọi API tạo order
+      try {
+        const orderResult = await createOrderApi(orderData);
+        // orderResult theo chuẩn IBackendResponse
+        // Nếu backend trả status=false hoặc không có data → hiển thị message cụ thể và dừng
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orderOk = !!orderResult && (orderResult as any)?.status !== false && (orderResult as any)?.data;
+        if (!orderOk) {
+          const backendMsg = (orderResult as any)?.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.';
+          message.error(backendMsg);
+          setIsPaymentLoading(false);
+          return;
+        }
+        
+        // Gọi API thanh toán
+        const paymentData = {
+          paymentMethod: paymentMethod,
+          returnUrl: "http://localhost:3000/payment/success",
+          cancelUrl: "http://localhost:3000/payment/cancel"
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orderId = (orderResult.data as any)?.orderId || (orderResult.data as any)?._id || (orderResult as any)?.orderId || (orderResult as any)?._id;
+        
+        // Persist orderId for cancellation if user aborts payment
+        try {
+          if (orderId) {
+            sessionStorage.setItem('last_order_id', String(orderId));
+          }
+        } catch (e: unknown) {
+          console.error('Error setting last_order_id:', e);
+        }
+
+        const paymentResult = await processPaymentApi(orderId, paymentData);
+        // Redirect đến URL thanh toán
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const paymentUrl = (paymentResult as any)?.data?.paymentUrl || (paymentResult as any)?.paymentUrl;
+        if (paymentUrl) {
+          window.location.href = paymentUrl;
+        } else {
+          const payMsg = (paymentResult as any)?.message || 'Không tạo được đường dẫn thanh toán.';
+          message.error(payMsg);
+          setIsPaymentLoading(false);
+          return;
+        }
+        
+      } catch (apiError) {
+        // Hiển thị thông điệp chi tiết từ backend nếu có (ví dụ ghế không khả dụng)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const backendMsg = (apiError as any)?.response?.data?.message || (apiError as any)?.message || 'Có lỗi xảy ra khi tạo đơn hàng/thanh toán.';
+        message.error(backendMsg);
+        setIsPaymentLoading(false);
+        return;
+      }
+
     } catch (error) {
       console.error("Payment error:", error);
-      alert("Có lỗi xảy ra trong quá trình thanh toán!");
+      message.error(error instanceof Error ? error.message : "Có lỗi xảy ra trong quá trình thanh toán!");
     } finally {
       setIsPaymentLoading(false);
     }
@@ -280,6 +362,7 @@ const PaymentPage = () => {
   // Tính tiền vé từ seatTypeCounts và bảng giá hiện tại (đã load ở SelectSeat và truyền tổng)
   // Fallback: nếu không có seatTypeCounts, tạm tính 0 để tránh sai số
   const [ticketTotal, setTicketTotal] = useState<number>(0);
+  const [ticketPriceMap, setTicketPriceMap] = useState<Record<string, number>>({});
   useEffect(() => {
     const calc = async () => {
       try {
@@ -289,6 +372,7 @@ const PaymentPage = () => {
         (priceList?.lines || []).forEach((l) => {
           if (l.type === 'ticket' && l.seatType) map[l.seatType] = l.price || 0;
         });
+        setTicketPriceMap(map);
         const total = Object.entries(seatTypeCounts || {}).reduce((sum, [type, count]) => sum + (map[type] || 0) * (count as number), 0);
         setTicketTotal(total);
       } catch {
@@ -324,14 +408,21 @@ const PaymentPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSubTotal]);
 
+  // Modal hết thời gian đã chuyển sang global ở Layout; không dùng modal cục bộ nữa
+
   useEffect(() => {
     if (timeLeft <= 0) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prevTime) => {
         if (prevTime <= 1) {
-          // Thời gian hết, có thể thêm logic chuyển hướng hoặc thông báo
-          alert("Hết thời gian đặt vé! Vui lòng thực hiện lại.");
+          // Hết thời gian: đặt cờ để Layout hiển thị modal sau khi redirect
+          try { setIsModalOpen(false); } catch (error) {
+            console.error("Error setting isModalOpen to false:", error);
+          }
+          try { sessionStorage.setItem('show_timeout_modal', '1'); } catch (error) {
+            console.error("Error setting show_timeout_modal:", error);
+          }
           navigate("/");
           return 0;
         }
@@ -361,7 +452,7 @@ const PaymentPage = () => {
                 : "bg-[#e7ede7] text-[#162d5a]"
             } flex-1 rounded-2xl p-6 mb-6 md:mb-0 shadow-lg transition-colors duration-200`}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between -mt-2">
               <button
                 onClick={() => navigate(-1)}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium select-none cursor-pointer transition-all duration-200 ${
@@ -425,28 +516,28 @@ const PaymentPage = () => {
                       }`}
                     >
                       <th
-                        className={`py-3 text-center font-bold ${
+                        className={`py-2 text-center font-bold ${
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
                         Sản phẩm/Combo
                       </th>
                       <th
-                        className={`py-3 text-center font-bold ${
+                        className={`py-2 text-center font-bold ${
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
                         Mô tả
                       </th>
                       <th
-                        className={`py-3 text-center font-bold ${
+                        className={`py-2 text-center font-bold ${
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
                         Giá
                       </th>
                       <th
-                        className={`py-3 text-center font-bold ${
+                        className={`py-2 text-center font-bold ${
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
@@ -462,7 +553,7 @@ const PaymentPage = () => {
                           c.quantity === 0 ? "opacity-60" : ""
                         }`}
                       >
-                        <td className="py-4 font-semibold text-center">
+                        <td className="py-3 font-semibold text-center">
                           <div
                             className={`text-base ${
                               c.quantity === 0 ? "text-gray-500" : ""
@@ -471,7 +562,7 @@ const PaymentPage = () => {
                             {c.name}
                           </div>
                         </td>
-                        <td className="py-4 text-sm text-center">
+                        <td className="py-3 text-sm text-center">
                             <span
                               className={
                                 c.quantity === 0 ? "text-gray-500" : ""
@@ -480,7 +571,7 @@ const PaymentPage = () => {
                               {c.description}
                             </span>
                         </td>
-                        <td className="py-4 text-center">
+                        <td className="py-3 text-center">
                             <span
                               className={`font-bold text-base ${
                                 c.quantity === 0
@@ -575,88 +666,82 @@ const PaymentPage = () => {
               </div>
             )}
 
-            {/* Voucher */}
+            {/* Voucher đã được chuyển sang panel bên phải, ngay dưới 'Thông tin thanh toán' */}
+
+            {/* Phương thức thanh toán */}
             <h3
-              className={`text-lg font-bold text-center mb-3 ${
+              className={`text-lg font-bold text-center mt-8 mb-3 ${
                 isDarkMode ? "text-cyan-400" : "text-blue-700"
               }`}
             >
-              Giảm giá
+              Phương thức thanh toán
             </h3>
 
-            {!appliedVoucher ? (
-              // Chưa áp dụng voucher - hiển thị form nhập
-              <div className="mb-4">
-                <div className="flex items-center justify-center gap-3.5 mb-3">
+            <div className="mb-4">
+              <div className="space-y-3">
+                {/* MOMO */}
+                <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                  paymentMethod === 'MOMO' 
+                    ? isDarkMode 
+                      ? 'bg-blue-900/30 border-blue-500' 
+                      : 'bg-[#f5f3ff] border-blue-400' // light mode selected: subtle lavender
+                    : isDarkMode 
+                      ? 'bg-[#232c3b] border-[#3a3d46] hover:bg-[#2a2f3a]' 
+                      : 'bg-[#f7f7f9] border-gray-300 hover:bg-[#f0f0f3]' // light mode idle: soft gray
+                }`}>
                   <input
-                    type="text"
-                    value={voucherCode}
-                    onChange={(e) => {
-                      setVoucherCode(e.target.value.toUpperCase());
-                      if (e.target.value.trim() === "") {
-                        setVoucherError("");
-                      }
-                    }}
-                    placeholder="Nhập mã voucher"
-                    className={`w-[300px] border rounded-md px-2.5 py-1.5 ${
-                      isDarkMode
-                        ? "bg-[#232c3b] text-white border-[#3a3d46] placeholder-gray-400"
-                        : "border-gray-300"
-                    }`}
+                    type="radio"
+                    name="paymentMethod"
+                    value="MOMO"
+                    checked={paymentMethod === 'MOMO'}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'MOMO' | 'VNPAY')}
+                    className="mr-3 w-4 h-4 text-blue-600"
                   />
-                  <button
-                    onClick={handleApplyVoucher}
-                    disabled={voucherLoading || !voucherCode.trim()}
-                    className={`px-3.5 py-1.5 rounded font-semibold transition-all duration-200 ${
-                      voucherLoading || !voucherCode.trim()
-                        ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                        : isDarkMode
-                        ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer"
-                        : "bg-blue-600 hover:bg-blue-500 text-white cursor-pointer"
-                    }`}
-                  >
-                    {voucherLoading ? "Đang kiểm tra..." : "Áp dụng"}
-                  </button>
-                </div>
+                  <div className="flex items-center">
+                    <img
+                      src={momoLogo}
+                      alt="MOMO"
+                      className="w-8 h-8 object-contain mr-3 rounded"
+                      width={32}
+                      height={32}
+                      loading="lazy"
+                    />
+                    <span className="text-sm font-medium">MOMO</span>
+                  </div>
+                </label>
 
-                {voucherError && (
-                  <div className="text-red-500 text-sm text-center mb-2 select-none">
-                    {voucherError}
+                {/* VNPAY */}
+                <label className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                  paymentMethod === 'VNPAY' 
+                    ? isDarkMode 
+                      ? 'bg-blue-900/30 border-blue-500' 
+                      : 'bg-[#eef5ff] border-blue-400' // light mode selected: pale blue
+                    : isDarkMode 
+                      ? 'bg-[#232c3b] border-[#3a3d46] hover:bg-[#2a2f3a]' 
+                      : 'bg-[#f7f7f9] border-gray-300 hover:bg-[#f0f0f3]'
+                }`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="VNPAY"
+                    checked={paymentMethod === 'VNPAY'}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'MOMO' | 'VNPAY')}
+                    className="mr-3 w-4 h-4 text-blue-600"
+                  />
+                  <div className="flex items-center">
+                    <img
+                      src={vnpayLogo}
+                      alt="VNPAY logo"
+                      className="w-8 h-8 object-contain mr-3 rounded"
+                      width={32}
+                      height={32}
+                      loading="lazy"
+                    />
+                    <span className="text-sm font-medium">VNPAY</span>
                   </div>
-                )}
+                </label>
               </div>
-            ) : (
-              // Đã áp dụng voucher - hiển thị thông tin voucher
-              <div className="mb-4">
-                <div
-                  className={`border rounded p-3 mb-2 ${
-                    isDarkMode
-                      ? "bg-[#232c3b] border-[#3a3d46]"
-                      : "bg-green-50 border-green-300"
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-semibold text-green-600">
-                        ✓ Mã voucher: {appliedVoucher.code}
-                      </div>
-                      <div className="text-sm">
-                        Bạn được giảm {appliedVoucher.discountPercent}%
-                        {typeof appliedVoucher.maxCap === 'number' && (
-                          <> (tối đa {appliedVoucher.maxCap.toLocaleString()} VNĐ)</>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleRemoveVoucher}
-                      className="text-red-500 hover:text-red-700 font-semibold text-sm cursor-pointer"
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
 
             {/* Đã chuyển phần hiển thị tiền giảm và tiền thanh toán sang panel bên phải */}
             <div className="flex justify-between items-center mb-4 mt-6 px-20">
@@ -757,6 +842,72 @@ const PaymentPage = () => {
                     {seats && seats.length > 0 ? seats.join(", ") : ""}
                   </p>
                 </div>
+
+                {/* Voucher (moved here) */}
+                <div className="mt-4">
+                      <h4 className={`mt-4 text-lg text-center font-bold mb-2 ${isDarkMode ? 'text-cyan-300' : 'text-blue-600'}`}>Giảm giá</h4>
+                      {!appliedVoucher ? (
+                        <div className="mb-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={voucherCode}
+                              onChange={(e) => {
+                                setVoucherCode(e.target.value.toUpperCase());
+                                if (e.target.value.trim() === "") {
+                                  setVoucherError("");
+                                }
+                              }}
+                              placeholder="Nhập mã voucher"
+                              className={`flex-1 border rounded-md px-2.5 py-1.5 ${
+                                isDarkMode
+                                  ? "bg-[#232c3b] text-white border-[#3a3d46] placeholder-gray-400"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                            <button
+                              onClick={handleApplyVoucher}
+                              disabled={voucherLoading || !voucherCode.trim()}
+                              className={`px-2 py-1.5 rounded font-semibold transition-all duration-200 ${
+                                voucherLoading || !voucherCode.trim()
+                                  ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                  : isDarkMode
+                                  ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer"
+                                  : "bg-blue-600 hover:bg-blue-500 text-white cursor-pointer"
+                              }`}
+                            >
+                              {voucherLoading ? "Đang kiểm tra..." : "Áp dụng"}
+                            </button>
+                          </div>
+                          {voucherError && (
+                            <div className="text-red-500 text-xs mt-2 select-none">{voucherError}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={`border rounded p-3 mb-2 ${
+                          isDarkMode ? 'bg-[#232c3b] border-[#3a3d46]' : 'bg-green-50 border-green-300'
+                        }`}>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-semibold text-green-600">✓ Mã voucher: {appliedVoucher.code}</div>
+                              <div className="text-sm">
+                                Bạn được giảm {appliedVoucher.discountPercent}%
+                                {typeof appliedVoucher.maxCap === 'number' && (
+                                  <> (tối đa {appliedVoucher.maxCap.toLocaleString()} VNĐ)</>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleRemoveVoucher}
+                              className="text-red-500 hover:text-red-700 font-semibold text-sm cursor-pointer"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                 {/* Thông tin thanh toán (đã chuyển sang bên phải) */}
                 <div className="mt-6">
                   <p className={`text-lg font-bold text-center mb-4 ${isDarkMode ? "text-cyan-400" : "text-blue-700"}`}>
@@ -785,7 +936,7 @@ const PaymentPage = () => {
                       <p className="label font-bold">Số tiền được giảm:</p>
                       <div className="value text-right">
                         <div className={`font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
-                          - {voucherDiscount.toLocaleString()} VNĐ
+                         {voucherDiscount.toLocaleString() === "0" ? "0" : `- ${voucherDiscount.toLocaleString()}`} VNĐ 
                         </div>
                         {typeof appliedVoucher?.maxCap === 'number' && voucherDiscount >= (appliedVoucher?.maxCap || 0) && (
                           <div className="text-xs italic" style={{ color: isDarkMode ? '#9ae6b4' : '#16a34a' }}>
@@ -794,14 +945,15 @@ const PaymentPage = () => {
                         )}
                       </div>
                     </div>
-                    <div className="row flex justify-between text-sm">
+                    <div className="row flex items-center justify-between text-sm">
                       <p className="label font-bold">Số tiền thanh toán:</p>
-                      <p className={`value font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+                      <p className={`value text-lg font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
                         {total.toLocaleString()} VNĐ
                       </p>
                     </div>
                   </div>
                 </div>
+
               </div>
               <button
                 className={`mt-6 w-full px-6 py-2 rounded font-semibold transition-all duration-200 cursor-pointer ${
@@ -1013,6 +1165,7 @@ const PaymentPage = () => {
             </div>
           )}
 
+
           {/* Tổng thanh toán */}
           <div className="border-t border-gray-200 pt-[15px] mt-[20px] text-right">
             <Title level={4} style={{ margin: 0, color: "#e74c3c" }}>
@@ -1021,7 +1174,7 @@ const PaymentPage = () => {
           </div>
 
           <div className="mt-[10px] text-[13px] text-center text-red-600 select-none">
-            (Khi bấm xác nhận sẽ chuyển đến trang thanh toán)
+            (Khi bấm xác nhận sẽ chuyển đến trang thanh toán {paymentMethod})
           </div>
         </div>
       </Modal>

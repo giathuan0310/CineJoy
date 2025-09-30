@@ -614,8 +614,10 @@ const CardInfMovie = () => {
                                         : movie?.ageRating === "T12+"
                                         ? 12
                                         : 13,
+                                    theaterId: movie?.theaterId, // Thêm theaterId
                                   },
-                                  showtimeId: showtime.parentId, // Use parent document ID
+                                  showtimeId: showtime.parentId,
+                                  theaterId: movie?.theaterId, // Thêm theaterId ở level state, // Use parent document ID
                                   cinema: filteredCinemas.find(
                                     (c) => c._id === selectedCinemaId
                                   )?.name,

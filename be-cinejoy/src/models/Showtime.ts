@@ -2,7 +2,7 @@ import { Schema, model, Document } from "mongoose";
 
 export interface IShowtimeSeat {
     seat: Schema.Types.ObjectId; // Reference to Seat model
-    status: 'available' | 'maintenance';
+    status: 'available' | 'selected' | 'maintenance';
     reservedUntil?: Date; // Temporary reservation
 }
 
@@ -32,11 +32,11 @@ const ShowtimeSchema = new Schema<IShowtime>({
             seats: [
                 {
                     seat: { type: Schema.Types.ObjectId, required: true, ref: "Seat" },
-                    status: { 
-                        type: String, 
-                        enum: ['available', 'maintenance'],
+                    status: {
+                        type: String,
+                        enum: ['available', 'selected', 'maintenance'],
                         default: 'available',
-                        required: true 
+                        required: true
                     },
                     reservedUntil: { type: Date }
                 },

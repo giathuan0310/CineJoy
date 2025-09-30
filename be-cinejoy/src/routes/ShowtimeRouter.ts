@@ -30,6 +30,18 @@ router.post(
   "/:id/initialize-seats",
   showtimeController.initializeSeats.bind(showtimeController)
 );
+
+// Release expired reserved seats
+router.post(
+  "/release-expired",
+  showtimeController.releaseExpired.bind(showtimeController)
+);
+
+// Dev-only: backfill seats cho toàn bộ showtimes
+router.post(
+  "/backfill-seats",
+  showtimeController.backfillSeats.bind(showtimeController)
+);
 // Route general
 router.get("/", showtimeController.getShowtimes.bind(showtimeController));
 router.post("/add", showtimeController.addShowtime.bind(showtimeController));

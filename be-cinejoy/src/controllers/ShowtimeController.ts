@@ -295,4 +295,24 @@ export default class ShowtimeController {
       });
     }
   }
+
+  // Release expired 'selected' seats (5 minutes hold)
+  async releaseExpired(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await showtimeService.releaseExpiredReservations();
+      res.status(200).json({ status: true, error: 0, message: 'Released expired reservations', data: result });
+    } catch (error) {
+      res.status(500).json({ status: false, error: 500, message: 'Release expired error', data: null });
+    }
+  }
+
+  // Endpoint backfill seats cho toàn bộ showtimes (chỉ dùng dev/admin)
+  async backfillSeats(req: Request, res: Response): Promise<void> {
+    try {
+      const result = await showtimeService.backfillAllShowtimeSeats(Boolean(req.query.force === 'true'));
+      res.status(200).json({ status: true, error: 0, message: "Backfill completed", data: result });
+    } catch (error) {
+      res.status(500).json({ status: false, error: 500, message: "Backfill error", data: null });
+    }
+  }
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Spin, Tag, Button, Descriptions, Table, Card, Popconfirm } from 'antd';
@@ -36,8 +35,17 @@ const VoucherDetail = ({ id: idProp }: Props) => {
       // Kiểm tra xem ngày hiện tại có nằm trong khoảng thời gian của line không
       const isWithinRange = today.isAfter(startDate.startOf('day')) && today.isBefore(endDate.endOf('day'));
       
-      // Cập nhật trạng thái dựa trên ngày
-      const newStatus: 'hoạt động' | 'không hoạt động' = isWithinRange ? 'hoạt động' : 'không hoạt động';
+      // Chỉ tự động cập nhật thành "không hoạt động" nếu ngày hiện tại nằm ngoài khoảng thời gian
+      // Nếu ngày hiện tại nằm trong khoảng thời gian, giữ nguyên trạng thái hiện tại (cho phép người dùng sửa)
+      let newStatus: 'hoạt động' | 'không hoạt động';
+      
+      if (!isWithinRange) {
+        // Ngày hiện tại nằm ngoài khoảng thời gian → tự động đổi thành "không hoạt động"
+        newStatus = 'không hoạt động';
+      } else {
+        // Ngày hiện tại nằm trong khoảng thời gian → giữ nguyên trạng thái hiện tại
+        newStatus = line.status;
+      }
       
       return {
         ...line,
@@ -601,6 +609,7 @@ const VoucherDetail = ({ id: idProp }: Props) => {
                   size="middle"
                   bordered
                   columns={(() => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const detail = line.detail as any;
                     const applyType = detail?.applyType;
                     
@@ -723,6 +732,7 @@ const VoucherDetail = ({ id: idProp }: Props) => {
                   size="middle"
                   bordered
                   columns={(() => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const detail = line.detail as any;
                     const applyType = detail?.applyType;
                     
@@ -769,10 +779,13 @@ const VoucherDetail = ({ id: idProp }: Props) => {
                       // Chỉ thêm cột "Phần trăm giảm" khi loại tặng là "Giảm giá"
                       if (detail?.rewardType === 'discount') {
                         columns.push({
-                          title: 'Phần trăm giảm (%)',
+                          title: 'Phần trăm giảm',
                           dataIndex: 'rewardDiscountPercent',
                           key: 'rewardDiscountPercent',
-                          render: (value: number) => (typeof value === 'number' && value > 0 ? value : 'Không có')
+                          render: (text: string) => {
+                            const num = Number(text);
+                            return Number.isFinite(num) && num > 0 ? `${num}%` : 'Không có';
+                          }
                         });
                       }
 
@@ -834,11 +847,14 @@ const VoucherDetail = ({ id: idProp }: Props) => {
 
                       // Chỉ thêm cột "Phần trăm giảm" khi loại tặng là "Giảm giá"
                       if (detail?.rewardType === 'discount') {
-                        columns.push({
-                          title: 'Phần trăm giảm (%)',
+                      columns.push({
+                          title: 'Phần trăm giảm',
                           dataIndex: 'rewardDiscountPercent',
                           key: 'rewardDiscountPercent',
-                          render: (value: number) => (typeof value === 'number' && value > 0 ? value : 'Không có')
+                        render: (text: string) => {
+                          const num = Number(text);
+                          return Number.isFinite(num) && num > 0 ? `${num}%` : 'Không có';
+                        }
                         });
                       }
 

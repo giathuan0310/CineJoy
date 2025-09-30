@@ -26,7 +26,9 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
     const [filteredTheaters, setFilteredTheaters] = useState<ITheater[]>([]);
     const [selectedRegionId, setSelectedRegionId] = useState<string>('');
     const [selectedMovie, setSelectedMovie] = useState<IMovie | null>(null);
-    const [rooms, setRooms] = useState<{_id: string; name: string; theater: {_id: string}}[]>([]);
+    const [rooms, setRooms] = useState<{
+        roomType: string;_id: string; name: string; theater: {_id: string}
+}[]>([]);
     const [selectedTheaterId, setSelectedTheaterId] = useState<string>('');
     const [form] = Form.useForm();
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -265,8 +267,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
         let existing = await getShowtimesByRoomAndDateApi(row.room, dateStr);
         // Khi sửa, loại bỏ các suất thuộc cùng document hiện tại để tránh đếm trùng (đã có trong form)
         if (editData) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            existing = existing.filter((e: { showtimeId?: string }) => e.showtimeId !== (editData as any)._id);
+            existing = existing.filter((e: { showtimeId?: string }) => e.showtimeId !== (editData as unknown as { _id: string })._id);
         }
         // lọc suất trong cùng ca
         const sStart = toMinutes(session.startTime); const sEnd = toMinutes(session.endTime) + (session.endTime <= session.startTime ? 24*60 : 0);
@@ -421,8 +422,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
             
             if (duplicates.length > 0) {
                 // Trường hợp sửa: cho phép nếu có ÍT NHẤT một bản ghi trùng thuộc đúng document đang sửa
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                if (editData && duplicates.some(d => d.showtimeId === (editData as any)._id)) {
+                if (editData && duplicates.some(d => d.showtimeId === (editData as unknown as { _id: string })._id)) {
                     // Cho phép vì đây chính là suất đang sửa
                 } else {
                     message.error('Suất chiếu này đã tồn tại! Vui lòng chọn thời gian khác.');
@@ -504,14 +504,14 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                 toast.success('Thêm suất chiếu thành công!');
             }
             onSuccess();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error saving showtime:', error);
             // Hiển thị lỗi chi tiết từ backend nếu có
-            const errorMessage = error?.response?.data?.message || error?.message || (editData ? 'Cập nhật suất chiếu thất bại!' : 'Thêm suất chiếu thất bại!');
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
+            const errorMessage = err?.response?.data?.message || err?.message || (editData ? 'Cập nhật suất chiếu thất bại!' : 'Thêm suất chiếu thất bại!');
             console.log('Error details:', {
-                response: error?.response?.data,
-                message: error?.message,
+                response: err?.response?.data,
+                message: err?.message,
                 finalMessage: errorMessage
             });
             toast.error(errorMessage);
@@ -757,7 +757,7 @@ const ShowtimeForm: React.FC<ShowtimeFormProps> = ({ onCancel, onSuccess, editDa
                                                             }
                                                             options={(form.getFieldValue('theaterId') ? rooms : []).map(room => ({
                                                                 value: room._id,
-                                                                label: `🎬 ${room.name}`
+                                                                label: `🎬 ${room.name} - ${room.roomType || 'N/A'}`
                                                             }))}
                                                             loading={rooms.length === 0 && !!form.getFieldValue('theaterId')}
                                                             placeholder={

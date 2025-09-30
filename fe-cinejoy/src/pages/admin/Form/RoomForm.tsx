@@ -238,21 +238,24 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, rooms = [], theaters, regions
                 });
                 
                 // Enforce rule for 2D rooms: last row must be couple seats and even count
-                const lastRowChar = String.fromCharCode(65 + maxRow);
-                const lastRowSeatIds = Object.keys(existingSeats).filter(id => id.charAt(0) === lastRowChar);
-                
-                // Force all seats in last row to 'couple'
-                lastRowSeatIds.forEach(id => {
-                    existingSeats[id] = { ...existingSeats[id], type: 'couple' } as typeof existingSeats[string];
-                });
-                
-                // If last row has odd number of seats, remove the last (highest column) one (e.g., I11)
-                if (lastRowSeatIds.length > 0) {
-                    const maxColInLastRow = Math.max(...lastRowSeatIds.map(id => parseInt(id.substring(1))));
-                    if (maxColInLastRow % 2 !== 0) {
-                        const oddSeatId = `${lastRowChar}${maxColInLastRow}`;
-                        if (existingSeats[oddSeatId]) {
-                            delete existingSeats[oddSeatId];
+                // Only apply this rule for 2D rooms, not for 4DX rooms
+                if (room && room.roomType === '2D') {
+                    const lastRowChar = String.fromCharCode(65 + maxRow);
+                    const lastRowSeatIds = Object.keys(existingSeats).filter(id => id.charAt(0) === lastRowChar);
+                    
+                    // Force all seats in last row to 'couple'
+                    lastRowSeatIds.forEach(id => {
+                        existingSeats[id] = { ...existingSeats[id], type: 'couple' } as typeof existingSeats[string];
+                    });
+                    
+                    // If last row has odd number of seats, remove the last (highest column) one (e.g., I11)
+                    if (lastRowSeatIds.length > 0) {
+                        const maxColInLastRow = Math.max(...lastRowSeatIds.map(id => parseInt(id.substring(1))));
+                        if (maxColInLastRow % 2 !== 0) {
+                            const oddSeatId = `${lastRowChar}${maxColInLastRow}`;
+                            if (existingSeats[oddSeatId]) {
+                                delete existingSeats[oddSeatId];
+                            }
                         }
                     }
                 }

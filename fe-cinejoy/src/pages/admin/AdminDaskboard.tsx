@@ -299,7 +299,6 @@ const Dashboard: React.FC = () => {
     }, 60000); // Cập nhật mỗi 60 giây
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cập nhật trạng thái voucher khi component được focus lại (từ VoucherDetail)
@@ -316,7 +315,6 @@ const Dashboard: React.FC = () => {
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   // Cập nhật trạng thái voucher khi quay lại từ VoucherDetail
@@ -333,7 +331,6 @@ const Dashboard: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedVoucherIdFromUrl]);
 
   // Lọc và phân trang cho từng tab
@@ -702,7 +699,7 @@ const Dashboard: React.FC = () => {
             console.log("Các sản phẩm/combo đã bỏ qua:", skippedItems);
           }
         } else {
-          toast.success("Thêm bảng giá thành công!");
+        toast.success("Thêm bảng giá thành công!");
         }
       }
       
@@ -748,7 +745,7 @@ const Dashboard: React.FC = () => {
     endDate: string;
   }) => {
     if (!editingPriceList) return;
-
+    
     try {
       setSplitVersionSubmitting(true);
       // Tạo mới 1 bảng giá từ dữ liệu bảng gốc, KHÔNG chạm vào bảng gốc
@@ -775,8 +772,8 @@ const Dashboard: React.FC = () => {
       }
 
       await loadPriceLists();
-     setSplitVersionModalVisible(false);
-     setEditingPriceList(null);
+      setSplitVersionModalVisible(false);
+      setEditingPriceList(null);
             setSplitVersionData({ newName: '', newCode: '', newDescription: '', startDate: '', endDate: '' });
     } catch (error: any) {
       console.error("Error duplicating price list:", error);
@@ -1293,7 +1290,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
               { label: "Phim", value: "movies", icon: "🎬" },
               { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
               { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
-                    { label: "Bảng giá", value: "priceLists", icon: "💰" },
+              { label: "Bảng giá", value: "priceLists", icon: "💰" },
                   ].map((subItem) => (
                     <li
                       key={subItem.value}
@@ -2021,7 +2018,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">
                               {theaterRooms.length} phòng
                             </span>
-                        </td>
+                          </td>
                         <td className="p-3">
                           <div className="flex gap-2">
                               <motion.button
@@ -2597,9 +2594,9 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
           {activeTab === "priceLists" && (
             <div>
               {!showPriceListDetailInline && (
-                <h2 className="text-2xl font-semibold mb-6 text-black select-none">
-                  Quản lý bảng giá
-                </h2>
+              <h2 className="text-2xl font-semibold mb-6 text-black select-none">
+                Quản lý bảng giá
+              </h2>
               )}
               {showPriceListDetailInline && viewingPriceList ? (
                 <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -2834,7 +2831,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                           <td className="p-3">
                             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               {priceList.status === "active" && (
-                                <button
+                              <button
                                   onClick={() => {
                                     setEditingEndDatePriceList(priceList);
                                     setNewEndDateValue(dayjs(priceList.endDate).format('YYYY-MM-DD'));
@@ -2843,19 +2840,19 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                                   className="bg-yellow-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-yellow-600 mr-2"
                                 >
                                   Sửa
-                                </button>
+                              </button>
                               )}  
                               {priceList.status === "active" && (
                                 <button
-                                    onClick={() => {
-                                      setEditingPriceList(priceList);
-                                      setSplitVersionData({
+                                  onClick={() => {
+                                    setEditingPriceList(priceList);
+                                    setSplitVersionData({
                                         newName: `${priceList.name} - Bản sao`,
                                         newCode: '',
                                         newDescription: priceList.description || '',
                                         startDate: '',
                                         endDate: ''
-                                      });
+                                    });
                                     setSplitVersionModalVisible(true);
                                   }}
                                   className="bg-purple-500 text-white px-3 py-1 rounded cursor-pointer hover:bg-purple-600 mr-2"
@@ -3070,7 +3067,16 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
               <Table
                 dataSource={selectedShowtime.showTimes.map((time: any, index: number) => {
                   const roomVal = time.room;
-                  const roomDisplay = typeof roomVal === 'string' ? roomVal : (roomVal?.name || roomVal?._id || 'N/A');
+                  console.log('Room data:', roomVal, typeof roomVal);
+                  
+                  // Tìm room trong danh sách rooms đã load bằng _id
+                  const roomInfo = rooms.find(r => r._id === roomVal._id);
+                  console.log('Found room info:', roomInfo);
+                  
+                  const roomDisplay = roomInfo?.name || roomVal?.name || 'N/A';
+                  const roomType = roomInfo?.roomType || '';
+                  console.log('Room type:', roomType);
+                  
                   const seatsArr = Array.isArray(time.seats) ? time.seats : [];
                   return {
                     key: index,
@@ -3080,6 +3086,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     end: time.end,
                     session: time.showSessionId,
                     room: roomDisplay,
+                    roomType: roomType,
                     availableSeats: seatsArr.filter((s: any) => s.status === 'available').length,
                     totalSeats: seatsArr.length,
                     seats: seatsArr
@@ -3146,11 +3153,18 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     title: '🏠 Phòng chiếu',
                     dataIndex: 'room',
                     key: 'room',
-                    render: (room: string) => (
-                      <Tag color="purple" className="font-medium">
-                        {room}
-                      </Tag>
-                    )
+                      render: (room: string, record: any) => (
+                        <Space direction="vertical" size="small">
+                          <Tag color="purple" className="font-medium">
+                            {room}
+                          </Tag>
+                          {record.roomType && (
+                            <div className="text-xs text-gray-600 text-center">
+                              {record.roomType}
+                            </div>
+                          )}
+                        </Space>
+                      )
                   },
                   {
                     title: '💺 Tình trạng ghế',
@@ -3329,7 +3343,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     <div key={room._id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h5 className="font-semibold text-gray-800 text-lg">{room.name}</h5>
+                        <h5 className="font-semibold text-gray-800 text-lg">{room.name}</h5>
                           <p className="text-sm text-gray-600 font-medium">{room.roomCode || 'N/A'}</p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -3654,7 +3668,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                   setNewEndDateValue('');
                 }}>Hủy</Button>
                 <Button type="primary" htmlType="submit" loading={editEndDateSubmitting}>Lưu</Button>
-              </div>
+                    </div>
             </Form>
           </ConfigProvider>
         </Modal>
@@ -3769,9 +3783,9 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     />
                   </Form.Item>
                   
-                  <Form.Item
+                    <Form.Item
                     label="Khoảng thời gian hiệu lực"
-                    required
+                      required
                     tooltip="Chọn khoảng ngày bắt đầu/kết thúc cho bản sao. Không được trùng với các khoảng đã có."
                   >
                     <DatePicker.RangePicker
@@ -3782,16 +3796,16 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                       }
                       onChange={(dates) => {
                         const [start, end] = dates || [];
-                        setSplitVersionData({
-                          ...splitVersionData,
+                          setSplitVersionData({
+                            ...splitVersionData, 
                           startDate: start ? start.format('YYYY-MM-DD') : '',
                           endDate: end ? end.format('YYYY-MM-DD') : ''
-                        });
-                      }}
-                      className="w-full"
-                      format="DD/MM/YYYY"
+                          });
+                        }}
+                        className="w-full"
+                        format="DD/MM/YYYY"
                       allowClear
-                      disabledDate={(current) => {
+                        disabledDate={(current) => {
                         if (!current) return false;
                         // Không cho chọn hôm nay và quá khứ
                         const isPastOrToday = current <= dayjs().startOf('day');
@@ -3804,9 +3818,9 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                           return (ts.isAfter(s) && ts.isBefore(e)) || ts.isSame(s, 'day') || ts.isSame(e, 'day');
                         });
                         return overlap;
-                      }}
-                    />
-                  </Form.Item>
+                        }}
+                      />
+                    </Form.Item>
 
                   <div className="bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
                     <div className="flex">
@@ -3878,7 +3892,7 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     message.error("Vui lòng điền đầy đủ thông tin");
                     return;
                   }
-                  
+
                   // Validation mã bảng giá: đúng 6 ký tự chữ/ số
                   if (!/^[A-Z0-9]{6}$/.test(splitVersionData.newCode)) {
                     message.error("Mã bảng giá phải gồm đúng 6 ký tự chữ/số (VD: BG0001)");
@@ -3975,8 +3989,8 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
               if (incompleteLines.length > 0) {
                 message.error(`Vui lòng hoàn thiện thông tin:\n${incompleteLines.join('\n')}`);
                 setEditPriceLinesSubmitting(false);
-                return;
-              }
+                    return;
+                  }
 
               // Check for duplicates
               const duplicates = [];
@@ -3998,8 +4012,8 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
               if (duplicates.length > 0) {
                 message.error(`Có sản phẩm/loại ghế bị trùng lặp: ${duplicates.join(', ')}`);
                 setEditPriceLinesSubmitting(false);
-                return;
-              }
+                    return;
+                  }
 
               await updatePriceList(viewingPriceList._id, { lines: editingPriceLines as any });
               await loadPriceLists();
@@ -4235,8 +4249,8 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     style={{ width: '100%' }}
                   >
                     Thêm dòng
-                  </Button>
-                </div>
+              </Button>
+            </div>
               );
             })()}
               </>

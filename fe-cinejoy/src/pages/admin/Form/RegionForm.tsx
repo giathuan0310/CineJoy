@@ -5,11 +5,12 @@ import type { InputRef } from 'antd';
 
 interface RegionFormProps {
     region?: IRegion;
+    regions?: IRegion[];
     onSubmit: (regionData: Partial<IRegion>) => Promise<void>;
     onCancel: () => void;
 }
 
-const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) => {
+const RegionForm: React.FC<RegionFormProps> = ({ region, regions = [], onSubmit, onCancel }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -17,6 +18,7 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
     useEffect(() => {
         if (region) {
             form.setFieldsValue({
+                regionCode: region.regionCode,
                 name: region.name
             });
         } else {
@@ -33,7 +35,7 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
         }
     }, [region]);
 
-    const handleSubmit = async (values: { name: string }) => {
+    const handleSubmit = async (values: { regionCode: string; name: string }) => {
         try {
             setIsLoading(true);
             await onSubmit(values);
@@ -78,27 +80,60 @@ const RegionForm: React.FC<RegionFormProps> = ({ region, onSubmit, onCancel }) =
                 onFinish={handleSubmit}
                 autoComplete="off"
             >
-                <Form.Item
-                    name="name"
-                    label="🌍 Tên khu vực"
-                    rules={[
-                        { required: true, message: 'Vui lòng nhập tên khu vực!' },
-                        { min: 2, message: 'Tên khu vực phải có ít nhất 2 ký tự!' },
-                        { max: 50, message: 'Tên khu vực không được quá 50 ký tự!' },
-                        {
-                            pattern: /^[a-zA-ZÀ-ỹ\s.,-]+$/,
-                            message: 'Tên khu vực chỉ được chứa chữ cái, dấu cách và dấu câu!'
-                        }
-                    ]}
-                >
-                    <Input
-                        ref={nameInputRef}
-                        placeholder="Ví dụ: Hà Nội, TP.HCM, Đà Nẵng..."
-                        size="large"
-                        showCount
-                        maxLength={50}
-                    />
-                </Form.Item>
+                <div className="grid grid-cols-2 gap-4">
+                    <Form.Item
+                        name="regionCode"
+                        label="🏷️ Mã khu vực"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập mã khu vực!' },
+                            { pattern: /^KV\d{3}$/, message: 'Mã khu vực phải có định dạng KV001, KV002, ...' },
+                            {
+                                validator: (_, value) => {
+                                    if (!value) return Promise.resolve();
+                                    
+                                    // Kiểm tra trùng lặp với các khu vực khác (trừ khu vực hiện tại nếu đang sửa)
+                                    const existingRegion = regions.find(r => 
+                                        r.regionCode === value && 
+                                        (!region || r._id !== region._id)
+                                    );
+                                    
+                                    if (existingRegion) {
+                                        return Promise.reject(new Error('Mã khu vực này đã tồn tại!'));
+                                    }
+                                    
+                                    return Promise.resolve();
+                                }
+                            }
+                        ]}
+                    >
+                        <Input
+                            placeholder="KV001, KV002, ..."
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="name"
+                        label="🌍 Tên khu vực"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập tên khu vực!' },
+                            { min: 2, message: 'Tên khu vực phải có ít nhất 2 ký tự!' },
+                            { max: 50, message: 'Tên khu vực không được quá 50 ký tự!' },
+                            {
+                                pattern: /^[a-zA-ZÀ-ỹ\s.,-]+$/,
+                                message: 'Tên khu vực chỉ được chứa chữ cái, dấu cách và dấu câu!'
+                            }
+                        ]}
+                    >
+                        <Input
+                            ref={nameInputRef}
+                            placeholder="Ví dụ: Hà Nội, TP.HCM, Đà Nẵng..."
+                            size="large"
+                            showCount
+                            maxLength={50}
+                        />
+                    </Form.Item>
+                </div>
 
                 <div className="flex justify-end gap-4 mt-6">
                     <motion.button

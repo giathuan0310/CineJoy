@@ -201,7 +201,7 @@ class PriceListService {
             return {
               ...line,
               productName: product.name,
-              price: line.price || product.price // Sử dụng giá đã nhập hoặc giá từ sản phẩm
+              price: line.price || 0 // Không có giá từ sản phẩm, chỉ dùng giá đã nhập
             };
           }
         }
@@ -228,7 +228,7 @@ class PriceListService {
             validLines.push({
               ...line,
               productName: product.name,
-              price: line.price || product.price
+              price: line.price || 0 // Không có giá từ sản phẩm, chỉ dùng giá đã nhập
             });
           } else {
             // Sản phẩm/combo không tồn tại, ghi lại để báo cáo

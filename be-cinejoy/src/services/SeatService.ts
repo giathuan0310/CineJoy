@@ -204,6 +204,17 @@ class SeatService {
             couple: 0
         };
     }
+
+     // Lấy danh sách các loại ghế duy nhất từ database
+     async getUniqueSeatTypes(): Promise<string[]> {
+        const uniqueTypes = await Seat.distinct('type');
+        return uniqueTypes.sort();
+    }
+
+
 }
+
+ 
+
 
 export default new SeatService();

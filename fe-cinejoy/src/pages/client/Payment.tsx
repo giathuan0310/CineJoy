@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button, Typography, Row, Col } from "antd";
-import { validateVoucherApi } from "@/services/api";
+import { validateVoucherApi, applyVoucherApi } from "@/services/api";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
+import { getCurrentPriceList } from "@/apiservice/apiPriceList";
+import type { IPriceList, IPriceListLine } from "@/apiservice/apiPriceList";
 import useAppStore from "@/store/app.store";
 
 const { Title, Text } = Typography;
@@ -26,15 +28,26 @@ const PaymentPage = () => {
   const {
     movie = {},
     seats = [],
+    seatTypeCounts = {},
     cinema = "",
     date = "",
     time = "",
     room = "",
   } = location.state || {};
-  const [combos, setCombos] = useState<IFoodCombo[]>([]);
+  // Kiểu dữ liệu hiển thị cho Dịch vụ kèm (tên/mô tả từ FoodCombo, giá từ bảng giá)
+  interface UIComboItem {
+    _id: string;
+    name: string;
+    description?: string;
+    type: "single" | "combo";
+    price: number;
+    quantity: number; // số lượng tối đa có thể chọn (không quản lý tồn kho → đặt mặc định 99)
+  }
+
+  const [combos, setCombos] = useState<UIComboItem[]>([]);
   const [combosLoading, setCombosLoading] = useState<boolean>(true);
   const [comboCounts, setComboCounts] = useState<Record<string, number>>({});
-  const [editableUserInfo, setEditableUserInfo] = useState({
+  const [editableUserInfo] = useState({
     fullName: user?.fullName || "",
     phoneNumber: user?.phoneNumber || "",
     email: user?.email || "",
@@ -45,6 +58,7 @@ const PaymentPage = () => {
     code: string;
     discountPercent: number;
     discountAmount: number;
+    maxCap?: number;
   } | null>(null);
   const [voucherLoading, setVoucherLoading] = useState<boolean>(false);
   const [voucherError, setVoucherError] = useState<string>("");
@@ -52,26 +66,68 @@ const PaymentPage = () => {
   const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadFoodCombos = async () => {
+    const loadServicesFromPriceList = async () => {
       try {
         setCombosLoading(true);
-        const data = await getFoodCombos();
-        setCombos(data);
-        // Khởi tạo combo counts với ID từ database
+
+        // 1) Lấy bảng giá hiện tại (trạng thái hoạt động)
+        const priceList: IPriceList | null = await getCurrentPriceList();
+        if (!priceList) {
+          setCombos([]);
+          setComboCounts({});
+          return;
+        }
+
+        // 2) Lọc các dòng áp dụng cho sản phẩm/combos
+        const relevantLines: IPriceListLine[] = (priceList.lines || []).filter(
+          (l) => l && (l.type === "combo" || l.type === "single")
+        );
+
+        if (relevantLines.length === 0) {
+          setCombos([]);
+          setComboCounts({});
+          return;
+        }
+
+        // 3) Lấy toàn bộ sản phẩm/combos để lấy mô tả
+        const products = await getFoodCombos();
+        const idToProduct = new Map<string, IFoodCombo>(
+          products.map((p) => [p._id, p])
+        );
+
+        // 4) Ghép dữ liệu: tên/mô tả từ FoodCombo, giá từ bảng giá
+        const merged: UIComboItem[] = relevantLines
+          .filter((line) => !!line.productId)
+          .map((line) => {
+            const prod = idToProduct.get(line.productId as string);
+            return {
+              _id: line.productId as string,
+              name: line.productName || prod?.name || "Sản phẩm",
+              type: line.type === "combo" ? "combo" : "single",
+              description: prod?.description || "",
+              price: line.price || 0,
+              quantity: 99,
+            } as UIComboItem;
+          });
+
+        setCombos(merged);
+
+        // 5) Khởi tạo combo counts
         const initialCounts: Record<string, number> = {};
-        data.forEach((combo) => {
-          initialCounts[combo._id] = 0;
+        merged.forEach((item) => {
+          initialCounts[item._id] = 0;
         });
         setComboCounts(initialCounts);
       } catch (error) {
-        console.error("Lỗi khi tải food combos:", error);
+        console.error("Lỗi khi tải dịch vụ từ bảng giá:", error);
         setCombos([]);
+        setComboCounts({});
       } finally {
         setCombosLoading(false);
       }
     };
 
-    loadFoodCombos();
+    loadServicesFromPriceList();
   }, []);
 
   const formatTime = (seconds: number) => {
@@ -119,32 +175,41 @@ const PaymentPage = () => {
     setVoucherLoading(true);
     setVoucherError("");
 
+    try {
+      // B1: kiểm tra hợp lệ cơ bản
     const response = await validateVoucherApi(voucherCode, user?._id);
+      if (!response || !(response as VoucherResponse).status) {
+        setVoucherError((response as VoucherResponse)?.message || "Mã voucher không hợp lệ");
+        setAppliedVoucher(null);
+        return;
+      }
 
-    if (!response) {
-      setVoucherError("Có lỗi xảy ra khi kiểm tra voucher");
+      // B2: áp dụng theo tổng hiện tại để tính đúng phần trăm và trần tối đa
+      const applyRes = await applyVoucherApi(voucherCode, currentSubTotal, user?._id);
+      if (!applyRes || !applyRes.status || !applyRes.data) {
+        setVoucherError(applyRes?.message || "Không áp dụng được voucher");
       setAppliedVoucher(null);
-      setVoucherLoading(false);
       return;
     }
 
-    const voucherResponse = response as unknown as VoucherResponse;
-
-    if (voucherResponse.status && voucherResponse.data) {
-      const discountPercent = voucherResponse.data.discount || 0;
-
+      const percent = (response as VoucherResponse)?.data?.discount || 0;
+      const cap = Number(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((response as any)?.data?.voucher?.maxDiscountValue) ?? undefined
+      ) || undefined;
       setAppliedVoucher({
         code: voucherCode,
-        discountPercent: discountPercent,
-        discountAmount: 0, // Sẽ được tính lại tự động
+        discountPercent: percent,
+        discountAmount: applyRes.data.discountAmount || 0,
+        maxCap: cap,
       });
       setVoucherError("");
-    } else {
-      setVoucherError(voucherResponse.message || "Mã voucher không hợp lệ");
+    } catch {
+      setVoucherError("Có lỗi xảy ra khi kiểm tra voucher");
       setAppliedVoucher(null);
-    }
-
+    } finally {
     setVoucherLoading(false);
+    }
   };
 
   const handleRemoveVoucher = () => {
@@ -208,21 +273,56 @@ const PaymentPage = () => {
 
   // Tính tổng tiền combo
   const comboTotal = combos.reduce(
-    (sum, c) => sum + comboCounts[c._id] * c.price,
+    (sum, c) => sum + (comboCounts[c._id] || 0) * (c.price || 0),
     0
   );
 
-  // Giá vé 1 ghế (cứng mẫu)
-  const seatPrice = 90000;
-  const ticketTotal = seats.length * seatPrice;
+  // Tính tiền vé từ seatTypeCounts và bảng giá hiện tại (đã load ở SelectSeat và truyền tổng)
+  // Fallback: nếu không có seatTypeCounts, tạm tính 0 để tránh sai số
+  const [ticketTotal, setTicketTotal] = useState<number>(0);
+  useEffect(() => {
+    const calc = async () => {
+      try {
+        // Lấy bảng giá hiện tại để dự phòng khi vào trực tiếp Payment
+        const priceList: IPriceList | null = await getCurrentPriceList();
+        const map: Record<string, number> = {};
+        (priceList?.lines || []).forEach((l) => {
+          if (l.type === 'ticket' && l.seatType) map[l.seatType] = l.price || 0;
+        });
+        const total = Object.entries(seatTypeCounts || {}).reduce((sum, [type, count]) => sum + (map[type] || 0) * (count as number), 0);
+        setTicketTotal(total);
+      } catch {
+        setTicketTotal(0);
+      }
+    };
+    calc();
+  }, [seatTypeCounts]);
 
   // Tính lại discount khi combo total thay đổi
   const currentSubTotal = ticketTotal + comboTotal;
-  const voucherDiscount = appliedVoucher
-    ? Math.round((currentSubTotal * appliedVoucher.discountPercent) / 100)
-    : 0;
+  const voucherDiscount = appliedVoucher?.discountAmount || 0;
 
-  const total = currentSubTotal - voucherDiscount;
+  const total = Math.max(0, currentSubTotal - voucherDiscount);
+
+  // Khi tổng thay đổi mà đã có voucher, gọi lại API apply để cập nhật số tiền giảm cho đúng trần
+  useEffect(() => {
+    const reapply = async () => {
+      if (!appliedVoucher?.code) return;
+      try {
+        const applyRes = await applyVoucherApi(appliedVoucher.code, currentSubTotal, user?._id);
+        if (applyRes?.status && applyRes.data) {
+          setAppliedVoucher((prev) => prev ? {
+            ...prev,
+            discountAmount: (applyRes.data?.discountAmount as number) || 0,
+          } : prev);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    reapply();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSubTotal]);
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -251,6 +351,7 @@ const PaymentPage = () => {
             : "bg-[#e7ede7] text-[#162d5a]"
         } min-h-screen py-8`}
       >
+        
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
           {/* Thông tin thanh toán */}
           <div
@@ -260,81 +361,33 @@ const PaymentPage = () => {
                 : "bg-[#e7ede7] text-[#162d5a]"
             } flex-1 rounded-2xl p-6 mb-6 md:mb-0 shadow-lg transition-colors duration-200`}
           >
-            <h2
-              className={`text-xl font-bold text-center mb-6 ${
-                isDarkMode ? "text-cyan-400" : "text-blue-700"
-              }`}
-            >
-              Thông tin thanh toán
-            </h2>
-            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
-              <div className="flex-1 flex flex-col items-center">
-                <span className="font-bold text-lg mb-2">Họ tên</span>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={editableUserInfo.fullName}
-                  onChange={(e) =>
-                    setEditableUserInfo((prev) => ({
-                      ...prev,
-                      fullName: e.target.value,
-                    }))
-                  }
-                  placeholder="Nhập họ tên"
-                  className={`${
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => navigate(-1)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium select-none cursor-pointer transition-all duration-200 ${
                     isDarkMode
-                      ? "bg-[#232c3b] text-white border border-[#3a3d46] placeholder-gray-400"
-                      : "bg-[#7caed921]"
-                  } min-w-[250px] text-center rounded-lg px-3.5 py-1.5 mb-2 shadow-sm focus:outline-none focus:ring-1 ${
-                    isDarkMode ? "focus:ring-cyan-400" : "focus:ring-blue-400"
-                  }`}
-                />
+                    ? "text-white hover:underline"
+                    : "text-gray-700 hover:underline"
+                }`}
+                aria-label="Quay lại"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Quay lại
+              </button>
               </div>
-              <div className="flex-1 flex flex-col items-center">
-                <span className="font-bold text-lg mb-2">Điện thoại</span>
-                <input
-                  type="tel"
-                  name="phoneNumber"
-                  value={editableUserInfo.phoneNumber}
-                  onChange={(e) =>
-                    setEditableUserInfo((prev) => ({
-                      ...prev,
-                      phoneNumber: e.target.value,
-                    }))
-                  }
-                  placeholder="Nhập số điện thoại"
-                  className={`${
-                    isDarkMode
-                      ? "bg-[#232c3b] text-white border border-[#3a3d46] placeholder-gray-400"
-                      : "bg-[#7caed921]"
-                  } min-w-[250px] text-center rounded-lg px-3.5 py-1.5 mb-2 shadow-sm focus:outline-none focus:ring-1 ${
-                    isDarkMode ? "focus:ring-cyan-400" : "focus:ring-blue-400"
-                  }`}
-                />
-              </div>
-              <div className="flex-1 flex flex-col items-center">
-                <span className="font-bold text-lg mb-2">Email</span>
-                <input
-                  type="email"
-                  name="email"
-                  value={editableUserInfo.email}
-                  onChange={(e) =>
-                    setEditableUserInfo((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
-                  }
-                  placeholder="Nhập email"
-                  className={`${
-                    isDarkMode
-                      ? "bg-[#232c3b] text-white border border-[#3a3d46] placeholder-gray-400"
-                      : "bg-[#7caed921]"
-                  } min-w-[250px] text-center rounded-lg px-3.5 py-1.5 mb-2 shadow-sm focus:outline-none focus:ring-1 ${
-                    isDarkMode ? "focus:ring-cyan-400" : "focus:ring-blue-400"
-                  }`}
-                />
-              </div>
-            </div>
+            {/* Phần nhập thông tin thanh toán đã được chuyển sang panel bên phải */}
 
             {/* Dịch vụ kèm */}
             <h3
@@ -376,14 +429,21 @@ const PaymentPage = () => {
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
-                        Tên combo
+                        Sản phẩm/Combo
                       </th>
                       <th
                         className={`py-3 text-center font-bold ${
                           isDarkMode ? "text-white" : ""
                         }`}
                       >
-                        Mô tả & Giá
+                        Mô tả
+                      </th>
+                      <th
+                        className={`py-3 text-center font-bold ${
+                          isDarkMode ? "text-white" : ""
+                        }`}
+                      >
+                        Giá
                       </th>
                       <th
                         className={`py-3 text-center font-bold ${
@@ -412,7 +472,6 @@ const PaymentPage = () => {
                           </div>
                         </td>
                         <td className="py-4 text-sm text-center">
-                          <div className="flex flex-col items-center gap-1">
                             <span
                               className={
                                 c.quantity === 0 ? "text-gray-500" : ""
@@ -420,6 +479,8 @@ const PaymentPage = () => {
                             >
                               {c.description}
                             </span>
+                        </td>
+                        <td className="py-4 text-center">
                             <span
                               className={`font-bold text-base ${
                                 c.quantity === 0
@@ -429,9 +490,8 @@ const PaymentPage = () => {
                                   : "text-green-600"
                               }`}
                             >
-                              {c.price.toLocaleString()} VNĐ
+                            {c.price ? c.price.toLocaleString() : '0'} VNĐ
                             </span>
-                          </div>
                         </td>
                         <td className="py-1 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -510,7 +570,7 @@ const PaymentPage = () => {
                 <span
                   className={isDarkMode ? "text-gray-300" : "text-gray-600"}
                 >
-                  Không có combo nào
+                  Không có sản phẩm/combo nào
                 </span>
               </div>
             )}
@@ -582,6 +642,9 @@ const PaymentPage = () => {
                       </div>
                       <div className="text-sm">
                         Bạn được giảm {appliedVoucher.discountPercent}%
+                        {typeof appliedVoucher.maxCap === 'number' && (
+                          <> (tối đa {appliedVoucher.maxCap.toLocaleString()} VNĐ)</>
+                        )}
                       </div>
                     </div>
                     <button
@@ -595,16 +658,7 @@ const PaymentPage = () => {
               </div>
             )}
 
-            <div className="text-right mb-2 mt-6">
-              Số tiền được giảm:{" "}
-              <span className="font-bold text-green-400">
-                {voucherDiscount.toLocaleString()} VNĐ
-              </span>
-            </div>
-            <div className="text-right mb-4 text-[18px] font-bold">
-              Số tiền cần thanh toán:{" "}
-              <span className="text-red-400">{total.toLocaleString()} VNĐ</span>
-            </div>
+            {/* Đã chuyển phần hiển thị tiền giảm và tiền thanh toán sang panel bên phải */}
             <div className="flex justify-between items-center mb-4 mt-6 px-20">
               <div className="text-center">
                 <div className="text-red-500 text-[14px] mb-2">
@@ -702,6 +756,51 @@ const PaymentPage = () => {
                   <p className={`value ${isDarkMode ? "text-gray-200" : ""}`}>
                     {seats && seats.length > 0 ? seats.join(", ") : ""}
                   </p>
+                </div>
+                {/* Thông tin thanh toán (đã chuyển sang bên phải) */}
+                <div className="mt-6">
+                  <p className={`text-lg font-bold text-center mb-4 ${isDarkMode ? "text-cyan-400" : "text-blue-700"}`}>
+                    Thông tin thanh toán
+                  </p>
+                  <div className="detail_movie_info space-y-2">
+                    <div className="row flex justify-between text-sm">
+                      <p className="label font-bold">Họ tên:</p>
+                      <p className={`value ${isDarkMode ? "text-gray-200" : ""}`}>
+                        {editableUserInfo.fullName}
+                      </p>
+                    </div>
+                    <div className="row flex justify-between text-sm">
+                      <p className="label font-bold">Điện thoại:</p>
+                      <p className={`value ${isDarkMode ? "text-gray-200" : ""}`}>
+                        {editableUserInfo.phoneNumber}
+                      </p>
+                    </div>
+                    <div className="row flex justify-between text-sm">
+                      <p className="label font-bold">Email:</p>
+                      <p className={`value ${isDarkMode ? "text-gray-200" : ""}`}>
+                        {editableUserInfo.email}
+                      </p>
+                    </div>
+                    <div className="row flex justify-between text-sm">
+                      <p className="label font-bold">Số tiền được giảm:</p>
+                      <div className="value text-right">
+                        <div className={`font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                          - {voucherDiscount.toLocaleString()} VNĐ
+                        </div>
+                        {typeof appliedVoucher?.maxCap === 'number' && voucherDiscount >= (appliedVoucher?.maxCap || 0) && (
+                          <div className="text-xs italic" style={{ color: isDarkMode ? '#9ae6b4' : '#16a34a' }}>
+                            Đã đạt mức giảm tối đa
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="row flex justify-between text-sm">
+                      <p className="label font-bold">Số tiền thanh toán:</p>
+                      <p className={`value font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+                        {total.toLocaleString()} VNĐ
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <button
@@ -812,7 +911,7 @@ const PaymentPage = () => {
 
           {/* Thông tin khách hàng */}
           <div className="mb-[20px]">
-            <Title level={5} style={{ textAlign: "center" }}>
+              <Title level={5} style={{ textAlign: "left", margin: 0, marginBottom: 8 }}>
               Thông tin khách hàng
             </Title>
             <Row gutter={16}>
@@ -864,7 +963,7 @@ const PaymentPage = () => {
                             }}
                           >
                             {combo.name} - {comboCounts[combo._id]} x{" "}
-                            {new Intl.NumberFormat("vi-VN").format(combo.price)}{" "}
+                            {new Intl.NumberFormat("vi-VN").format(combo.price || 0)}{" "}
                             VNĐ
                           </Text>
                         );
@@ -890,14 +989,22 @@ const PaymentPage = () => {
           {/* Voucher */}
           {appliedVoucher && (
             <div style={{ marginBottom: "20px" }}>
-              <Title level={5} style={{ textAlign: "center" }}>
+              <Title level={5} style={{ textAlign: "left", margin: 0, marginBottom: 8 }}>
                 Mã giảm giá
               </Title>
               <Row gutter={16}>
-                <Col span={12}>
-                  <Text>Mã voucher: {appliedVoucher.code}</Text>
+                <Col span={8}>
+                  <Text strong>Mã voucher:</Text>
                 </Col>
-                <Col span={12} style={{ textAlign: "right" }}>
+                <Col span={16} style={{ textAlign: "right" }}>
+                  <Text>{appliedVoucher.code}</Text>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Text strong>Số tiền được giảm:</Text>
+                </Col>
+                <Col span={16} style={{ textAlign: "right" }}>
                   <Text style={{ color: "#52c41a" }}>
                     -{voucherDiscount.toLocaleString()} VNĐ
                   </Text>

@@ -43,10 +43,10 @@ class ShowSessionController {
     // Create new show session
     async createShowSession(req: Request, res: Response) {
         try {
-            const { name, startTime, endTime } = req.body;
+            const { shiftCode, name, startTime, endTime } = req.body;
 
             // Validate required fields
-            if (!name || !startTime || !endTime) {
+            if (!shiftCode || !name || !startTime || !endTime) {
                 return errorResponse(res, 400, 'Vui lòng cung cấp đầy đủ thông tin ca chiếu');
             }
 
@@ -63,6 +63,7 @@ class ShowSessionController {
             }
 
             const sessionData = {
+                shiftCode,
                 name,
                 startTime,
                 endTime
@@ -85,7 +86,7 @@ class ShowSessionController {
     async updateShowSession(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, startTime, endTime } = req.body;
+            const { shiftCode, name, startTime, endTime } = req.body;
 
             // Check if session exists
             const existingSession = await ShowSessionService.getShowSessionById(id);
@@ -113,6 +114,7 @@ class ShowSessionController {
             }
 
             const updateData = {
+                ...(shiftCode && { shiftCode }),
                 ...(name && { name }),
                 ...(startTime && { startTime }),
                 ...(endTime && { endTime })

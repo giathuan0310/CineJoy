@@ -3,6 +3,7 @@ import axiosClient from './axiosClient';
 
 export interface IShowSession {
     _id: string;
+    shiftCode: string; // Mã ca chiếu
     name: string;
     startTime: string;
     endTime: string;
@@ -11,6 +12,7 @@ export interface IShowSession {
 }
 
 export interface ICreateShowSessionData {
+    shiftCode: string; // Mã ca chiếu
     name: string;
     startTime: string;
     endTime: string;

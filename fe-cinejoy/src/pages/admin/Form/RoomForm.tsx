@@ -6,6 +6,7 @@ import { getSeatsByRoomApi } from '@/services/api';
 
 interface RoomFormProps {
     room?: IRoom;
+    rooms?: IRoom[];
     theaters: Array<{ _id: string; name: string; address: string; location: { city: string }; regionId: string }>;
     regions: Array<{ _id: string; name: string }>;
     preSelectedTheater?: { _id: string; name: string; address: string; location: { city: string }; regionId: string } | null;
@@ -86,7 +87,7 @@ const create4DXSeatTemplate = (rows: number, cols: number) => {
     return seats;
 };
 
-const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelectedTheater, onSubmit, onCancel, loading = false }) => {
+const RoomForm: React.FC<RoomFormProps> = ({ room, rooms = [], theaters, regions, preSelectedTheater, onSubmit, onCancel, loading = false }) => {
     const nameInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
     const [selectedRegion, setSelectedRegion] = useState<string>('');
@@ -95,7 +96,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
     const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; seatId: string }>({
         visible: false, x: 0, y: 0, seatId: ''
     });
-    const [selectedRoomType, setSelectedRoomType] = useState<string>('');
+    const [selectedRoomType, setSelectedRoomType] = useState<string>('4DX');
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     useEffect(() => {
@@ -114,6 +115,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
             }
             
             form.setFieldsValue({
+                roomCode: room.roomCode,
                 name: room.name,
                 region: theater ? theater.regionId : '',
                 theater: room.theater._id,
@@ -128,22 +130,22 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
             loadRoomSeats(room._id);
         } else {
             form.resetFields();
-            setSelectedRoomType('2D');
+            setSelectedRoomType('4DX');
             
-            // Set default values for new room
+            // Set default values for new room (4DX mặc định)
             form.setFieldsValue({
-                roomType: '2D',
+                roomType: '4DX',
                 status: 'active'
             });
             
-            // Apply default template for 2D room
-            const defaultSeats = createDefaultSeatTemplate(8, 10);
+            // Apply default template for 4DX room (tất cả ghế 4DX)
+            const defaultSeats = create4DXSeatTemplate(8, 10);
             setSeatLayout({ 
                 rows: 8, 
                 cols: 10, 
                 seats: defaultSeats 
             });
-            console.log('Default 2D template created:', Object.keys(defaultSeats).length, 'seats');
+            console.log('Default 4DX template created:', Object.keys(defaultSeats).length, 'seats');
             
             // Handle preSelectedTheater if provided
             if (preSelectedTheater) {
@@ -361,6 +363,13 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
         const [rowLetter] = seatId;
         const rowIndex = rowLetter.charCodeAt(0) - 65;
         
+        // Nếu là phòng 4DX: khóa loại ghế luôn là 4DX
+        if (selectedRoomType === '4DX') {
+            message.info('Phòng 4DX: tất cả ghế đều là 4DX, không thể đổi loại.');
+            setContextMenu({ visible: false, x: 0, y: 0, seatId: '' });
+            return;
+        }
+
         // Rule 1: First 3 rows (A-C) must be normal seats
         if (rowIndex < 3 && type !== 'normal') {
             message.error('3 dòng đầu tiên (A-C) bắt buộc phải là ghế thường!');
@@ -463,20 +472,20 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
             }
         }
         
-        // Determine how many seats this row should have
+        // Xác định số ghế của dòng
         let colsForThisRow = seatLayout.cols;
         if (rowIndex === seatLayout.rows - 1 && type === 'couple') {
-            // For couple seats in last row, ensure even number
+            // Dòng cuối: bắt buộc số ghế chẵn cho cặp đôi
             colsForThisRow = seatLayout.cols % 2 === 0 ? seatLayout.cols : seatLayout.cols - 1;
         }
-        
-        // Clear all seats in this row first
+
+        // Clear toàn bộ dòng hiện tại
         for (let col = 0; col < seatLayout.cols; col++) {
             const currentSeatId = generateSeatId(rowIndex, col);
             delete newSeats[currentSeatId];
         }
-        
-        // Set seats for this row with the appropriate count
+
+        // Gán ghế theo số lượng colsForThisRow
         for (let col = 0; col < colsForThisRow; col++) {
             const currentSeatId = generateSeatId(rowIndex, col);
             newSeats[currentSeatId] = { type, status: 'available' };
@@ -587,6 +596,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
     };
 
     const handleSubmit = async (values: {
+        roomCode: string;
         name: string;
         theater: string;
         roomType: '2D' | '4DX';
@@ -611,6 +621,7 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
             }
             
             const submitData: ICreateRoomData = {
+                roomCode: values.roomCode,
                 name: values.name,
                 theater: values.theater,
                 capacity: capacity,
@@ -671,21 +682,54 @@ const RoomForm: React.FC<RoomFormProps> = ({ room, theaters, regions, preSelecte
                 onFinish={handleSubmit}
                 autoComplete="off"
             >
-                <Form.Item
-                    name="name"
-                    label="Tên phòng chiếu"
-                    rules={[
-                        { required: true, message: 'Vui lòng nhập tên phòng chiếu!' },
-                        { min: 2, message: 'Tên phòng chiếu phải có ít nhất 2 ký tự!' },
-                        { max: 50, message: 'Tên phòng chiếu không được quá 50 ký tự!' }
-                    ]}
-                >
-                    <Input
-                        ref={nameInputRef}
-                        placeholder="VD: Room 1"
-                        size="large"
-                    />
-                </Form.Item>
+                <div className="grid grid-cols-2 gap-4">
+                    <Form.Item
+                        name="roomCode"
+                        label="🏷️ Mã phòng"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập mã phòng!' },
+                            { pattern: /^PC\d{3}$/, message: 'Mã phòng phải có định dạng PC001, PC002, ...' },
+                            {
+                                validator: (_, value) => {
+                                    if (!value) return Promise.resolve();
+                                    
+                                    // Kiểm tra trùng lặp với các phòng khác (trừ phòng hiện tại nếu đang sửa)
+                                    const existingRoom = rooms.find(r => 
+                                        r.roomCode === value && 
+                                        (!room || r._id !== room._id)
+                                    );
+                                    
+                                    if (existingRoom) {
+                                        return Promise.reject(new Error('Mã phòng này đã tồn tại!'));
+                                    }
+                                    
+                                    return Promise.resolve();
+                                }
+                            }
+                        ]}
+                    >
+                        <Input
+                            placeholder="PC001, PC002, ..."
+                            size="large"
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="name"
+                        label="Tên phòng chiếu"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập tên phòng chiếu!' },
+                            { min: 2, message: 'Tên phòng chiếu phải có ít nhất 2 ký tự!' },
+                            { max: 50, message: 'Tên phòng chiếu không được quá 50 ký tự!' }
+                        ]}
+                    >
+                        <Input
+                            ref={nameInputRef}
+                            placeholder="VD: Room 1"
+                            size="large"
+                        />
+                    </Form.Item>
+                </div>
 
                 <Form.Item
                     name="region"

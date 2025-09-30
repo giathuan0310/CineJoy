@@ -13,6 +13,7 @@ import Members from 'pages/client/Members';
 import Payment from 'pages/client/Payment';
 import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
+import VoucherDetail from 'pages/admin/VoucherDetail';
 import { ToastContainer } from 'react-toastify';
 
 const router = createBrowserRouter([
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <Dashboard />
+  },
+  {
+    path: "/admin/vouchers/:id",
+    element: <VoucherDetail />
   },
   {
     path: "*",

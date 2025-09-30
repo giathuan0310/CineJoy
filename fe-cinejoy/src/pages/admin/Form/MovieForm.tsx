@@ -7,11 +7,12 @@ import dayjs from 'dayjs';
 
 interface MovieFormProps {
     movie?: IMovie;
+    movies?: IMovie[];
     onSubmit: (movieData: Partial<IMovie>) => Promise<void>;
     onCancel: () => void;
 }
 
-const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
+const MovieForm: React.FC<MovieFormProps> = ({ movie, movies = [], onSubmit, onCancel }) => {
     const titleInputRef = useRef<InputRef>(null);
     const [form] = Form.useForm();
     const [imagePreview, setImagePreview] = useState<string>('');
@@ -23,6 +24,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     useEffect(() => {
         if (movie) {
             form.setFieldsValue({
+                movieCode: movie.movieCode,
                 title: movie.title,
                 image: movie.image,
                 posterImage: movie.posterImage,
@@ -106,6 +108,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     const ageRestrictions = ['T13+', 'T16+', 'T18+', 'P'];
 
     const handleSubmit = async (values: {
+        movieCode: string;
         title: string;
         image: string;
         posterImage: string;
@@ -125,6 +128,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
         try {
             setIsLoading(true);
             const submitData = {
+                movieCode: values.movieCode,
                 title: values.title,
                 image: values.image,
                 posterImage: values.posterImage,
@@ -224,6 +228,37 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                 autoComplete="off"
             >
                     <div className="grid grid-cols-2 gap-4">
+                    <Form.Item
+                        name="movieCode"
+                        label="Mã phim"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập mã phim!' },
+                            { pattern: /^MV\d{3}$/, message: 'Mã phim phải có định dạng MV001, MV002, ...' },
+                            {
+                                validator: (_, value) => {
+                                    if (!value) return Promise.resolve();
+                                    
+                                    // Kiểm tra trùng lặp với các phim khác (trừ phim hiện tại nếu đang sửa)
+                                    const existingMovie = movies.find(m => 
+                                        m.movieCode === value && 
+                                        (!movie || m._id !== movie._id)
+                                    );
+                                    
+                                    if (existingMovie) {
+                                        return Promise.reject(new Error('Mã phim này đã tồn tại!'));
+                                    }
+                                    
+                                    return Promise.resolve();
+                                }
+                            }
+                        ]}
+                    >
+                        <Input
+                            placeholder="MV001, MV002, ..."
+                            size="large"
+                        />
+                    </Form.Item>
+
                     <Form.Item
                                 name="title"
                         label="Tên phim"

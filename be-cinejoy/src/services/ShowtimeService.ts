@@ -73,22 +73,7 @@ class ShowtimeService {
         for (let i = 0; i < normalizedShowTimes.length; i++) {
           const incoming = normalizedShowTimes[i] as any;
           
-          // Kiểm tra xem có document nào khác đã có suất chiếu trùng không
-          const existingDuplicate = await Showtime.findOne({
-            "showTimes.date": { $gte: new Date(incoming.date), $lt: new Date(new Date(incoming.date).getTime() + 24 * 60 * 60 * 1000) },
-            "showTimes.room": incoming.room,
-            "showTimes.start": { 
-              $gte: new Date(new Date(incoming.start).getTime() - 60 * 1000), // -1 phút
-              $lte: new Date(new Date(incoming.start).getTime() + 60 * 1000)  // +1 phút
-            }
-          });
-          
-          if (existingDuplicate) {
-            const roomDoc = await RoomModel.findById(incoming.room).select("name");
-            const roomLabel = roomDoc?.name || String(incoming.room);
-            const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
-            throw new Error(errorMessage);
-          }
+          // Đã bỏ ràng buộc trùng lặp suất chiếu theo yêu cầu
           
           // Tính khung ca
           let sessionStartMin: number | null = null;
@@ -151,31 +136,15 @@ class ShowtimeService {
         return doc;
       }
 
-      // Đã có document → gộp các showTimes, tránh thêm trùng
+      // Đã có document → gộp các showTimes, bỏ ràng buộc trùng lặp
       for (const incoming of normalizedShowTimes) {
-        const exists = doc.showTimes.some((st: any) => {
-          const sameDate = this.dateKeyUTC(st.date) === this.dateKeyUTC(incoming.date);
-          const sameRoom = st.room.toString() === incoming.room.toString();
-          const startA = new Date(st.start).getTime();
-          const startB = new Date(incoming.start).getTime();
-          const sameStart = Math.abs(startA - startB) < 60 * 1000; // 1 phút
-          return sameDate && sameRoom && sameStart;
-        });
-
-        if (exists) {
-          // Nếu đã tồn tại suất chiếu trùng, throw error
-          const roomDoc = await RoomModel.findById(incoming.room).select("name");
-          const roomLabel = roomDoc?.name || String(incoming.room);
-          const errorMessage = `Suất chiếu này đã tồn tại! Ngày: ${new Date(incoming.date).toLocaleDateString("vi-VN")}, Phòng: ${roomLabel}, Thời gian: ${new Date(incoming.start).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}`;
-          throw new Error(errorMessage);
-        }
-
-        if (!exists) {
-          // Kiểm tra giới hạn 2 suất/ca trong ngày/phòng
-          // Ưu tiên dùng showSessionId nếu có; nếu không, suy ra theo time range
-          let sessionStartMin: number | null = null;
-          let sessionEndMin: number | null = null;
-          let sessionName: string | undefined;
+        // Đã bỏ kiểm tra trùng lặp suất chiếu theo yêu cầu
+        
+        // Kiểm tra giới hạn 2 suất/ca trong ngày/phòng
+        // Ưu tiên dùng showSessionId nếu có; nếu không, suy ra theo time range
+        let sessionStartMin: number | null = null;
+        let sessionEndMin: number | null = null;
+        let sessionName: string | undefined;
           if (incoming.showSessionId) {
             const session = await ShowSession.findById(incoming.showSessionId);
             if (session) {
@@ -241,18 +210,6 @@ class ShowtimeService {
           const totalInSession = inThisSession.length + alsoIncoming.length;
 
           doc.showTimes.push(incoming);
-        } else {
-          // Nếu đã tồn tại, có thể cập nhật seats nếu doc hiện tại chưa có
-          const idx = doc.showTimes.findIndex((st: any) => {
-            const sameDate = new Date(st.date).toDateString() === new Date(incoming.date).toDateString();
-            const sameRoom = st.room.toString() === incoming.room.toString();
-            const sameStart = Math.abs(new Date(st.start).getTime() - new Date(incoming.start).getTime()) < 60 * 1000;
-            return sameDate && sameRoom && sameStart;
-          });
-          if (idx !== -1 && (!doc.showTimes[idx].seats || doc.showTimes[idx].seats.length === 0)) {
-            doc.showTimes[idx].seats = incoming.seats;
-          }
-        }
       }
 
       await doc.save();

@@ -3,6 +3,7 @@ import axiosClient from './axiosClient';
 
 export interface IRoom {
     _id: string;
+    roomCode: string;
     name: string;
     theater: {
         _id: string;
@@ -25,6 +26,7 @@ export interface IRoom {
 }
 
 export interface ICreateRoomData {
+    roomCode: string;
     name: string;
     theater: string;
     capacity: number;

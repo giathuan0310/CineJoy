@@ -17,17 +17,12 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
     const [form] = Form.useForm();
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [productType, setProductType] = useState<'single' | 'combo'>('single');
-    const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
     const [availableProducts, setAvailableProducts] = useState<IFoodCombo[]>([]);
-    const [itemMaxQuantities, setItemMaxQuantities] = useState<{[key: number]: number}>({});
 
     useEffect(() => {
         if (combo) {
             const type = combo.type || 'single';
             setProductType(type);
-            if (combo.discountType) {
-                setDiscountType(combo.discountType);
-            }
             
             // Xử lý items để đảm bảo productId là string
             const processedItems = (combo.items || []).map((item: IComboItem & { productId: string | { _id: string } }) => ({
@@ -36,28 +31,14 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
             }));
 
             form.setFieldsValue({
+                // @ts-expect-error backend supplies code
+                code: (combo as any).code,
                 name: combo.name,
-                price: combo.price,
                 description: combo.description,
-                quantity: combo.quantity,
                 type: type,
-                category: combo.category,
                 items: processedItems,
-                discountType: combo.discountType || 'percent',
-                discountValue: combo.discountValue || 0,
             });
 
-            // Cập nhật max quantities cho các items khi edit
-            if (type === 'combo' && processedItems.length > 0) {
-                const maxQuantities: {[key: number]: number} = {};
-                processedItems.forEach((item, index) => {
-                    const product = availableProducts.find(p => p._id === item.productId);
-                    if (product) {
-                        maxQuantities[index] = product.quantity;
-                    }
-                });
-                setItemMaxQuantities(maxQuantities);
-            }
         }
     }, [combo, form, availableProducts]);
 
@@ -75,12 +56,6 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
         }
     }, [combo]);
 
-    // Reset discount value when discount type changes (only for new combos)
-    useEffect(() => {
-        if (productType === 'combo' && !combo) {
-            form.setFieldValue('discountValue', discountType === 'percent' ? 10 : 0);
-        }
-    }, [discountType, productType, form, combo]);
 
     const loadSingleProducts = async () => {
         try {
@@ -94,16 +69,6 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
         }
     };
 
-    // Function để cập nhật max quantity cho một item
-    const updateItemMaxQuantity = (itemIndex: number, productId: string) => {
-        const selectedProduct = availableProducts.find(p => p._id === productId);
-        if (selectedProduct) {
-            setItemMaxQuantities(prev => ({
-                ...prev,
-                [itemIndex]: selectedProduct.quantity
-            }));
-        }
-    };
 
     // Tự động focus vào input tên combo chỉ khi thêm mới (không phải edit)
     useEffect(() => {
@@ -118,31 +83,30 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
         }
     }, [combo]);
 
-        const handleSubmit = async (values: Partial<IFoodCombo>) => {
+        const handleSubmit = async (values: Partial<IFoodCombo> & { code?: string }) => {
         try {
             setIsLoading(true);
             
             if (productType === 'single') {
                 const submitData: Partial<IFoodCombo> = {
+                    // @ts-expect-error extend field
+                    code: values.code,
                     name: values.name,
-                    price: values.price,
                     description: values.description,
-                    quantity: values.quantity,
                     type: 'single',
-                    category: values.category,
                 };
-                await onSubmit(submitData);
+                await onSubmit(submitData as any);
             } else {
                 // Combo type
                 const submitData: Partial<IFoodCombo> = {
+                    // @ts-expect-error extend field
+                    code: values.code,
                     name: values.name,
                     description: values.description,
                     items: values.items || [],
-                    discountType: values.discountType,
-                    discountValue: values.discountValue,
                     type: 'combo',
                 };
-                await onSubmit(submitData);
+                await onSubmit(submitData as any);
             }
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -182,6 +146,40 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                 onFinish={handleSubmit}
                 autoComplete="off"
             >
+                {/* Code */}
+                <Form.Item
+                    name="code"
+                    label={productType === 'single' ? 'Mã sản phẩm' : 'Mã combo'}
+                    rules={[
+                        { required: true, message: 'Vui lòng nhập mã!' },
+                        // Kiểm tra trùng mã tại FE
+                        {
+                            validator: async (_: unknown, value: string) => {
+                                const v = String(value || '').trim();
+                                if (!v) return Promise.resolve();
+                                try {
+                                    const { getFoodCombos } = await import('@/apiservice/apiFoodCombo');
+                                    const all = await getFoodCombos();
+                                    const currentId = (combo as any)?._id;
+                                    const exists = all.some((c: any) => String(c.code).toUpperCase() === v.toUpperCase() && c._id !== currentId);
+                                    if (exists) return Promise.reject(new Error('Mã đã tồn tại, vui lòng chọn mã khác'));
+                                } catch {}
+                                return Promise.resolve();
+                            }
+                        },
+                        {
+                            validator: (_, value) => {
+                                if (!value) return Promise.resolve();
+                                const v = String(value).toUpperCase();
+                                const ok = productType === 'single' ? /^SP\d{3,}$/ : /^CB\d{3,}$/;
+                                return ok.test(v) ? Promise.resolve() : Promise.reject(new Error(productType === 'single' ? 'Định dạng SPxxx, ví dụ SP001' : 'Định dạng CBxxx, ví dụ CB001'));
+                            }
+                        }
+                    ]}
+                >
+                    <Input placeholder={productType === 'single' ? 'VD: SP001' : 'VD: CB001'} size="large"/>
+                </Form.Item>
+
                 {/* Product Type Selection */}
                 <Form.Item
                     name="type"
@@ -217,80 +215,23 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                 </Form.Item>
 
                 {productType === 'single' && (
-                    <>
-                        <Form.Item
-                            name="category"
-                            label="Danh mục"
-                            rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}
-                        >
-                            <Select
-                                size="large"
-                                placeholder="Chọn danh mục sản phẩm"
-                            >
-                                <Option value="Popcorn">Bắp rang</Option>
-                                <Option value="Drink">Nước uống</Option>
-                                <Option value="Snack">Snack</Option>
-                                <Option value="Other">Khác</Option>
-                            </Select>
-                        </Form.Item>
-
-                        <Form.Item
-                            name="price"
-                            label="Giá (VNĐ)"
-                            rules={[
-                                { required: true, message: 'Vui lòng nhập giá sản phẩm!' },
-                                { type: 'number', min: 1000, message: 'Giá sản phẩm phải ít nhất 1,000 VNĐ!' }
-                            ]}
-                        >
-                            <InputNumber
-                                placeholder="Nhập giá sản phẩm"
-                                size="large"
-                                min={1000}
-                                max={1000000}
-                                step={1000}
-                                style={{ width: '100%' }}
-                                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                // @ts-expect-error: Ant Design InputNumber parser type constraint
-                                parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) || 1000}
-                                addonAfter="VNĐ"
-                            />
-                        </Form.Item>
-
-                        <Form.Item
-                            name="quantity"
-                            label="Số lượng"
-                            rules={[
-                                { required: true, message: 'Vui lòng nhập số lượng!' },
-                                { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0!' }
-                            ]}
-                        >
-                            <InputNumber
-                                placeholder="Nhập số lượng"
-                                size="large"
-                                min={1}
-                                max={10000}
-                                style={{ width: '100%' }}
-                            />
-                        </Form.Item>
-
-                        <Form.Item
-                            name="description"
-                            label="Mô tả"
-                            rules={[
-                                { required: true, message: 'Vui lòng nhập mô tả sản phẩm!' },
-                                { min: 10, message: 'Mô tả phải có ít nhất 10 ký tự!' },
-                                { max: 500, message: 'Mô tả không được quá 500 ký tự!' }
-                            ]}
-                        >
-                            <Input.TextArea
-                                placeholder="Ví dụ: Bắp ngô rang thơm ngon, béo ngậy"
-                                rows={4}
-                                size="large"
-                                showCount
-                                maxLength={500}
-                            />
-                        </Form.Item>
-                    </>
+                    <Form.Item
+                        name="description"
+                        label="Mô tả"
+                        rules={[
+                            { required: true, message: 'Vui lòng nhập mô tả sản phẩm!' },
+                            { min: 10, message: 'Mô tả phải có ít nhất 10 ký tự!' },
+                            { max: 500, message: 'Mô tả không được quá 500 ký tự!' }
+                        ]}
+                    >
+                        <Input.TextArea
+                            placeholder="Ví dụ: Bắp ngô rang thơm ngon, béo ngậy"
+                            rows={4}
+                            size="large"
+                            showCount
+                            maxLength={500}
+                        />
+                    </Form.Item>
                 )}
 
                 {productType === 'combo' && (
@@ -315,11 +256,11 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                                                         filterOption={(input, option) =>
                                                             String(option?.children || '').toLowerCase().includes(input.toLowerCase())
                                                         }
-                                                        onChange={(value) => updateItemMaxQuantity(name, value)}
+                                                        onChange={(value) => {}}
                                                     >
                                                         {availableProducts.map(product => (
                                                             <Option key={product._id} value={product._id}>
-                                                                {product.name} - {product.price.toLocaleString()}đ
+                                                                {product.name}
                                                             </Option>
                                                         ))}
                                                     </Select>
@@ -333,7 +274,7 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                                                     <InputNumber
                                                         placeholder="Số lượng"
                                                         min={1}
-                                                        max={itemMaxQuantities[name] || 10}
+                                                        max={100}
                                                         style={{ width: '100%' }}
                                                     />
                                                 </Form.Item>
@@ -348,15 +289,7 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                                     ))}
                                     <Button
                                         type="dashed"
-                                        onClick={() => {
-                                            add();
-                                            // Reset max quantity cho item mới
-                                            const newIndex = fields.length;
-                                            setItemMaxQuantities(prev => ({
-                                                ...prev,
-                                                [newIndex]: 10 // Default max
-                                            }));
-                                        }}
+                                        onClick={() => add()}
                                         block
                                         icon={<PlusOutlined />}
                                         className="mb-4"
@@ -367,60 +300,6 @@ const FoodComboForm: React.FC<FoodComboFormProps> = ({ combo, onSubmit, onCancel
                             )}
                         </Form.List>
 
-                        <Divider orientation="left">Giảm giá</Divider>
-                            <Form.Item
-                                name="discountType"
-                                label="Loại giảm giá"
-                                rules={[{ required: true, message: 'Vui lòng chọn loại giảm giá!' }]}
-                            >
-                                <Select 
-                                    size="large" 
-                                    placeholder="Chọn loại giảm giá"
-                                    onChange={(value) => {
-                                        setDiscountType(value);
-                                        // Only reset discount value when creating new combo, not when editing
-                                        if (!combo) {
-                                            form.setFieldValue('discountValue', value === 'percent' ? 10 : 0);
-                                        }
-                                    }}
-                                >
-                                    <Option value="percent">Phần trăm (%)</Option>
-                                    <Option value="fixed">Số tiền cố định (VNĐ)</Option>
-                                </Select>
-                            </Form.Item>
-
-                        <Form.Item
-                            name="discountValue"
-                            label="Giá trị giảm giá"
-                                rules={[
-                                    { required: true, message: 'Vui lòng nhập giá trị giảm giá!' },
-                                    {
-                                        type: 'number',
-                                        min: discountType === 'percent' ? 10 : 0,
-                                        max: discountType === 'percent' ? 30 : 1000000,
-                                        message: discountType === 'percent'
-                                            ? 'Giá trị giảm giá phải từ 10% đến 30%!'
-                                            : 'Giá trị giảm giá phải >= 0 và không quá 1,000,000 VNĐ!'
-                                    }
-                                ]}
-                        >
-                            <InputNumber
-                                placeholder="Nhập giá trị giảm giá"
-                                size="large"
-                                min={discountType === 'percent' ? 10 : 0}
-                                max={discountType === 'percent' ? 30 : 1000000}
-                                style={{ width: '100%' }}
-                                formatter={(value) => {
-                                    if (!value) return '';
-                                    return discountType === 'fixed' 
-                                        ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-                                        : `${value}`;
-                                }}
-                                // @ts-expect-error: Ant Design InputNumber parser type constraint
-                                parser={(value) => Number(value!.replace(/\$\s?|(,*)|%/g, '')) || 0}
-                                addonAfter={discountType === 'percent' ? '%' : 'VNĐ'}
-                            />
-                        </Form.Item>
 
                         <Form.Item
                             name="description"

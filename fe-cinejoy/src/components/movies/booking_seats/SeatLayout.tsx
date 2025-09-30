@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useNavigationType } from "react-router-dom";
 import Seat from "components/movies/booking_seats/Seat";
 import useAppStore from "@/store/app.store";
 import screenImage from "@/assets/screen.png";
@@ -32,6 +32,7 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
 }) => {
   const { isDarkMode } = useAppStore();
   const navigate = useNavigate();
+  const navigationType = useNavigationType(); // 'POP' khi back/forward
 
   // Handle seat data loading
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +42,51 @@ const SeatLayout: React.FC<SeatLayoutProps> = ({
       onSeatsLoaded(seatData);
     }
   };
+
+  // Persist selected seats per showtime in sessionStorage
+  const storageKey = React.useMemo(() => `booking:selected:${showtimeId || 'unknown'}`, [showtimeId]);
+
+  // Save when selectedSeats changes
+  React.useEffect(() => {
+    try {
+      if (selectedSeats && selectedSeats.length >= 0) {
+        sessionStorage.setItem(storageKey, JSON.stringify(selectedSeats));
+      }
+    } catch (error) {
+      console.error("Error saving selected seats:", error);
+    }
+  }, [selectedSeats, storageKey]);
+
+  // On mount: attempt to restore and notify parent for bulk select
+  React.useEffect(() => {
+    try {
+      const perf = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+      const isBackForward = navigationType === 'POP' || (!!perf && perf.type === 'back_forward');
+
+      if (!isBackForward) {
+        // Không phải quay lại từ trang thanh toán → xóa cache để tránh lưu khi reload/đi thẳng
+        sessionStorage.removeItem(storageKey);
+        return;
+      }
+
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const restored: string[] = JSON.parse(raw);
+        if (Array.isArray(restored) && restored.length > 0) {
+          if (onSelectMultiple) {
+            onSelectMultiple(restored);
+          } else if (onSelect) {
+            // Fallback: chọn từng ghế nếu component cha không hỗ trợ select nhiều
+            restored.forEach((s) => onSelect(s));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error restoring selected seats:", error);
+    }
+  // only run once for current showtime
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, navigationType]);
 
   return (
     <div

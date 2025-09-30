@@ -1,9 +1,11 @@
-import { useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { message } from "antd";
 import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
+import { getCurrentPriceList } from "@/apiservice/apiPriceList";
+import type { IPriceList } from "@/apiservice/apiPriceList";
 
 export const SelectSeat = () => {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -12,14 +14,70 @@ export const SelectSeat = () => {
   const [seatTypeMap, setSeatTypeMap] = useState<Record<string, string>>({});
   const [layoutCols, setLayoutCols] = useState<number>(10);
   const [has4dx, setHas4dx] = useState<boolean>(false);
+  const [ticketPrices, setTicketPrices] = useState<Record<string, number>>({});
+  const [totalTicketPrice, setTotalTicketPrice] = useState<number>(0);
+  const [hasTicketPriceGap, setHasTicketPriceGap] = useState<boolean>(false);
 
   const navigate = useNavigate();
+  const navigationType = useNavigationType(); // 'POP' khi back/forward
   const location = useLocation();
+  
   const { isDarkMode } = useAppStore();
   const { movie, cinema, date, time, room, showtimeId } = location.state || {};
 
   const displayTime = time;
   const apiTime = time;
+
+  // Load giá vé từ bảng giá đang hoạt động
+  useEffect(() => {
+    const loadTicketPrices = async () => {
+      try {
+        const priceList: IPriceList | null = await getCurrentPriceList();
+        if (!priceList) {
+          setTicketPrices({});
+          return;
+        }
+        const map: Record<string, number> = {};
+        (priceList.lines || []).forEach((line) => {
+          if (line.type === 'ticket' && line.seatType) {
+            map[line.seatType] = line.price || 0;
+          }
+        });
+        setTicketPrices(map);
+      } catch (error) {
+        console.error("Error loading ticket prices:", error);
+        setTicketPrices({});
+      }
+    };
+    loadTicketPrices();
+  }, []);
+
+  // Khôi phục ghế đã chọn nếu quay lại từ trang thanh toán
+  useEffect(() => {
+    const storageKey = `booking:selected:${showtimeId || 'unknown'}`;
+    const cameFromBack = navigationType === 'POP';
+    if (!cameFromBack) return; // chỉ khôi phục khi quay lại
+
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const restored: string[] = JSON.parse(raw);
+        if (Array.isArray(restored)) {
+          setSelectedSeats(restored);
+        }
+      }
+    } catch (error) {
+      console.error("Error restoring selected seats:", error);
+    }
+  }, [navigationType, showtimeId]);
+
+  // Khi đã có seatTypeMap, nếu có ghế đã khôi phục mà chưa có loại, set selectedSeatType
+  useEffect(() => {
+    if (selectedSeats.length > 0 && !selectedSeatType) {
+      const t = seatTypeMap[selectedSeats[0]];
+      if (t) setSelectedSeatType(t);
+    }
+  }, [selectedSeats, selectedSeatType, seatTypeMap]);
 
   // Helper function to validate seat type selection
   const validateSeatTypeSelection = useCallback((newSeatType: string): boolean => {
@@ -107,6 +165,27 @@ export const SelectSeat = () => {
     setSelectedSeats([...selectedSeats, ...seats]);
   }, [seatTypeMap, selectedSeats, selectedSeatType, validateSeatTypeSelection]);
 
+  // Tính tổng tiền vé theo loại ghế và giá từ bảng giá
+  useEffect(() => {
+    if (!selectedSeats || selectedSeats.length === 0) {
+      setTotalTicketPrice(0);
+      setHasTicketPriceGap(false);
+      return;
+    }
+    let missing = false;
+    const total = selectedSeats.reduce((sum, seatId) => {
+      const st = seatTypeMap[seatId];
+      const price = ticketPrices[st];
+      if (price === undefined) {
+        missing = true;
+        return sum;
+      }
+      return sum + price;
+    }, 0);
+    setTotalTicketPrice(total);
+    setHasTicketPriceGap(missing);
+  }, [selectedSeats, seatTypeMap, ticketPrices]);
+
   // Callback to update sold seats from API data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSeatsLoaded = (seatData: any) => {
@@ -173,7 +252,8 @@ export const SelectSeat = () => {
             soldSeats: soldSeats,
             format: has4dx ? '4DX' : movie?.format,
           }}
-          totalPrice={selectedSeats.length * 90000}
+          totalPrice={totalTicketPrice}
+          priceError={hasTicketPriceGap}
           onContinue={() =>
             navigate("/payment", {
               state: {
@@ -181,6 +261,11 @@ export const SelectSeat = () => {
                   ...movie,
                 },
                 seats: selectedSeats,
+                seatTypeCounts: selectedSeats.reduce((acc: Record<string, number>, s) => {
+                  const t = seatTypeMap[s];
+                  if (t) acc[t] = (acc[t] || 0) + 1;
+                  return acc;
+                }, {}),
                 cinema,
                 date: date,
                 time: apiTime,

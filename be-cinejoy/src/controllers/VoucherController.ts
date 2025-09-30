@@ -31,69 +31,46 @@ export default class VoucherController {
         try {
             const body = req.body as any;
 
-            // Chuẩn hóa dữ liệu: hỗ trợ cả cấu trúc legacy và cấu trúc mới (lines)
-            const applyType = body.applyType ?? 'voucher';
+            // ========= Map input to new structure =========
+            // Header fields
+            const name = body.name;
+            const promotionalCodeRaw = body.promotionalCode || body.code;
+            const promotionalCode = typeof promotionalCodeRaw === 'string' ? promotionalCodeRaw.trim().toUpperCase() : undefined;
+            const description = body.description ?? body.headerDescription;
+            const startDate = body.startDate ?? body.validityPeriod?.startDate;
+            const endDate = body.endDate ?? body.validityPeriod?.endDate;
             const status = body.status ?? 'hoạt động';
 
-            // Nếu chưa có lines nhưng có các trường cũ -> map sang lines[0]
-            if (!Array.isArray(body.lines) || body.lines.length === 0) {
-                const legacyDescription = body.description || body.name || '';
-                const legacyPoints = body.pointToRedeem;
-                const legacyQuantity = body.quantity;
-                const legacyDiscountPercent = body.discountPercent;
+            // Lines: optional, do not auto-create from legacy anymore
+            const lines = Array.isArray(body.lines) ? body.lines : [];
 
-                body.lines = [
-                    {
-                        description: legacyDescription,
-                        condition: {
-                            points: legacyPoints,
-                            quantity: legacyQuantity,
-                        },
-                        discount: {
-                            type: 'percent',
-                            value: legacyDiscountPercent ?? 0,
-                            maxValue: body.maxValue,
-                        },
-                        details: [],
-                    },
-                ];
-            }
-
-            // Bổ sung applyType/status mặc định
-            body.applyType = applyType;
-            body.status = status;
-
-            // Validate cơ bản theo applyType
-            const line = body.lines[0];
-            if (!line || !line.description || !line.discount || line.discount.value === undefined) {
-                res.status(400).json({ message: 'Thiếu thông tin khuyến mãi bắt buộc' });
+            // ========= Validations =========
+            if (!name) {
+                res.status(400).json({ message: 'Thiếu tên khuyến mãi' });
                 return;
             }
-            if (applyType === 'voucher') {
-                if (line.condition?.points === undefined || line.condition?.quantity === undefined) {
-                    res.status(400).json({ message: 'Voucher cần points và quantity' });
-                    return;
-                }
+            if (!startDate || !endDate) {
+                res.status(400).json({ message: 'Thiếu startDate/endDate cho voucher' });
+                return;
             }
-            if (applyType === 'ticket') {
-                if (!line.condition?.seatType) {
-                    res.status(400).json({ message: 'Ticket cần seatType' });
-                    return;
-                }
+            if (!promotionalCode) {
+                res.status(400).json({ message: 'Thiếu promotionalCode' });
+                return;
             }
-            if (applyType === 'combo') {
-                if (!line.condition?.comboId || !line.condition?.comboName) {
-                    res.status(400).json({ message: 'Combo cần comboId và comboName' });
-                    return;
-                }
-            }
+            // Lines không bắt buộc khi tạo header
 
-            // Bổ sung mặc định cho discount.type nếu thiếu (trường hợp FE disable select)
-            if (Array.isArray(body.lines) && body.lines[0]?.discount) {
-                body.lines[0].discount.type = body.lines[0].discount.type || 'percent';
-            }
+            // Build payload
+            const payload = {
+                name,
+                description,
+                promotionalCode,
+                startDate,
+                endDate,
+                status,
+                lines,
+            } as any;
 
-            const newVoucher = await voucherService.addVoucher(body);
+            const newVoucher = await voucherService.addVoucher(payload);
             res.status(201).json(newVoucher);
         } catch (error) {
             const message = (error as any)?.message || 'Error adding voucher';
@@ -148,14 +125,172 @@ export default class VoucherController {
         }
     };
 
+    async addPromotionLine(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        try {
+            const lineData = req.body;
+            
+            // Validation
+            if (!lineData.promotionType) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Thiếu promotionType", 
+                    data: null 
+                });
+                return;
+            }
+
+            if (!lineData.startDate || !lineData.endDate) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Thiếu startDate hoặc endDate", 
+                    data: null 
+                });
+                return;
+            }
+
+            const updatedVoucher = await voucherService.addPromotionLine(id, lineData);
+            if (!updatedVoucher) {
+                res.status(404).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Voucher không tồn tại", 
+                    data: null 
+                });
+                return;
+            }
+
+            res.json({
+                status: true,
+                error: 0,
+                message: "Thêm chi tiết khuyến mãi thành công",
+                data: updatedVoucher
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                status: false,
+                error: 1,
+                message: error.message || "Lỗi thêm chi tiết khuyến mãi",
+                data: null
+            });
+        }
+    }
+
+    async updatePromotionLine(req: Request, res: Response): Promise<void> {
+        const { id, lineIndex } = req.params;
+        try {
+            const lineData = req.body;
+            
+            // Validation
+            if (!lineData.promotionType) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Thiếu promotionType", 
+                    data: null 
+                });
+                return;
+            }
+
+            if (!lineData.startDate || !lineData.endDate) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Thiếu startDate hoặc endDate", 
+                    data: null 
+                });
+                return;
+            }
+
+            const index = parseInt(lineIndex);
+            if (isNaN(index) || index < 0) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Line index không hợp lệ", 
+                    data: null 
+                });
+                return;
+            }
+
+            const updatedVoucher = await voucherService.updatePromotionLine(id, index, lineData);
+            if (!updatedVoucher) {
+                res.status(404).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Voucher hoặc line không tồn tại", 
+                    data: null 
+                });
+                return;
+            }
+
+            res.json({
+                status: true,
+                error: 0,
+                message: "Cập nhật chi tiết khuyến mãi thành công",
+                data: updatedVoucher
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                status: false,
+                error: 1,
+                message: error.message || "Lỗi cập nhật chi tiết khuyến mãi",
+                data: null
+            });
+        }
+    }
+
+    async deletePromotionLine(req: Request, res: Response): Promise<void> {
+        const { id, lineIndex } = req.params;
+        try {
+            const index = parseInt(lineIndex);
+            if (isNaN(index) || index < 0) {
+                res.status(400).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Line index không hợp lệ", 
+                    data: null 
+                });
+                return;
+            }
+
+            const updatedVoucher = await voucherService.deletePromotionLine(id, index);
+            if (!updatedVoucher) {
+                res.status(404).json({ 
+                    status: false, 
+                    error: 1, 
+                    message: "Voucher hoặc line không tồn tại", 
+                    data: null 
+                });
+                return;
+            }
+
+            res.json({
+                status: true,
+                error: 0,
+                message: "Xóa chi tiết khuyến mãi thành công",
+                data: updatedVoucher
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                status: false,
+                error: 1,
+                message: error.message || "Lỗi xóa chi tiết khuyến mãi",
+                data: null
+            });
+        }
+    }
+
     async redeemVoucher(req: any, res: any) {
         try {
             const userId = req.user!._id as string;
-            const { voucherId } = req.body;
+            const { voucherId, detailId } = req.body;
             if (!voucherId) {
                 return res.status(400).json({ status: false, error: 1, message: "Thiếu voucherId", data: null });
             }
-            const userVoucher = await voucherService.redeemVoucher(userId, voucherId);
+            const userVoucher = await voucherService.redeemVoucher(userId, { voucherId, detailId });
             res.json({
                 status: true,
                 error: 0,

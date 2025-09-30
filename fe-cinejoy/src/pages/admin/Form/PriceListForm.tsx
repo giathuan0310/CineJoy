@@ -132,14 +132,18 @@ const PriceListForm: React.FC<PriceListFormProps> = ({
       }
 
 
-      const submitData: { code: string; name: string; description?: string; startDate: string; endDate: string; lines: IPriceListLine[] } = {
+      const submitData: { code: string; name: string; description?: string; startDate: string; endDate: string; lines?: unknown[] } = {
         code: values.code.trim().toUpperCase(),
         name: values.name.trim(),
         description: values.description?.trim() || undefined,
         startDate: values.dateRange[0].toISOString(),
         endDate: values.dateRange[1].toISOString(),
-        lines: [], // Gửi array rỗng khi tạo mới
       };
+
+      // Khi tạo mới (không có priceList), backend yêu cầu có 'lines' → gửi mảng rỗng
+      if (!priceList) {
+        submitData.lines = [];
+      }
 
       onSubmit(submitData);
     } catch (error) {

@@ -161,11 +161,12 @@ export const getMyVouchersApi = async () => {
   return response.data;
 };
 
-export const redeemVoucherApi = async (voucherId: string) => {
+export const redeemVoucherApi = async (voucherId: string, detailId?: string) => {
   const response = await axios.post<IBackendResponse<IUserVoucher>>(
     "/vouchers/redeem",
     {
       voucherId,
+      detailId,
     }
   );
   return response.data;

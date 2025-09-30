@@ -69,6 +69,12 @@ export const getSeatsByRoomApi = async (roomId: string): Promise<ISeat[]> => {
     return (response.data as any).data;
 };
 
+// Get unique seat types
+export const getUniqueSeatTypesApi = async (): Promise<string[]> => {
+    const response = await axiosClient.get('/seats/types');
+    return (response.data as any).data;
+};
+
 // Get seat statistics for a room
 export const getSeatStatisticsApi = async (roomId: string): Promise<ISeatStatistics> => {
     const response = await axiosClient.get(`/seats/room/${roomId}/statistics`);

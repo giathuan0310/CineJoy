@@ -86,9 +86,16 @@ const CardInfMovie = () => {
     }))
   );
 
-  const showTimesOfSelectedDate = allShowTimes.filter(
+  // Lọc theo ngày, và nếu là hôm nay thì ẩn suất đã quá giờ bắt đầu 5 phút
+  let showTimesOfSelectedDate = allShowTimes.filter(
     (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
   );
+  if (selectedDate === dayjs().format("YYYY-MM-DD")) {
+    const now = dayjs();
+    showTimesOfSelectedDate = showTimesOfSelectedDate.filter((st) =>
+      dayjs(st.start).add(5, "minute").isAfter(now)
+    );
+  }
 
   const navigate = useNavigate();
 

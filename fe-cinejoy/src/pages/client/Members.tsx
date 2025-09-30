@@ -155,7 +155,7 @@ const MembersPage = () => {
                 : 'linear-gradient(180deg, #e0f7fa 0%, #b2ebf2 100%)'
             }}
           >
-            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Thông tin cá nhân</h2>
+            <h2 className="text-2xl font-bold text-left mb-6" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Thông tin cá nhân</h2>
             <div className="flex flex-col items-center mb-6">
               <img
                 src={previewImage || user.avatar}

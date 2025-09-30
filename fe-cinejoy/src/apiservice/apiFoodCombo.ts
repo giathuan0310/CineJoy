@@ -43,11 +43,9 @@ export const getFoodComboById = async (id: string): Promise<IFoodCombo> => {
 
 // Thêm sản phẩm đơn lẻ
 export const addSingleProduct = async (data: {
+    code: string;
     name: string;
-    price: number;
-    category: string;
     description: string;
-    quantity: number;
 }): Promise<IFoodCombo> => {
     const res = await axiosClient.post<IFoodCombo>("/foodcombos/single-product", data);
     return res.data;
@@ -55,33 +53,15 @@ export const addSingleProduct = async (data: {
 
 // Thêm combo
 export const addCombo = async (data: {
+    code: string;
     name: string;
     description: string;
     items: IComboItem[];
-    discountType: "percent" | "fixed";
-    discountValue: number;
 }): Promise<IFoodCombo> => {
     const res = await axiosClient.post<IFoodCombo>("/foodcombos/combo", data);
     return res.data;
 };
 
-// Cập nhật số lượng sau khi bán
-export const updateQuantityAfterSale = async (items: Array<{ productId: string; quantity: number }>): Promise<{ message: string }> => {
-    const res = await axiosClient.put<{ message: string }>("/foodcombos/update-quantity", { items });
-    return res.data;
-};
-
-// Tính lại số lượng combo
-export const recalculateComboQuantities = async (): Promise<{ message: string }> => {
-    const res = await axiosClient.put<{ message: string }>("/foodcombos/recalculate-combo-quantities");
-    return res.data;
-};
-
-// Kiểm tra combo có thể bán được không
-export const canSellCombo = async (id: string, quantity: number): Promise<{ canSell: boolean }> => {
-    const res = await axiosClient.get<{ canSell: boolean }>(`/foodcombos/${id}/can-sell?quantity=${quantity}`);
-    return res.data;
-};
 
 export const updateFoodCombo = async (id: string, combo: Partial<IFoodCombo>): Promise<IFoodCombo> => {
     const res = await axiosClient.put<IFoodCombo>(`/foodcombos/update/${id}`, combo);

@@ -84,6 +84,15 @@ export default class MoviesController {
 
 
 
+                    // Kiểm tra mã phim trùng
+                    const existingMovie = await moviesService.getMovieByCode(movieData.movieCode);
+                    if (existingMovie) {
+                        return res.status(400).json({
+                            message: "Mã phim đã tồn tại",
+                            error: "Movie code already exists"
+                        });
+                    }
+
                     const newMovie = await moviesService.addMovie(movieData);
                     res.status(201).json(newMovie);
                 } catch (error: any) {
@@ -128,7 +137,7 @@ export default class MoviesController {
 
                     // Xử lý các trường array từ JSON string
                     ['genre', 'actors', 'language', 'reviews'].forEach(field => {
-                        if (movieData[field]) {
+                        if (movieData[field] && typeof movieData[field] === 'string') {
                             try {
                                 movieData[field] = JSON.parse(movieData[field]);
                                 console.log(`Parsed ${field}:`, movieData[field]);
@@ -139,22 +148,38 @@ export default class MoviesController {
                         }
                     });
 
-                    // Lấy URLs từ Cloudinary
-                    if (req.files) {
+                    // Lấy URLs từ Cloudinary (chỉ khi có file mới)
+                    if (req.files && Object.keys(req.files).length > 0) {
                         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
                         console.log('Uploaded files:', files);
 
-                        if (files.image) {
+                        if (files.image && files.image.length > 0) {
                             movieData.image = files.image[0].path;
                             console.log('Image URL:', movieData.image);
                         }
-                        if (files.posterImage) {
+                        if (files.posterImage && files.posterImage.length > 0) {
                             movieData.posterImage = files.posterImage[0].path;
                             console.log('Poster URL:', movieData.posterImage);
                         }
                     }
 
                     console.log('Final movie data:', movieData);
+
+                    // Kiểm tra mã phim trùng (chỉ khi mã phim thay đổi)
+                    if (movieData.movieCode) {
+                        // Lấy phim hiện tại để so sánh
+                        const currentMovie = await moviesService.getMovieById(id);
+                        if (currentMovie && currentMovie.movieCode !== movieData.movieCode) {
+                            // Mã phim đã thay đổi, kiểm tra trùng lặp
+                            const existingMovie = await moviesService.getMovieByCode(movieData.movieCode);
+                            if (existingMovie) {
+                                return res.status(400).json({
+                                    message: "Mã phim đã tồn tại",
+                                    error: "Movie code already exists"
+                                });
+                            }
+                        }
+                    }
 
                     const updatedMovie = await moviesService.updateMovie(id, movieData);
                     if (!updatedMovie) {
@@ -164,6 +189,7 @@ export default class MoviesController {
                     res.status(200).json(updatedMovie);
                 } catch (error: any) {
                     console.error('Error processing movie data:', error);
+                    console.error('Error stack:', error.stack);
                     res.status(500).json({
                         message: "Error updating movie",
                         error: error.message,

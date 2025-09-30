@@ -12,6 +12,11 @@ export default class MoviesService {
         return Movie.findById(id);
     }
 
+    // Lấy phim theo mã phim
+    getMovieByCode(movieCode: string): Promise<IMovie | null> {
+        return Movie.findOne({ movieCode });
+    }
+
     // Thêm một phim mới
     addMovie(movieData: IMovie): Promise<IMovie> {
         movieData.titleNoAccent = removeAccents(movieData.title);

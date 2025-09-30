@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import RoomService from '../services/RoomService';
+import Room from '../models/Room';
 import { successResponse as createSuccessResponse, errorResponse as createErrorResponse } from '../utils/apiResponse';
 
 // Helper functions for sending responses
@@ -55,20 +56,27 @@ class RoomController {
     // Create new room
     async createRoom(req: Request, res: Response) {
         try {
-            const { name, theater, capacity, roomType, status, description, seatLayout } = req.body;
+            const { roomCode, name, theater, capacity, roomType, status, description, seatLayout } = req.body;
 
             // Validate required fields
-            if (!name || !theater || !capacity) {
- errorResponse(res, 400, 'Vui lòng cung cấp đầy đủ thông tin phòng chiếu');
+            if (!roomCode || !name || !theater || !capacity) {
+                errorResponse(res, 400, 'Vui lòng cung cấp đầy đủ thông tin phòng chiếu');
+            }
+
+            // Check if room code already exists
+            const existingRoomByCode = await Room.findOne({ roomCode });
+            if (existingRoomByCode) {
+                errorResponse(res, 400, 'Mã phòng chiếu đã tồn tại');
             }
 
             // Check if room name already exists in this theater
             const isNameExists = await RoomService.isRoomNameExists(theater, name);
             if (isNameExists) {
- errorResponse(res, 400, 'Tên phòng chiếu đã tồn tại trong rạp này');
+                errorResponse(res, 400, 'Tên phòng chiếu đã tồn tại trong rạp này');
             }
 
             const roomData = {
+                roomCode,
                 name,
                 theater,
                 capacity,
@@ -104,7 +112,7 @@ class RoomController {
     async updateRoom(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, theater, capacity, roomType, status, description } = req.body;
+            const { roomCode, name, theater, capacity, roomType, status, description } = req.body;
 
             // Check if room exists
             const existingRoom = await RoomService.getRoomById(id);
@@ -112,15 +120,24 @@ class RoomController {
  errorResponse(res, 404, 'Không tìm thấy phòng chiếu');
             }
 
+            // Check if new room code already exists (excluding current room)
+            if (roomCode) {
+                const existingRoomByCode = await Room.findOne({ roomCode, _id: { $ne: id } });
+                if (existingRoomByCode) {
+                    errorResponse(res, 400, 'Mã phòng chiếu đã tồn tại');
+                }
+            }
+
             // Check if new name already exists (excluding current room)
             if (name && theater) {
                 const isNameExists = await RoomService.isRoomNameExists(theater, name, id);
                 if (isNameExists) {
- errorResponse(res, 400, 'Tên phòng chiếu đã tồn tại trong rạp này');
+                    errorResponse(res, 400, 'Tên phòng chiếu đã tồn tại trong rạp này');
                 }
             }
 
             const updateData = {
+                ...(roomCode && { roomCode }),
                 ...(name && { name }),
                 ...(theater && { theater }),
                 ...(capacity && { capacity }),

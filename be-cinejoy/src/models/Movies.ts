@@ -7,6 +7,7 @@ interface IReview {
 }
 
 export interface IMovie extends Document {
+  movieCode: string;
   title: string;
   releaseDate: Date;
   startDate: Date;
@@ -28,6 +29,7 @@ export interface IMovie extends Document {
 }
 
 const MovieSchema = new Schema<IMovie>({
+  movieCode: { type: String, required: true, unique: true },
   title: { type: String, required: true },
   releaseDate: { type: Date, required: true },
   startDate: { type: Date, required: true },

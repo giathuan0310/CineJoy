@@ -20,9 +20,10 @@ interface MovieInfoProps {
   };
   onContinue: () => void;
   totalPrice: number;
+  priceError?: boolean; // true nếu thiếu giá vé đang hoạt động cho loại ghế đã chọn
 }
 
-const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice }) => {
+const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice, priceError = false }) => {
   const { isDarkMode, setIsModalOpen } = useAppStore();
   const hasSelectedSeats = movie.seats.length > 0;
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -70,7 +71,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice }) 
   };
 
   const handleClickContinue = () => {
-    if (!hasSelectedSeats) return;
+    if (!hasSelectedSeats || priceError) return;
 
     if (violatesSingleGapRule()) {
       message.warning("Vui lòng không chừa 1 ghế trống bên trái hoặc bên phải của các ghế bạn đã chọn.");
@@ -201,7 +202,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice }) 
 
       <button
         className={`mt-2 px-6 py-2 w-full rounded font-semibold transition-all duration-200 ${
-          hasSelectedSeats
+          hasSelectedSeats && !priceError
             ? `cursor-pointer ${
                 isDarkMode
                   ? "bg-cyan-400 hover:bg-cyan-300 text-[#23272f]"
@@ -214,14 +215,14 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice }) 
               }`
         }`}
         onClick={handleClickContinue}
-        disabled={!hasSelectedSeats}
+        disabled={!hasSelectedSeats || priceError}
       >
         Tiếp tục
       </button>
 
-      <Modal centered open={confirmOpen} width={380} onCancel={() => setConfirmOpen(false)} footer={null} getContainer={false} closeIcon={null}>
-        <div className="text-center mb-4 text-xl font-semibold">Thông tin vé</div>
-        <div className="text-sm leading-6 mb-6 text-justify">
+      <Modal centered open={confirmOpen} width={360} onCancel={() => setConfirmOpen(false)} footer={null} getContainer={false} closeIcon={null}>
+        <div className="text-center mb-2 text-xl font-semibold">Thông tin vé</div>
+        <div className="text-sm leading-6 mb-2 text-justify">
           Tôi xác nhận mua vé cho người xem từ đủ {minAge} tuổi trở lên và đồng ý cung cấp giấy tờ tùy thân để xác thực độ tuổi người xem, tham khảo <span className="font-bold text-red-500 cursor-pointer">quy định</span> của Bộ Văn Hóa, Thể Thao và Du Lịch,{" "}
           {minAge < 16 && (
             <>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Button, Select, TimePicker } from 'antd';
+import { Modal, Form, Button, Select, TimePicker, Input } from 'antd';
 import dayjs from 'dayjs';
 
 interface ShowSessionFormProps {
     showSession?: IShowSession;
+    showSessions: IShowSession[]; // Danh sách ca chiếu hiện có để kiểm tra trùng lặp
     onSubmit: (sessionData: Partial<IShowSession>) => void;
     onCancel: () => void;
     loading?: boolean;
@@ -11,6 +12,7 @@ interface ShowSessionFormProps {
 
 const ShowSessionForm: React.FC<ShowSessionFormProps> = ({ 
     showSession, 
+    showSessions,
     onSubmit, 
     onCancel, 
     loading = false 
@@ -41,6 +43,7 @@ const ShowSessionForm: React.FC<ShowSessionFormProps> = ({
     useEffect(() => {
         if (showSession) {
             form.setFieldsValue({
+                shiftCode: showSession.shiftCode,
                 name: showSession.name,
                 startTime: dayjs(showSession.startTime, 'HH:mm'),
                 endTime: dayjs(showSession.endTime, 'HH:mm')
@@ -51,6 +54,7 @@ const ShowSessionForm: React.FC<ShowSessionFormProps> = ({
     }, [showSession, form]);
 
     const handleSubmit = async (values: {
+        shiftCode: string;
         name: string;
         startTime: dayjs.Dayjs;
         endTime: dayjs.Dayjs;
@@ -65,6 +69,7 @@ const ShowSessionForm: React.FC<ShowSessionFormProps> = ({
             setIsSubmitting(true);
             
             const submitData: Partial<IShowSession> = {
+                shiftCode: values.shiftCode,
                 name: values.name,
                 startTime: values.startTime.format('HH:mm'),
                 endTime: values.endTime.format('HH:mm')
@@ -141,6 +146,33 @@ const ShowSessionForm: React.FC<ShowSessionFormProps> = ({
                 autoComplete="off"
                 className="mt-4"
             >
+                <Form.Item
+                    name="shiftCode"
+                    label="🏷️ Mã ca chiếu"
+                    rules={[
+                        { required: true, message: 'Vui lòng nhập mã ca chiếu!' },
+                        { pattern: /^CC\d{3}$/, message: 'Mã ca chiếu phải có định dạng CC001, CC002, ...' },
+                        {
+                            validator: (_, value) => {
+                                if (!value) return Promise.resolve();
+                                const existingSession = showSessions.find(s =>
+                                    s.shiftCode === value &&
+                                    (!showSession || s._id !== showSession._id)
+                                );
+                                if (existingSession) {
+                                    return Promise.reject(new Error('Mã ca chiếu này đã tồn tại!'));
+                                }
+                                return Promise.resolve();
+                            }
+                        }
+                    ]}
+                >
+                    <Input
+                        placeholder="CC001, CC002, ..."
+                        size="large"
+                    />
+                </Form.Item>
+
                 <Form.Item
                     name="name"
                     label="Tên ca chiếu"

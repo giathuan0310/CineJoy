@@ -126,9 +126,20 @@ const ScheduleList: React.FC = () => {
         })
         .flat();
 
-      const showTimesOfSelectedDate = allShowTimes.filter(
+      // Lọc theo ngày chọn
+      let showTimesOfSelectedDate = allShowTimes.filter(
         (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
       );
+
+      // Nếu là hôm nay: ẩn các suất bắt đầu trước thời điểm hiện tại 5 phút
+      const isToday = selectedDate === dayjs().format("YYYY-MM-DD");
+      if (isToday) {
+        const now = dayjs();
+        showTimesOfSelectedDate = showTimesOfSelectedDate.filter((st) => {
+          const start = dayjs(st.start);
+          return start.add(5, "minute").isAfter(now);
+        });
+      }
 
       const newGroupedShowtimes = showTimesOfSelectedDate.reduce(
         (acc, showtime) => {

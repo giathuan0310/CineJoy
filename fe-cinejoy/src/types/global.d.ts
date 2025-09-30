@@ -49,6 +49,7 @@ declare global {
 
   interface IMovie {
     _id: string;
+    movieCode: string;
     title: string;
     releaseDate: string; // dạng ISO string, ví dụ "2025-06-07"
     startDate: string; // ngày khởi chiếu
@@ -80,6 +81,7 @@ declare global {
 
   interface ITheater {
     _id: string;
+    theaterCode: string; // Mã rạp
     name: string;
     regionId: string; // ID của vùng (region)
     location: {
@@ -89,11 +91,31 @@ declare global {
   }
 
   interface IRegion {
+    _id: string;
+    regionCode: string; // Mã khu vực
     name: string; // Tên vùng
+  }
+
+  interface IRoom {
+    _id: string;
+    roomCode: string; // Mã phòng
+    name: string;
+    theater: ITheater;
+    capacity: number;
+    roomType: '2D' | '4DX';
+    status: 'active' | 'maintenance' | 'inactive';
+    description?: string;
+    seatLayout: {
+      rows: number;
+      cols: number;
+    };
+    createdAt: string;
+    updatedAt: string;
   }
 
   interface IShowSession {
     _id: string;
+    shiftCode: string; // Mã ca chiếu
     name: string;
     startTime: string;
     endTime: string;
@@ -132,44 +154,21 @@ declare global {
   interface IVoucher {
     _id: string;
     name: string;
-    validityPeriod?: {
-        startDate: Date;
-        endDate: Date;
-    };
+    promotionalCode: string;
+    description?: string;
+    startDate: Date | string;
+    endDate: Date | string;
     status: 'hoạt động' | 'không hoạt động';
-    applyType: 'voucher' | 'combo' | 'ticket';
-    lines: {
-      description: string;
-      condition: {
-        // Cho voucher/combo
-        points?: number;
-        quantity?: number;
-        // Cho ticket
-        seatType?: 'normal' | 'vip' | 'couple' | '4dx';
-        // Cho combo
-        comboName?: string;
-        comboId?: string, 
-      };
-      discount: {
-        type: 'percent' | 'amount';
-        value: number;
-        maxValue?: number; // Chỉ có cho voucher
-      };
-      details: Array<{
-        // Cho ticket và combo
-        buyItem?: string;
-        buyQuantity?: number;
-        rewardItem?: string;
-        rewardItemId?: string;
-        rewardQuantity?: number;
-        rewardType?: 'free' | 'discount';
-        rewardDiscountPercent?: number;
-      }>;
-    }[];
-    // Các trường cũ để tương thích ngược (chỉ cho voucher)
+    lines: IPromotionLine[];
+    // Legacy fields for backward compatibility
     quantity?: number;
     discountPercent?: number;
     pointToRedeem?: number;
+    validityPeriod?: {
+      startDate: Date | string;
+      endDate: Date | string;
+    };
+    applyType?: 'voucher' | 'combo' | 'ticket';
   }
 
   interface IUserVoucher {
@@ -179,7 +178,7 @@ declare global {
       _id: string;
       name: string;
       validityPeriod: {
-        startDate: string;
+        startDate: string;api
         endDate: string;
       };
       quantity: number;
@@ -190,6 +189,67 @@ declare global {
     status: "unused" | "used" | "expired";
     redeemedAt: string;
     usedAt?: string;
+  }
+
+  // =====================
+  // Voucher V2 (theo cấu trúc promotion)
+  // Giữ IVoucher cũ để tương thích; FE có thể dần chuyển sang IVoucherV2
+  // =====================
+  interface VoucherDetail {
+    _id?: string;
+    description?: string;
+    pointToRedeem?: number;
+    quantity?: number;
+    discountPercent?: number;
+    maxDiscountValue?: number;
+  }
+
+  interface DiscountDetail {
+    applyType?: 'combo' | 'ticket';
+    comboName?: string;
+    comboId?: string; // ID của combo được chọn
+    comboDiscountPercent?: number;
+    seatType?: 'normal' | 'vip' | 'couple' | '4dx';
+    ticketDiscountPercent?: number;
+    description?: string; // Mô tả cho khuyến mãi chiết khấu
+  }
+
+  interface AmountDetail {
+    minOrderValue: number;
+    discountValue: number;
+    description?: string; // Mô tả cho khuyến mãi tiền
+  }
+
+  interface ItemDetail {
+    applyType?: 'combo' | 'ticket';
+    // Cho combo: buyItem lấy từ combo, có comboId
+    buyItem: string;
+    comboId?: string; // ID của combo được chọn khi applyType = 'combo'
+    buyQuantity: number;
+    // Cho ticket: buyItem là loại vé
+    // rewardItem lấy từ cả sản phẩm và combo
+    rewardItem: string;
+    rewardItemId?: string; // ID của sản phẩm/combo được chọn làm phần thưởng
+    rewardQuantity: number;
+    rewardType: 'free' | 'discount';
+    rewardDiscountPercent?: number;
+    description?: string; // Mô tả cho khuyến mãi hàng
+  }
+
+  type PromotionDetail = VoucherDetail | DiscountDetail | AmountDetail | ItemDetail;
+
+  interface IPromotionLine {
+    promotionType: 'item' | 'amount' | 'percent' | 'voucher';
+    validityPeriod: {
+      startDate: Date | string;
+      endDate: Date | string;
+    };
+    status: 'hoạt động' | 'không hoạt động';
+    detail: PromotionDetail;
+    rule?: {
+      stackingPolicy: 'STACKABLE' | 'EXCLUSIVE' | 'EXCLUSIVE_WITH_GROUP';
+      exclusionGroup?: string; // chỉ dùng khi stackingPolicy = EXCLUSIVE_WITH_GROUP
+    };
   }
 
   // Blog
@@ -209,15 +269,11 @@ declare global {
 
   interface IFoodCombo {
     _id: string;
+    code: string; // Mã SP/Combo
     name: string;
-    price: number;
-    quantity: number;
     type: "single" | "combo";
-    category?: string; // Chỉ cho single products
-    description?: string; // Chỉ cho single products
+    description?: string; // Cho cả single products và combo
     items?: IComboItem[]; // Chỉ cho combo
-    discountType?: "percent" | "fixed"; // Chỉ cho combo
-    discountValue?: number; // Chỉ cho combo
     createdAt: string;
     updatedAt: string;
   }

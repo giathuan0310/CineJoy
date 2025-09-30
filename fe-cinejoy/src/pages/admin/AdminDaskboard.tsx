@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useNavigate, useLocation } from "react-router-dom";/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
+import VoucherDetail from "@/pages/admin/VoucherDetail";
 import { Popconfirm, Modal, Table, Tag, Space, Descriptions, Form, Input, DatePicker, Button, message, ConfigProvider } from "antd";
 import { Select, InputNumber } from "antd";
 import dayjs from "dayjs";
@@ -73,8 +74,12 @@ dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 const Dashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("movies");
+  const [activeTab, setActiveTab] = useState<string>((history?.state && (history.state as any)?.usr?.tab) || "movies");
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set(['movieManagement']));
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const location = useLocation();
+  const urlMatch = location.pathname.match(/\/admin\/vouchers\/(.+)$/);
+  const selectedVoucherIdFromUrl = urlMatch ? urlMatch[1] : null;
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [movies, setMovies] = useState<IMovie[]>([]);
   const [theaters, setTheaters] = useState<ITheater[]>([]);
@@ -135,11 +140,9 @@ const Dashboard: React.FC = () => {
     undefined
   );
   const [showSessionSubmitting, setShowSessionSubmitting] = useState<boolean>(false);
-  // Voucher accordion states
-  const [expandedVouchers, setExpandedVouchers] = useState<Set<string>>(new Set());
-  const [allExpanded, setAllExpanded] = useState<boolean>(false);
-  const [showVoucherDetailsModal, setShowVoucherDetailsModal] = useState<boolean>(false);
-  const [selectedVoucherForDetails, setSelectedVoucherForDetails] = useState<IVoucher | null>(null);
+  const navigate = useNavigate();
+  // Chặn navigate khi đang mở Popconfirm trong bảng voucher
+  const [blockVoucherRowNavigate, setBlockVoucherRowNavigate] = useState<boolean>(false);
   
   // Price List states
   const [priceLists, setPriceLists] = useState<IPriceList[]>([]);
@@ -283,6 +286,56 @@ const Dashboard: React.FC = () => {
     loadShowSessions();
   }, []);
 
+
+  // Tự động cập nhật trạng thái voucher mỗi phút
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const data = await getVouchers();
+        await updateVoucherStatuses(data);
+      } catch (error) {
+        console.error("Error auto-updating voucher statuses:", error);
+      }
+    }, 60000); // Cập nhật mỗi 60 giây
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cập nhật trạng thái voucher khi component được focus lại (từ VoucherDetail)
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (activeTab === "vouchers") {
+        try {
+          await loadVouchers();
+        } catch (error) {
+          console.error("Error updating voucher statuses on focus:", error);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Cập nhật trạng thái voucher khi quay lại từ VoucherDetail
+  useEffect(() => {
+    const handlePopState = async () => {
+      if (activeTab === "vouchers" && !selectedVoucherIdFromUrl) {
+        try {
+          await loadVouchers();
+        } catch (error) {
+          console.error("Error updating voucher statuses on popstate:", error);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedVoucherIdFromUrl]);
+
   // Lọc và phân trang cho từng tab
   const filterAndPaginate = <T,>(
     data: T[],
@@ -389,31 +442,7 @@ const Dashboard: React.FC = () => {
   // Reset page when tab/searchTerm thay đổi
   React.useEffect(() => {
     setCurrentPage(1);
-    // Khi đổi tab hoặc từ khóa tìm kiếm, thu gọn tất cả
-    setExpandedVouchers(new Set());
-    setAllExpanded(false);
   }, [activeTab, searchTerm]);
-
-  // Toggle expand 1 voucher
-  const toggleVoucherExpanded = (id: string) => {
-    setExpandedVouchers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  // Toggle expand all vouchers (trong danh sách hiện có)
-  const toggleAllVouchers = () => {
-    if (allExpanded) {
-      setExpandedVouchers(new Set());
-      setAllExpanded(false);
-    } else {
-      const allIds = new Set(vouchers.map((v) => v._id));
-      setExpandedVouchers(allIds);
-      setAllExpanded(true);
-    }
-  };
 
   ////////////////////////Xử lý CRUD khu vực////////////////////////
   const handleRegionSubmit = async (regionData: Partial<IRegion>) => {
@@ -922,20 +951,17 @@ const Dashboard: React.FC = () => {
         // Thêm mới
         if (comboData.type === 'single') {
           await addSingleProduct({
+            code: comboData.code,
             name: comboData.name,
-            price: comboData.price,
-            category: comboData.category,
-            description: comboData.description,
-            quantity: comboData.quantity
+            description: comboData.description
           });
           toast.success("Thêm sản phẩm đơn lẻ thành công!");
         } else {
           await addCombo({
+            code: comboData.code,
             name: comboData.name,
             description: comboData.description,
-            items: comboData.items,
-            discountType: comboData.discountType,
-            discountValue: comboData.discountValue
+            items: comboData.items
           });
         toast.success("Thêm combo thành công!");
         }
@@ -977,55 +1003,173 @@ const Dashboard: React.FC = () => {
   const loadVouchers = async () => {
     try {
       const data = await getVouchers();
-      setVouchers(data);
+      
+      // Tự động cập nhật trạng thái voucher dựa trên ngày hiện tại
+      const updatedData = await updateVoucherStatuses(data);
+      
+      // Cập nhật state với dữ liệu đã được cập nhật trạng thái
+      setVouchers(updatedData || data);
     } catch (error) {
       console.error("Error loading vouchers:", error);
       setVouchers([]);
     }
   };
 
-  const handleVoucherSubmit = async (voucherData: Partial<IVoucher>) => {
-    try {
-      if (selectedVoucher) {
-        // Cập nhật
-        await updateVoucher(selectedVoucher._id!, voucherData as IVoucher);
-        toast.success("Cập nhật voucher thành công!");
+// Tự động cập nhật trạng thái voucher dựa trên ngày hiện tại
+const updateVoucherStatuses = async (vouchers: IVoucher[]) => {
+  const today = dayjs();
+    const vouchersToUpdate: { id: string; status: 'hoạt động' | 'không hoạt động' }[] = [];
+
+  // Bước 1: Cập nhật trạng thái dựa trên ngày hiện tại
+  for (const voucher of vouchers) {
+    const startDate = dayjs(voucher.startDate);
+    const endDate = dayjs(voucher.endDate);
+    
+    // Kiểm tra xem ngày hiện tại có nằm trong khoảng thời gian của voucher không
+    const isCurrentlyActive = today.isAfter(startDate.startOf('day')) && today.isBefore(endDate.endOf('day'));
+    
+      // Xác định trạng thái mới dựa trên ngày hiện tại
+      let newStatus: 'hoạt động' | 'không hoạt động';
+      if (isCurrentlyActive) {
+        newStatus = 'hoạt động';
       } else {
-        // Thêm mới
-        await addVoucher(voucherData as IVoucher);
-        toast.success("Thêm voucher thành công!");
+        newStatus = 'không hoạt động';
       }
-      // Reload dữ liệu sau khi thêm/sửa
-      await loadVouchers();
-      setShowVoucherForm(false);
-      setSelectedVoucher(undefined);
-    } catch (error) {
-      console.error("Error submitting voucher:", error);
-      toast.error(selectedVoucher ? "Cập nhật voucher thất bại!" : "Thêm voucher thất bại!");
+    
+    // Nếu trạng thái khác với trạng thái hiện tại, thêm vào danh sách cập nhật
+    if (voucher.status !== newStatus) {
+      vouchersToUpdate.push({
+        id: voucher._id,
+        status: newStatus
+      });
     }
-  };
+  }
 
-  const handleDeleteVoucher = async (voucherId: string) => {
+  // Bước 2: Xử lý trùng lặp khoảng thời gian
+  const overlapUpdates = await handleOverlappingVouchers(vouchers);
+  vouchersToUpdate.push(...overlapUpdates);
+
+  // Cập nhật tất cả voucher có trạng thái thay đổi
+  for (const update of vouchersToUpdate) {
     try {
-      await deleteVoucher(voucherId);
-      // Reload dữ liệu sau khi xóa
-      await loadVouchers();
-      toast.success("Xóa voucher thành công!");
+      await updateVoucher(update.id, { status: update.status } as any);
+      console.log(`Đã cập nhật trạng thái voucher ${update.id} thành ${update.status}`);
     } catch (error) {
-      console.error("Error deleting voucher:", error);
-      toast.error("Xóa voucher thất bại!");
+      console.error(`Lỗi cập nhật trạng thái voucher ${update.id}:`, error);
     }
-  };
+  }
 
-  const handleEditVoucher = (voucher: IVoucher) => {
-    setSelectedVoucher(voucher);
-    setShowVoucherForm(true);
-  };
+  // Trả về dữ liệu đã được cập nhật trạng thái
+  if (vouchersToUpdate.length > 0) {
+    try {
+      const updatedData = await getVouchers();
+      return updatedData;
+    } catch (error) {
+      console.error("Error reloading vouchers after status update:", error);
+      return vouchers; // Trả về dữ liệu gốc nếu có lỗi
+    }
+  }
+  
+  return vouchers; // Trả về dữ liệu gốc nếu không có cập nhật
+};
 
-  const handleAddVoucher = () => {
+// Xử lý trùng lặp khoảng thời gian
+const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
+  const today = dayjs();
+  const updates: { id: string; status: 'hoạt động' | 'không hoạt động' }[] = [];
+  
+  // Tìm các voucher có trùng lặp khoảng thời gian
+  for (let i = 0; i < vouchers.length; i++) {
+    const voucher1 = vouchers[i];
+    const start1 = dayjs(voucher1.startDate);
+    const end1 = dayjs(voucher1.endDate);
+    
+    // Kiểm tra xem voucher1 có đang trong thời gian hoạt động không
+    const isVoucher1Active = today.isAfter(start1.startOf('day')) && today.isBefore(end1.endOf('day'));
+    
+    if (!isVoucher1Active) continue; // Chỉ xử lý voucher đang hoạt động
+    
+    for (let j = i + 1; j < vouchers.length; j++) {
+      const voucher2 = vouchers[j];
+      const start2 = dayjs(voucher2.startDate);
+      const end2 = dayjs(voucher2.endDate);
+      
+      // Kiểm tra xem voucher2 có đang trong thời gian hoạt động không
+      const isVoucher2Active = today.isAfter(start2.startOf('day')) && today.isBefore(end2.endOf('day'));
+      
+      if (!isVoucher2Active) continue; // Chỉ xử lý voucher đang hoạt động
+      
+      // Kiểm tra trùng lặp: (start1 <= end2) && (start2 <= end1)
+      const hasOverlap = (start1.isSameOrBefore(end2) && end1.isSameOrAfter(start2));
+      
+      if (hasOverlap) {
+        // Ưu tiên voucher có ngày tạo mới hơn (ID lớn hơn)
+        if (voucher1._id > voucher2._id) {
+          // Voucher1 được ưu tiên, voucher2 bị vô hiệu hóa
+          if (voucher2.status === 'hoạt động') {
+            updates.push({
+              id: voucher2._id,
+              status: 'không hoạt động'
+            });
+          }
+        } else {
+          // Voucher2 được ưu tiên, voucher1 bị vô hiệu hóa
+          if (voucher1.status === 'hoạt động') {
+            updates.push({
+              id: voucher1._id,
+              status: 'không hoạt động'
+            });
+          }
+        }
+      }
+    }
+  }
+  
+  return updates;
+};
+
+const handleVoucherSubmit = async (voucherData: Partial<IVoucher>) => {
+  try {
+    if (selectedVoucher) {
+      // Cập nhật
+      await updateVoucher(selectedVoucher._id!, voucherData as IVoucher);
+      toast.success("Cập nhật voucher thành công!");
+    } else {
+      // Thêm mới
+      await addVoucher(voucherData as IVoucher);
+      toast.success("Thêm voucher thành công!");
+    }
+    // Reload dữ liệu sau khi thêm/sửa
+    await loadVouchers();
+    setShowVoucherForm(false);
     setSelectedVoucher(undefined);
-    setShowVoucherForm(true);
-  };
+  } catch (error) {
+    console.error("Error submitting voucher:", error);
+    toast.error(selectedVoucher ? "Cập nhật voucher thất bại!" : "Thêm voucher thất bại!");
+  }
+};
+
+const handleDeleteVoucher = async (voucherId: string) => {
+  try {
+    await deleteVoucher(voucherId);
+    // Reload dữ liệu sau khi xóa
+    await loadVouchers();
+    toast.success("Xóa khuyến mãi thành công!");
+  } catch (error) {
+    console.error("Error deleting voucher:", error);
+    toast.error("Xóa khuyến mãi thất bại!");
+  }
+};
+
+const handleEditVoucher = (voucher: IVoucher) => {
+  setSelectedVoucher(voucher);
+  setShowVoucherForm(true);
+};
+
+const handleAddVoucher = () => {
+  setSelectedVoucher(undefined);
+  setShowVoucherForm(true);
+};
   /////////////////////////////////////////////////////////////////
 
   ////////////////////////Xử lý CRUD phim ////////////////////////
@@ -1057,15 +1201,13 @@ const Dashboard: React.FC = () => {
   const handleUpdateMovie = async (movieData: Partial<IMovie>) => {
     if (!selectedMovie?._id) return;
     try {
-      const updatedMovie = await updateMovie(
+      await updateMovie(
         selectedMovie._id,
         movieData as IMovie
       );
-      setMovies((prev) =>
-        prev.map((movie) =>
-          movie._id === selectedMovie._id ? updatedMovie : movie
-        )
-      );
+      // Reload movies để đảm bảo dữ liệu được cập nhật
+      const moviesRes = await getMovies();
+      setMovies(Array.isArray(moviesRes) ? moviesRes : ((moviesRes as any)?.data ?? []));
       setShowMovieForm(false);
       setSelectedMovie(undefined);
       toast.success("Cập nhật phim thành công!");
@@ -1126,35 +1268,220 @@ const Dashboard: React.FC = () => {
         </div>
         <nav className="mt-4">
           <ul>
-            {[
-              { label: "Phim", value: "movies", icon: "🎬" },
-              { label: "Blog", value: "blogs", icon: "📰" },
-              { label: "Sản phẩm & Combo", value: "foodCombos", icon: "🍿" },
-              { label: "Khu vực", value: "regions", icon: "🌏" },
-              { label: "Rạp & Phòng chiếu", value: "theaters", icon: "🏢" },
-              { label: "Khuyến mãi", value: "vouchers", icon: "🎟️" },
-              { label: "Người dùng", value: "users", icon: "👥" },
-              { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
-              { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
-              { label: "Bảng giá", value: "priceLists", icon: "💰" },
-            ].map((tab) => (
-              <li
-                key={tab.value}
-                className={`px-4 py-3 cursor-pointer flex items-center gap-3 transition-colors duration-200 ${
-                  activeTab === tab.value
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-200 hover:bg-gray-800"
-                }`}
+            {/* Quản lý Phim */}
+            <li className="mb-2">
+              <div 
+                className="px-4 py-3 cursor-pointer flex items-center gap-3 text-gray-200 hover:bg-gray-800 transition-colors duration-200"
                 onClick={() => {
-                  setActiveTab(tab.value);
-                  setSearchTerm("");
-                  setCurrentPage(1);
+                  const newExpandedMenus = new Set(expandedMenus);
+                  if (expandedMenus.has('movieManagement')) {
+                    newExpandedMenus.delete('movieManagement');
+                  } else {
+                    newExpandedMenus.add('movieManagement');
+                  }
+                  setExpandedMenus(newExpandedMenus);
                 }}
               >
-                <span className="text-lg">{tab.icon}</span>
-                {tab.label}
-              </li>
-            ))}
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">🎬</span>
+                  <span>Quản lý Phim</span>
+                </div>
+              </div>
+              {expandedMenus.has('movieManagement') && (
+                <ul className="ml-4 border-l border-gray-700">
+                  {[
+                    { label: "Phim", value: "movies", icon: "🎬" },
+                    { label: "Ca chiếu", value: "showSessions", icon: "🎭" },
+                    { label: "Suất chiếu", value: "showtimes", icon: "⏰" },
+                    { label: "Bảng giá", value: "priceLists", icon: "💰" },
+                  ].map((subItem) => (
+                    <li
+                      key={subItem.value}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 text-sm transition-colors duration-200 ${
+                        activeTab === subItem.value
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-300 hover:bg-gray-800"
+                      }`}
+                      onClick={async () => {
+                        setActiveTab(subItem.value);
+                        setSearchTerm("");
+                        setCurrentPage(1);
+                        
+                        // Tự động mở dropdown Quản lý Phim
+                        const newExpandedMenus = new Set(expandedMenus);
+                        newExpandedMenus.add('movieManagement');
+                        setExpandedMenus(newExpandedMenus);
+                      }}
+                    >
+                      <span className="text-sm">{subItem.icon}</span>
+                      {subItem.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+
+            {/* Quản lý Rạp */}
+            <li className="mb-2">
+              <div 
+                className="px-4 py-3 cursor-pointer flex items-center gap-3 text-gray-200 hover:bg-gray-800 transition-colors duration-200"
+                onClick={() => {
+                  const newExpandedMenus = new Set(expandedMenus);
+                  if (expandedMenus.has('theaterManagement')) {
+                    newExpandedMenus.delete('theaterManagement');
+                  } else {
+                    newExpandedMenus.add('theaterManagement');
+                  }
+                  setExpandedMenus(newExpandedMenus);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">🏢</span>
+                  <span>Quản lý Rạp</span>
+                </div>
+              </div>
+              {expandedMenus.has('theaterManagement') && (
+                <ul className="ml-4 border-l border-gray-700">
+                  {[
+                    { label: "Khu vực", value: "regions", icon: "🌏" },
+                    { label: "Rạp & Phòng chiếu", value: "theaters", icon: "🏢" },
+                  ].map((subItem) => (
+                    <li
+                      key={subItem.value}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 text-sm transition-colors duration-200 ${
+                        activeTab === subItem.value
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-300 hover:bg-gray-800"
+                      }`}
+                      onClick={async () => {
+                        setActiveTab(subItem.value);
+                        setSearchTerm("");
+                        setCurrentPage(1);
+                        
+                        // Tự động mở dropdown Quản lý Rạp
+                        const newExpandedMenus = new Set(expandedMenus);
+                        newExpandedMenus.add('theaterManagement');
+                        setExpandedMenus(newExpandedMenus);
+                      }}
+                    >
+                      <span className="text-sm">{subItem.icon}</span>
+                      {subItem.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+
+            {/* Quản lý Bán hàng */}
+            <li className="mb-2">
+              <div 
+                className="px-4 py-3 cursor-pointer flex items-center gap-3 text-gray-200 hover:bg-gray-800 transition-colors duration-200"
+                onClick={() => {
+                  const newExpandedMenus = new Set(expandedMenus);
+                  if (expandedMenus.has('salesManagement')) {
+                    newExpandedMenus.delete('salesManagement');
+                  } else {
+                    newExpandedMenus.add('salesManagement');
+                  }
+                  setExpandedMenus(newExpandedMenus);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">🛒</span>
+                  <span>Quản lý Bán hàng</span>
+                </div>
+              </div>
+              {expandedMenus.has('salesManagement') && (
+                <ul className="ml-4 border-l border-gray-700">
+                  {[
+                    { label: "Sản phẩm & Combo", value: "foodCombos", icon: "🍿" },
+                    { label: "Khuyến mãi", value: "vouchers", icon: "🎟️" },
+                  ].map((subItem) => (
+                    <li
+                      key={subItem.value}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 text-sm transition-colors duration-200 ${
+                        activeTab === subItem.value
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-300 hover:bg-gray-800"
+                      }`}
+                      onClick={async () => {
+                        setActiveTab(subItem.value);
+                        setSearchTerm("");
+                        setCurrentPage(1);
+                        
+                        // Tự động mở dropdown Quản lý Bán hàng
+                        const newExpandedMenus = new Set(expandedMenus);
+                        newExpandedMenus.add('salesManagement');
+                        setExpandedMenus(newExpandedMenus);
+                        
+                        // Nếu chuyển sang tab "Khuyến mãi", cập nhật trạng thái voucher
+                        if (subItem.value === "vouchers") {
+                          try {
+                            await loadVouchers();
+                          } catch (error) {
+                            console.error("Error updating voucher statuses when switching to vouchers tab:", error);
+                          }
+                        }
+                      }}
+                    >
+                      <span className="text-sm">{subItem.icon}</span>
+                      {subItem.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+
+            {/* Hệ thống & Người dùng */}
+            <li className="mb-2">
+              <div 
+                className="px-4 py-3 cursor-pointer flex items-center gap-3 text-gray-200 hover:bg-gray-800 transition-colors duration-200"
+                onClick={() => {
+                  const newExpandedMenus = new Set(expandedMenus);
+                  if (expandedMenus.has('systemManagement')) {
+                    newExpandedMenus.delete('systemManagement');
+                  } else {
+                    newExpandedMenus.add('systemManagement');
+                  }
+                  setExpandedMenus(newExpandedMenus);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">⚙️</span>
+                  <span>Hệ thống & Người dùng</span>
+                </div>
+              </div>
+              {expandedMenus.has('systemManagement') && (
+                <ul className="ml-4 border-l border-gray-700">
+                  {[
+                    { label: "Người dùng", value: "users", icon: "👥" },
+                    { label: "Blog", value: "blogs", icon: "📰" },
+                  ].map((subItem) => (
+                    <li
+                      key={subItem.value}
+                      className={`px-4 py-2 cursor-pointer flex items-center gap-3 text-sm transition-colors duration-200 ${
+                        activeTab === subItem.value
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-300 hover:bg-gray-800"
+                      }`}
+                      onClick={async () => {
+                        setActiveTab(subItem.value);
+                        setSearchTerm("");
+                        setCurrentPage(1);
+                        
+                        // Tự động mở dropdown Hệ thống & Người dùng
+                        const newExpandedMenus = new Set(expandedMenus);
+                        newExpandedMenus.add('systemManagement');
+                        setExpandedMenus(newExpandedMenus);
+                      }}
+                    >
+                      <span className="text-sm">{subItem.icon}</span>
+                      {subItem.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
           </ul>
         </nav>
       </aside>
@@ -1226,6 +1553,7 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã phim</th>
                       <th className="p-3 text-left font-semibold text-black">Poster</th>
                       <th className="p-3 text-left font-semibold text-black">Tên phim</th>
                       <th className="p-3 text-left font-semibold text-black">Ngày khởi chiếu</th>
@@ -1247,6 +1575,9 @@ const Dashboard: React.FC = () => {
                       >
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-semibold text-black">{movie.movieCode || 'N/A'}</span>
                         </td>
                         <td className="p-3">
                           <img
@@ -1433,11 +1764,10 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã SP/Combo</th>
                       <th className="p-3 text-left font-semibold text-black">Loại</th>
                       <th className="p-3 text-left font-semibold text-black">Tên</th>
-                      <th className="p-3 text-left font-semibold text-black">Giá</th>
                       <th className="p-3 text-left font-semibold text-black">Mô tả</th>
-                      <th className="p-3 text-left font-semibold text-black">Số lượng</th>
                       <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
@@ -1450,6 +1780,7 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
+                        <td className="p-3 text-base font-semibold text-gray-900">{(combo as any).code || 'N/A'}</td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             combo.type === 'single' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
@@ -1458,20 +1789,8 @@ const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="p-3 font-medium">{combo.name}</td>
-                        <td className="p-3 text-green-600 font-semibold">
-                          {combo.price.toLocaleString("vi-VN")} đ
-                        </td>
-                        <td className="p-3 max-w-xs truncate" title={combo.description || combo.category}>
-                          {combo.description || combo.category}
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-1 rounded-full text-sm ${
-                            combo.quantity > 100 ? 'bg-green-100 text-green-800' :
-                            combo.quantity > 50 ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {combo.quantity}
-                          </span>
+                        <td className="p-3 max-w-xs truncate" title={combo.description}>
+                          {combo.description}
                         </td>
                         <td className="p-3">
                           <div className="flex gap-2">
@@ -1557,6 +1876,7 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã Khu vực</th>
                       <th className="p-3 text-left font-semibold text-black">Tên Khu vực</th>
                       <th className="p-3 text-left font-semibold text-black">Hành Động</th>
                     </tr>
@@ -1569,6 +1889,9 @@ const Dashboard: React.FC = () => {
                       >
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-semibold text-black">{region.regionCode || 'N/A'}</span>
                         </td>
                         <td className="p-3">{region.name}</td>
                         <td className="p-3">
@@ -1665,6 +1988,7 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã rạp</th>
                       <th className="p-3 text-left font-semibold text-black">Tên rạp</th>
                       <th className="p-3 text-left font-semibold text-black">Thành phố</th>
                       <th className="p-3 text-left font-semibold text-black">Địa chỉ</th>
@@ -1680,6 +2004,9 @@ const Dashboard: React.FC = () => {
                         <tr key={theater._id} className="border-b hover:bg-gray-100">
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-semibold text-black">{theater.theaterCode || 'N/A'}</span>
                         </td>
                         <td className="p-3 font-medium">{theater.name}</td>
                         <td className="p-3">
@@ -1740,8 +2067,8 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Vouchers Tab */}
-          {activeTab === "vouchers" && (
+         {/* Vouchers Tab */}
+         {activeTab === "vouchers" && (
             <div>
               <h2 className="text-2xl font-semibold mb-6 text-black select-none">
                 Quản lý Khuyến mãi
@@ -1787,31 +2114,19 @@ const Dashboard: React.FC = () => {
               
               {/* Accordion Voucher Table */}
               <div className="bg-white text-black rounded-lg shadow-md overflow-hidden border border-gray-200">
-                <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+                <div className="p-3 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-black">Danh sách Khuyến mãi</h3>
-                  <motion.button
-                    onClick={toggleAllVouchers}
-                    className={`${allExpanded ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'} text-white px-3 py-1.5 rounded text-xs cursor-pointer flex items-center gap-1.5 transition-colors`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <span className="text-sm font-bold">
-                      {allExpanded ? '▲' : '▼'}
-                          </span>
-                    <span>
-                      {allExpanded ? 'Thu gọn tất cả' : 'Mở rộng tất cả'}
-                          </span>
-                  </motion.button>
                 </div>
                 
-                {/* Table Header */}
+                {/* Table Header - chỉ header voucher */}
                 <div className="bg-gray-100 text-black">
-                  <div className="grid grid-cols-6 gap-4 p-3 border-b border-gray-200">
+                  <div className="grid grid-cols-7 gap-4 p-3 border-b border-gray-200">
+                    <div className="font-semibold text-black">Mã KM</div>
                     <div className="font-semibold text-black">Tên</div>
+                    <div className="font-semibold text-black">Mô tả</div>
                     <div className="font-semibold text-black">Ngày bắt đầu</div>
                     <div className="font-semibold text-black">Ngày kết thúc</div>
                     <div className="font-semibold text-black">Trạng thái</div>
-                    <div className="font-semibold text-black">Loại</div>
                     <div className="font-semibold text-black">Hành động</div>
                   </div>
                 </div>
@@ -1819,52 +2134,27 @@ const Dashboard: React.FC = () => {
                 <div className="divide-y divide-gray-200">
                   {paginatedVouchers.map((voucher) => (
                     <div key={voucher._id}>
-                      {/* Header Row */}
+                      {/* Header Row - chỉ header fields */}
                       <div 
-                        className="grid grid-cols-6 gap-4 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => toggleVoucherExpanded(voucher._id)}
+                        className="grid grid-cols-7 gap-4 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (blockVoucherRowNavigate) return;
+                          navigate(`/admin/vouchers/${voucher._id}`, { state: { tab: 'vouchers' } });
+                        }}
                       >
-                        <div className="flex items-center space-x-2">
-                          {/* Expand/Collapse Icon */}
-                          <motion.div
-                            animate={{ rotate: expandedVouchers.has(voucher._id) ? 180 : 0 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="text-black text-lg font-bold"
-                          >
-                            ▼
-                          </motion.div>
-                          <span className="text-black">{voucher.name}</span>
-                        </div>
-                        <div className="text-black">{voucher.validityPeriod?.startDate ? new Date(voucher.validityPeriod.startDate).toLocaleDateString("vi-VN") : 'N/A'}</div>
-                        <div className="text-black">{voucher.validityPeriod?.endDate ? new Date(voucher.validityPeriod.endDate).toLocaleDateString("vi-VN") : 'N/A'}</div>
+                        <div className="text-black font-semibold">{voucher.promotionalCode}</div>
+                        <div className="text-black">{voucher.name}</div>
+                        <div className="text-black truncate" title={voucher.description || ''}>{voucher.description || ''}</div>
+                        <div className="text-black">{(voucher.startDate || voucher.validityPeriod?.startDate) ? new Date((voucher.startDate || voucher.validityPeriod!.startDate) as any).toLocaleDateString("vi-VN") : 'N/A'}</div>
+                        <div className="text-black">{(voucher.endDate || voucher.validityPeriod?.endDate) ? new Date((voucher.endDate || voucher.validityPeriod!.endDate) as any).toLocaleDateString("vi-VN") : 'N/A'}</div>
                         <div>
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            voucher.status === 'hoạt động' 
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200' 
-                              : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200'
-                          }`}>
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${voucher.status === 'hoạt động' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {voucher.status || 'hoạt động'}
                           </span>
                         </div>
-                        <div>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-semibold ${
-                              voucher.applyType === 'ticket'
-                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                                : voucher.applyType === 'combo'
-                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200'
-                            }`}
-                          >
-                            {voucher.applyType || 'voucher'}
-                          </span>
-                        </div>
-                          <div className="flex gap-2">
+                        <div className="flex gap-2 justify-start" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
                             <motion.button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditVoucher(voucher);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); handleEditVoucher(voucher); }}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer transition-colors"
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
@@ -1872,11 +2162,13 @@ const Dashboard: React.FC = () => {
                               Sửa
                             </motion.button>
                             <Popconfirm
-                              title="Xóa voucher"
-                              description="Bạn có chắc chắn muốn xóa voucher này?"
+                              title="Xóa khuyến mãi"
+                              description="Bạn có chắc chắn muốn xóa khuyến mãi này? Tất cả chi tiết liên quan sẽ bị xóa."
                               onConfirm={() => handleDeleteVoucher(voucher._id!)}
                               okText="Có"
                               cancelText="Không"
+                               onOpenChange={(open) => setBlockVoucherRowNavigate(open)}
+                               onCancel={() => setBlockVoucherRowNavigate(false)}
                             >
                               <motion.button
                               onClick={(e) => e.stopPropagation()}
@@ -1889,76 +2181,18 @@ const Dashboard: React.FC = () => {
                             </Popconfirm>
                           </div>
                       </div>
-                      
-                      {/* Expandable Content */}
-                      <motion.div
-                        initial={false}
-                        animate={{ 
-                          height: expandedVouchers.has(voucher._id) ? "auto" : 0,
-                          opacity: expandedVouchers.has(voucher._id) ? 1 : 0
-                        }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="overflow-hidden bg-gray-50"
-                      >
-                        {expandedVouchers.has(voucher._id) && (
-                          <div className="p-4">
-                            <div className="grid grid-cols-2 gap-8">
-                              {/* Left Column */}
-                              <div className="space-y-2">
-                                <div className="text-gray-600">
-                                  Mô tả: <span className="text-black">{voucher.lines?.[0]?.description || 'Chưa có mô tả'}</span>
-                                </div>
-                                {Array.isArray(voucher.lines?.[0]?.details) && voucher.lines[0].details.length > 0 && (
-                                  <div className="text-gray-600">
-                                    Chi tiết quà tặng: <span 
-                                      className="text-blue-600 cursor-pointer hover:text-blue-500"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedVoucherForDetails(voucher);
-                                        setShowVoucherDetailsModal(true);
-                                      }}
-                                    >
-                                      Xem chi tiết
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Right Column */}
-                              <div className="space-y-2">
-                                {voucher.applyType === 'ticket' ? (
-                                  <div className="text-gray-600">
-                                    Loại ghế: <span className="text-black">{voucher.lines?.[0]?.condition?.seatType || 'Không xác định'}</span>
-                                    {voucher.lines?.[0]?.discount?.value > 0 && (
-                                      <span className="text-black"> | Giảm giá: <span className="text-red-600">-{voucher.lines[0].discount.value}%</span></span>
-                                    )}
-                                  </div>
-                                ) : voucher.applyType === 'combo' ? (
-                                  <div className="text-gray-600">
-                                    Tên Combo: <span className="text-black">{voucher.lines?.[0]?.condition?.comboName || 'Không xác định'}</span>
-                                    {voucher.lines?.[0]?.discount?.value > 0 && (
-                                      <span className="text-black"> | Giảm giá: <span className="text-red-600">-{voucher.lines[0].discount.value}%</span></span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="text-gray-600">
-                                    Điều kiện: <span className="text-black">Điểm: {voucher.lines?.[0]?.condition?.points || voucher.pointToRedeem}, Giảm tối đa: {voucher.lines?.[0]?.discount?.maxValue ? voucher.lines[0].discount.maxValue.toLocaleString('vi-VN') + ' VNĐ' : 'Không giới hạn'}</span>
-                                    <span className="text-black"> | Số lượng: {voucher.lines?.[0]?.condition?.quantity || voucher.quantity}</span>
-                                    <span className="text-black"> | Giảm giá: <span className="text-red-600">-{voucher.lines?.[0]?.discount?.value || voucher.discountPercent}%</span></span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
+                      {/* Inline detail panel when expanded via route-like UX */}
+                      {selectedVoucherIdFromUrl === voucher._id && (
+                        <div className="p-4">
+                          <VoucherDetail id={voucher._id} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           )}
-
 
 
           {/* Users Tab */}
@@ -2130,6 +2364,7 @@ const Dashboard: React.FC = () => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã ca chiếu</th>
                       <th className="p-3 text-left font-semibold text-black">Tên ca chiếu</th>
                       <th className="p-3 text-left font-semibold text-black">Thời gian bắt đầu</th>
                       <th className="p-3 text-left font-semibold text-black">Thời gian kết thúc</th>
@@ -2161,6 +2396,9 @@ const Dashboard: React.FC = () => {
                         >
                           <td className="p-3">
                             {(currentPage - 1) * itemsPerPage + idx + 1}
+                          </td>
+                          <td className="p-3">
+                            <span className="font-semibold text-black">{session.shiftCode || 'N/A'}</span>
                           </td>
                           <td className="p-3">
                             <span className="font-medium text-lg">{session.name}</span>
@@ -2291,13 +2529,23 @@ const Dashboard: React.FC = () => {
                         <td className="p-3">{showtime.theaterId.name}</td>
                         <td className="p-3">
                           {showtime.showTimes.length > 0 ? 
-                            new Date(showtime.showTimes[0].date).toLocaleDateString("vi-VN") : 
+                            (() => {
+                              // Tìm ngày sớm nhất trong tất cả suất chiếu
+                              const dates = showtime.showTimes.map(st => new Date(st.date));
+                              const earliestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+                              return earliestDate.toLocaleDateString("vi-VN");
+                            })() : 
                             'N/A'
                           }
                         </td>
                         <td className="p-3">
                           {showtime.showTimes.length > 0 ? 
-                            new Date(showtime.showTimes[showtime.showTimes.length - 1].date).toLocaleDateString("vi-VN") : 
+                            (() => {
+                              // Tìm ngày trễ nhất trong tất cả suất chiếu
+                              const dates = showtime.showTimes.map(st => new Date(st.date));
+                              const latestDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                              return latestDate.toLocaleDateString("vi-VN");
+                            })() : 
                             'N/A'
                           }
                         </td>
@@ -2359,7 +2607,7 @@ const Dashboard: React.FC = () => {
                     <Button onClick={() => setShowPriceListDetailInline(false)} className="bg-white">← Quay lại danh sách</Button>
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-                    <h3 className="text-xl text-center font-semibold text-gray-800 mb-4">Thông tin cơ bản</h3>
+                    <h3 className="text-xl text-left font-semibold text-gray-800 mb-4">Thông tin cơ bản</h3>
                     <div className="grid grid-cols-3 gap-6">
                       <div className="space-y-1.5">
                         <div>
@@ -2401,7 +2649,7 @@ const Dashboard: React.FC = () => {
                   <div className="space-y-4">
                     <div className="rounded-lg">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg text-center w-full font-semibold text-gray-800">Danh sách giá</h3>
+                        <h3 className="text-lg text-left w-full font-semibold text-gray-800">Danh sách giá</h3>
                         {viewingPriceList.status === 'scheduled' && (
                           <div className="flex gap-2">
                             {(!viewingPriceList.lines || viewingPriceList.lines.length === 0) && (
@@ -2696,6 +2944,7 @@ const Dashboard: React.FC = () => {
       {showMovieForm && (
         <MovieForm
           movie={selectedMovie}
+          movies={movies}
           onSubmit={selectedMovie ? handleUpdateMovie : handleAddMovie}
           onCancel={() => {
             setShowMovieForm(false);
@@ -2784,12 +3033,22 @@ const Dashboard: React.FC = () => {
                     <>
                       <span>
                         <Tag color="green">
-                          Từ: {new Date(selectedShowtime.showTimes[0].date).toLocaleDateString("vi-VN")}
+                          Từ: {(() => {
+                            // Tìm ngày sớm nhất trong tất cả suất chiếu
+                            const dates = selectedShowtime.showTimes.map(st => new Date(st.date));
+                            const earliestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+                            return earliestDate.toLocaleDateString("vi-VN");
+                          })()}
                         </Tag>
                       </span>
                       <span>
                         <Tag color="orange">
-                          Đến: {new Date(selectedShowtime.showTimes[selectedShowtime.showTimes.length - 1].date).toLocaleDateString("vi-VN")}
+                          Đến: {(() => {
+                            // Tìm ngày trễ nhất trong tất cả suất chiếu
+                            const dates = selectedShowtime.showTimes.map(st => new Date(st.date));
+                            const latestDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                            return latestDate.toLocaleDateString("vi-VN");
+                          })()}
                         </Tag>
                       </span>
                     </>
@@ -2956,6 +3215,7 @@ const Dashboard: React.FC = () => {
       {showRegionForm && (
         <RegionForm
           region={selectedRegion}
+          regions={regions}
           onSubmit={handleRegionSubmit}
           onCancel={() => {
             setShowRegionForm(false);
@@ -2968,6 +3228,7 @@ const Dashboard: React.FC = () => {
       {showTheaterForm && (
         <TheaterForm
           theater={selectedTheater}
+          theaters={theaters}
           onSubmit={handleTheaterSubmit}
           onCancel={() => {
             setShowTheaterForm(false);
@@ -2994,6 +3255,7 @@ const Dashboard: React.FC = () => {
       {showRoomForm && (
         <RoomForm
           room={selectedRoom}
+          rooms={rooms}
           theaters={theaters.map(t => ({ _id: t._id, name: t.name, address: t.location?.address || '', location: { city: t.location?.city || '' }, regionId: t.regionId }))}
           regions={regions}
           preSelectedTheater={preSelectedTheater ? {
@@ -3066,7 +3328,10 @@ const Dashboard: React.FC = () => {
                   {theaterRooms.map((room) => (
                     <div key={room._id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                       <div className="flex justify-between items-start mb-3">
-                        <h5 className="font-semibold text-gray-800 text-lg">{room.name}</h5>
+                        <div>
+                          <h5 className="font-semibold text-gray-800 text-lg">{room.name}</h5>
+                          <p className="text-sm text-gray-600 font-medium">{room.roomCode || 'N/A'}</p>
+                        </div>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                           room.roomType === '2D' ? 'bg-blue-100 text-blue-800' :
                           room.roomType === '4DX' ? 'bg-purple-100 text-purple-800' :
@@ -3165,6 +3430,7 @@ const Dashboard: React.FC = () => {
       {showShowSessionForm && (
         <ShowSessionForm
           showSession={selectedShowSession}
+          showSessions={showSessions}
           loading={showSessionSubmitting}
           onSubmit={handleShowSessionSubmit}
           onCancel={() => {
@@ -3214,7 +3480,7 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4">
             {/* Thông tin cơ bản */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Thông tin cơ bản</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800 text-left">Thông tin cơ bản</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="font-medium text-gray-600">Tên bảng giá:</span>
@@ -3245,7 +3511,7 @@ const Dashboard: React.FC = () => {
 
             {/* Danh sách giá */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-gray-800">Danh sách giá</h3>
+              <h3 className="text-lg font-semibold mb-3 text-gray-800 text-left">Danh sách giá</h3>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
@@ -3394,81 +3660,6 @@ const Dashboard: React.FC = () => {
         </Modal>
       )}
 
-      {/* Voucher Details Modal */}
-      {showVoucherDetailsModal && (
-        <Modal
-          title="Chi tiết quà tặng"
-          open={showVoucherDetailsModal}
-          onCancel={() => setShowVoucherDetailsModal(false)}
-          footer={null}
-          width={800}
-        >
-          {selectedVoucherForDetails && (
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="text-black text-lg font-semibold mb-3">
-                  {selectedVoucherForDetails.name}
-                </h3>
-                
-                {(selectedVoucherForDetails.applyType === 'ticket' || selectedVoucherForDetails.applyType === 'combo') ? (
-                  <div>
-                    <h4 className="text-blue-600 font-medium mb-2">Chi tiết quà tặng:</h4>
-                    <div className="overflow-x-auto">
-                      {(() => {
-                        const showDiscountCol = Array.isArray(selectedVoucherForDetails.lines?.[0]?.details)
-                          && selectedVoucherForDetails.lines![0]!.details!.some((d: any) => d?.rewardType === 'discount');
-                        return (
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-left py-2 text-gray-600">Sản phẩm mua</th>
-                            <th className="text-left py-2 text-gray-600">Số lượng mua</th>
-                            <th className="text-left py-2 text-gray-600">Sản phẩm nhận</th>
-                            <th className="text-left py-2 text-gray-600">Số lượng nhận</th>
-                            <th className="text-left py-2 text-gray-600">Hình thức</th>
-                            {showDiscountCol && (
-                              <th className="text-left py-2 text-gray-600 pl-4">Phần trăm giảm</th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedVoucherForDetails.lines?.[0]?.details?.map((detail: any, index: number) => (
-                            <tr key={index} className="border-b border-gray-200">
-                              <td className="py-2 text-blue-600">{detail.buyItem}</td>
-                              <td className="py-2 text-blue-600">{detail.buyQuantity}</td>
-                              <td className="py-2 text-green-600">{detail.rewardItem}</td>
-                              <td className="py-2 text-green-600">{detail.rewardQuantity}</td>
-                              <td className="py-2 text-yellow-600">
-                                {detail.rewardType === 'free' ? 'Miễn phí' : 'Giảm giá'}
-                              </td>
-                              {showDiscountCol && (
-                                <td className="py-2 text-red-600 pl-4">
-                                  {detail.rewardType === 'discount' && typeof detail.rewardDiscountPercent === 'number'
-                                    ? `-${detail.rewardDiscountPercent}%`
-                                    : ''}
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <h4 className="text-blue-600 font-medium mb-2">Chi tiết quà tặng:</h4>
-                    <div className="text-black">
-                      {selectedVoucherForDetails.lines?.[0]?.details?.join(', ')}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </Modal>
-      )}
 
       {/* Modal Sao chép */}
       {splitVersionModalVisible && editingPriceList && (
@@ -3539,11 +3730,17 @@ const Dashboard: React.FC = () => {
                     label="Mã bảng giá mới"
                     required
                     tooltip="Mã định danh cho bảng giá mới"
+                    validateStatus={splitVersionData.newCode && !/^[A-Z0-9]{6}$/.test(splitVersionData.newCode) ? 'error' : ''}
+                    help={splitVersionData.newCode && !/^[A-Z0-9]{6}$/.test(splitVersionData.newCode) ? 'Mã bảng giá phải gồm đúng 6 ký tự chữ/số (VD: BG0001)' : ''}
                   >
                     <Input
                       ref={newCodeInputRef}
                       value={splitVersionData.newCode}
-                      onChange={(e) => setSplitVersionData({...splitVersionData, newCode: e.target.value.toUpperCase()})}
+                      maxLength={6}
+                      onChange={(e) => {
+                        const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                        setSplitVersionData({ ...splitVersionData, newCode: v });
+                      }}
                       placeholder="Ví dụ: BG0001"
                       style={{ textTransform: 'uppercase' }}
                     />
@@ -3682,9 +3879,9 @@ const Dashboard: React.FC = () => {
                     return;
                   }
                   
-                  // Validation mã bảng giá
-                  if (splitVersionData.newCode.length < 3 || splitVersionData.newCode.length > 20) {
-                    message.error("Mã bảng giá phải có từ 3-20 ký tự");
+                  // Validation mã bảng giá: đúng 6 ký tự chữ/ số
+                  if (!/^[A-Z0-9]{6}$/.test(splitVersionData.newCode)) {
+                    message.error("Mã bảng giá phải gồm đúng 6 ký tự chữ/số (VD: BG0001)");
                     return;
                   }
                   // Validation ngày

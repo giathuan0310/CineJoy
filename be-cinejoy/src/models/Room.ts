@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IRoom extends Document {
     _id: string;
+    roomCode: string;
     name: string;
     theater: mongoose.Types.ObjectId;
     capacity: number;
@@ -18,6 +19,13 @@ export interface IRoom extends Document {
 
 const RoomSchema = new Schema<IRoom>(
     {
+        roomCode: {
+            type: String,
+            required: [true, 'Mã phòng chiếu là bắt buộc'],
+            unique: true,
+            trim: true,
+            maxlength: [10, 'Mã phòng chiếu không được quá 10 ký tự']
+        },
         name: {
             type: String,
             required: [true, 'Tên phòng chiếu là bắt buộc'],

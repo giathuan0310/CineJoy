@@ -33,36 +33,6 @@ export default class FoodComboController {
     }
   }
 
-  // Lấy combo có sẵn
-  async getAvailableCombos(req: Request, res: Response): Promise<void> {
-    try {
-      const combos = await foodComboService.getAvailableCombos();
-      res.status(200).json(combos);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching available combos", error });
-    }
-  }
-
-  // Lấy sản phẩm đơn lẻ có sẵn
-  async getAvailableSingleProducts(req: Request, res: Response): Promise<void> {
-    try {
-      const products = await foodComboService.getAvailableSingleProducts();
-      res.status(200).json(products);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching available single products", error });
-    }
-  }
-
-  // Lấy theo category
-  async getProductsByCategory(req: Request, res: Response): Promise<void> {
-    const { category } = req.params;
-    try {
-      const products = await foodComboService.getProductsByCategory(category);
-      res.status(200).json(products);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching products by category", error });
-    }
-  }
 
   async getFoodComboById(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
@@ -81,20 +51,18 @@ export default class FoodComboController {
   // Thêm sản phẩm đơn lẻ
   async addSingleProduct(req: Request, res: Response): Promise<void> {
     try {
-      const { name, price, category, description, quantity } = req.body;
+      const { code, name, description } = req.body;
       
       // Validation
-      if (!name || !price || !category || !description || quantity === undefined) {
+      if (!code || !name || !description) {
         res.status(400).json({ message: "Missing required fields for single product" });
         return;
       }
 
       const newProduct = await foodComboService.addSingleProduct({
+        code,
         name,
-        price,
-        category,
-        description,
-        quantity
+        description
       });
       
       res.status(201).json(newProduct);
@@ -106,10 +74,10 @@ export default class FoodComboController {
   // Thêm combo
   async addCombo(req: Request, res: Response): Promise<void> {
     try {
-      const { name, description, items, discountType, discountValue } = req.body;
+      const { code, name, description, items } = req.body;
       
       // Validation
-      if (!name || !description || !items || !discountType || discountValue === undefined) {
+      if (!code || !name || !description || !items) {
         res.status(400).json({ message: "Missing required fields for combo" });
         return;
       }
@@ -120,11 +88,10 @@ export default class FoodComboController {
       }
 
       const newCombo = await foodComboService.addCombo({
+        code,
         name,
         description,
-        items,
-        discountType,
-        discountValue
+        items
       });
       
       res.status(201).json(newCombo);
@@ -133,45 +100,6 @@ export default class FoodComboController {
     }
   }
 
-  // Cập nhật số lượng sau khi bán
-  async updateQuantityAfterSale(req: Request, res: Response): Promise<void> {
-    try {
-      const { items } = req.body;
-      
-      if (!Array.isArray(items)) {
-        res.status(400).json({ message: "Items must be an array" });
-        return;
-      }
-
-      await foodComboService.updateQuantityAfterSale(items);
-      res.status(200).json({ message: "Quantity updated successfully" });
-    } catch (error) {
-      res.status(500).json({ message: "Error updating quantity", error });
-    }
-  }
-
-  // Tính lại số lượng combo
-  async recalculateComboQuantities(req: Request, res: Response): Promise<void> {
-    try {
-      await foodComboService.recalculateComboQuantities();
-      res.status(200).json({ message: "Combo quantities recalculated successfully" });
-    } catch (error) {
-      res.status(500).json({ message: "Error recalculating combo quantities", error });
-    }
-  }
-
-  // Kiểm tra combo có thể bán được không
-  async canSellCombo(req: Request, res: Response): Promise<void> {
-    const { id } = req.params;
-    const { quantity } = req.query;
-    
-    try {
-      const canSell = await foodComboService.canSellCombo(id, parseInt(quantity as string));
-      res.status(200).json({ canSell });
-    } catch (error) {
-      res.status(500).json({ message: "Error checking combo availability", error });
-    }
-  }
 
   async updateFoodCombo(req: Request, res: Response): Promise<void> {
     const { id } = req.params;

@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IShowSession extends Document {
     _id: string;
+    shiftCode: string; // Mã ca chiếu
     name: string;
     startTime: string; // Format: "08:00"
     endTime: string;   // Format: "11:59"
@@ -11,6 +12,13 @@ export interface IShowSession extends Document {
 
 const ShowSessionSchema = new Schema<IShowSession>(
     {
+        shiftCode: {
+            type: String,
+            required: [true, 'Mã ca chiếu là bắt buộc'],
+            unique: true,
+            trim: true,
+            maxlength: [10, 'Mã ca chiếu không được quá 10 ký tự']
+        },
         name: {
             type: String,
             required: [true, 'Tên ca chiếu là bắt buộc'],

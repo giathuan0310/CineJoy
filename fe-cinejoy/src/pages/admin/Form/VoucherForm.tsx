@@ -5,6 +5,7 @@ import { Modal, Form, Input, InputNumber, DatePicker, Spin, Select, message, Pop
 import type { InputRef } from 'antd';
 import dayjs from 'dayjs';
 import { getFoodCombos } from '@/apiservice/apiFoodCombo';
+import { getVouchers } from '@/apiservice/apiVoucher';
 
 interface VoucherFormProps {
     voucher?: IVoucher;
@@ -18,6 +19,8 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [showDetails, setShowDetails] = useState<boolean>(false);
     const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
+    const [statusLocked, setStatusLocked] = useState<boolean>(false);
+    const [existingVouchers, setExistingVouchers] = useState<IVoucher[]>([]);
 
     // Load danh sách sản phẩm/combo
     useEffect(() => {
@@ -31,6 +34,20 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
             }
         };
         loadFoodCombos();
+    }, []);
+
+    // Load danh sách voucher hiện có để kiểm tra trùng lặp
+    useEffect(() => {
+        const loadExistingVouchers = async () => {
+            try {
+                const data = await getVouchers();
+                setExistingVouchers(data);
+            } catch (error) {
+                console.error('Error loading existing vouchers:', error);
+                setExistingVouchers([]);
+            }
+        };
+        loadExistingVouchers();
     }, []);
 
     // Bơm CSS ẩn scrollbar một lần nếu chưa có
@@ -49,45 +66,20 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
 
     useEffect(() => {
         if (voucher) {
-            const isTicket = voucher.applyType === 'ticket';
-            const line = voucher.lines?.[0];
-            
-            console.log('Edit voucher:', voucher);
-            console.log('Edit line:', line);
-            console.log('Edit line.condition:', line?.condition);
-            console.log('Edit comboName:', line?.condition?.comboName);
-            console.log('Edit comboId:', line?.condition?.comboId);
-            
             form.setFieldsValue({
                 name: voucher.name,
-                startDate: voucher.validityPeriod?.startDate ? dayjs(voucher.validityPeriod.startDate) : undefined,
-                endDate: voucher.validityPeriod?.endDate ? dayjs(voucher.validityPeriod.endDate) : undefined,
+                promotionalCode: voucher.promotionalCode,
+                startDate: voucher.startDate ? dayjs(voucher.startDate) : (voucher.validityPeriod?.startDate ? dayjs(voucher.validityPeriod.startDate) : undefined),
+                endDate: voucher.endDate ? dayjs(voucher.endDate) : (voucher.validityPeriod?.endDate ? dayjs(voucher.validityPeriod.endDate) : undefined),
                 status: voucher.status || 'hoạt động',
-                applyType: voucher.applyType || 'voucher',
-                description: line?.description || (isTicket ? '' : `Giảm ${voucher.discountPercent || 0}% toàn hóa đơn`),
-                // Chỉ load cho voucher/combo
-                pointToRedeem: isTicket ? undefined : (line?.condition?.points || voucher.pointToRedeem),
-                quantity: isTicket ? undefined : (line?.condition?.quantity || voucher.quantity),
-                discountType: isTicket ? 'percent' : (line?.discount?.type || 'percent'),
-                discountValue: line?.discount?.value || voucher.discountPercent,
-                maxValue: isTicket ? undefined : (line?.discount?.maxValue || 30000),
-                // Cho ticket và combo
-                seatType: isTicket ? line?.condition?.seatType : undefined,
-                comboName: voucher.applyType === 'combo' ? line?.condition?.comboName : undefined,
-                comboId: voucher.applyType === 'combo' ? line?.condition?.comboId : undefined,
-                buyItem: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.buyItem : undefined,
-                buyQuantity: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.buyQuantity : undefined,
-                rewardItem: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.rewardItem : undefined,
-                rewardItemId: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.rewardItemId : undefined,
-                rewardQuantity: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.rewardQuantity : undefined,
-                rewardType: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.rewardType : undefined,
-                rewardDiscountPercent: (isTicket || voucher.applyType === 'combo') ? line?.details?.[0]?.rewardDiscountPercent : undefined,
+                description: voucher.description || '',
             });
-            
-            // Nếu có details thì hiển thị form chi tiết
-            if ((isTicket && line?.details?.[0]) || (voucher.applyType === 'combo' && line?.details?.[0])) {
-                setShowDetails(true);
-            }
+            setStatusLocked(true); // Khóa trạng thái khi edit
+        } else {
+            setStatusLocked(true); // Khóa trạng thái cả khi thêm mới
+            // Tự động cập nhật trạng thái ban đầu cho form thêm mới
+            const today = dayjs();
+            form.setFieldValue('status', 'không hoạt động'); // Mặc định là không hoạt động
         }
     }, [voucher, form]);
 
@@ -104,123 +96,71 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
         }
     }, [voucher]);
 
-    // Tự động reset loại giảm giá khi thay đổi loại voucher
-    const handleApplyTypeChange = (value: string) => {
-        if (value === 'voucher') {
-            form.setFieldValue('discountType', 'percent');
+    // Tự động cập nhật trạng thái dựa trên ngày
+    const updateStatusBasedOnDates = (startDate: dayjs.Dayjs | null, endDate: dayjs.Dayjs | null) => {
+        if (!startDate || !endDate) return;
+        
+        const today = dayjs();
+        const isWithinRange = today.isAfter(startDate.startOf('day')) && today.isBefore(endDate.endOf('day'));
+        
+        if (isWithinRange) {
+            form.setFieldValue('status', 'hoạt động');
+        } else {
+            form.setFieldValue('status', 'không hoạt động');
         }
     };
 
-    // Tự động reset giá trị giảm giá khi thay đổi loại giảm giá
-    const handleDiscountTypeChange = () => {
-        // Reset giá trị giảm giá khi thay đổi loại
-        form.setFieldValue('discountValue', undefined);
+    // Kiểm tra trùng lặp khoảng thời gian
+    const checkDateOverlap = (startDate: dayjs.Dayjs, endDate: dayjs.Dayjs): boolean => {
+        if (!startDate || !endDate) return false;
+        
+        const currentStart = startDate.startOf('day');
+        const currentEnd = endDate.endOf('day');
+        
+        return existingVouchers.some(existingVoucher => {
+            // Bỏ qua voucher hiện tại khi edit
+            if (voucher && existingVoucher._id === voucher._id) return false;
+            
+            const existingStart = dayjs(existingVoucher.startDate).startOf('day');
+            const existingEnd = dayjs(existingVoucher.endDate).endOf('day');
+            
+            // Kiểm tra trùng lặp: (start1 <= end2) && (start2 <= end1)
+            return (currentStart.isSameOrBefore(existingEnd) && currentEnd.isSameOrAfter(existingStart));
+        });
+    };
+
+    // Kiểm tra ngày có bị trùng lặp không
+    const isDateInOverlapRange = (date: dayjs.Dayjs): boolean => {
+        return existingVouchers.some(existingVoucher => {
+            // Bỏ qua voucher hiện tại khi edit
+            if (voucher && existingVoucher._id === voucher._id) return false;
+            
+            const existingStart = dayjs(existingVoucher.startDate).startOf('day');
+            const existingEnd = dayjs(existingVoucher.endDate).endOf('day');
+            
+            return date.isSameOrAfter(existingStart) && date.isSameOrBefore(existingEnd);
+        });
     };
 
     const handleSubmit = async (values: {
         name: string;
+        promotionalCode: string;
         startDate: dayjs.Dayjs;
         endDate: dayjs.Dayjs;
         status: 'hoạt động' | 'không hoạt động';
-        applyType: 'voucher' | 'combo' | 'ticket';
         description: string;
-        pointToRedeem?: number;
-        quantity?: number;
-        discountType?: 'percent' | 'amount';
-        discountValue?: number;
-        maxValue?: number;
-        seatType?: 'normal' | 'vip' | 'couple' | '4dx';
-        buyItem?: string;
-        buyQuantity?: number;
-        rewardItem?: string;
-        rewardItemId?: string;
-        rewardQuantity?: number;
-        rewardType?: 'free' | 'discount';
-        rewardDiscountPercent?: number;
-        // Cho combo
-        comboId?: string;
-        comboName?: string;
     }) => {
         try {
             setIsLoading(true);
-            const isTicket = values.applyType === 'ticket';
             
-            const submitData: Partial<IVoucher> = {
+            const submitData: any = {
                 name: values.name,
-                validityPeriod: {
-                    startDate: values.startDate ? values.startDate.toDate() : new Date(),
-                    endDate: values.endDate ? values.endDate.toDate() : new Date()
-                },
+                promotionalCode: values.promotionalCode?.toUpperCase().trim(),
+                startDate: values.startDate ? values.startDate.toDate() : new Date(),
+                endDate: values.endDate ? values.endDate.toDate() : new Date(),
                 status: values.status,
-                applyType: values.applyType,
+                description: values.description,
             };
-
-            if (isTicket) {
-                // Logic cho ticket
-                submitData.lines = [{
-                    description: values.description,
-                    condition: {
-                        seatType: values.seatType
-                    },
-                    discount: {
-                        type: 'percent' as 'percent' | 'amount',
-                        value: values.discountValue || 0
-                    },
-                    details: showDetails ? [{
-                        buyItem: values.buyItem,
-                        buyQuantity: values.buyQuantity,
-                        rewardItem: values.rewardItem,
-                        rewardItemId: values.rewardItemId,
-                        rewardQuantity: values.rewardQuantity,
-                        rewardType: values.rewardType,
-                        rewardDiscountPercent: values.rewardDiscountPercent
-                    } as any] : []
-                }];
-            } else if (values.applyType === 'combo') {
-                // Logic cho combo - giống ticket
-                console.log('Combo values:', values);
-                console.log('ComboName:', values.comboName);
-                console.log('ComboId:', values.comboId);
-                submitData.lines = [{
-                    description: values.description,
-                    condition: {
-                        comboName: values.comboName,
-                        comboId: values.comboId
-                    },
-                    discount: {
-                        type: values.discountType as 'percent' | 'amount',
-                        value: values.discountValue || 0
-                    },
-                    details: showDetails ? [{
-                        buyItem: values.buyItem,
-                        buyQuantity: values.buyQuantity,
-                        rewardItem: values.rewardItem,
-                        rewardItemId: values.rewardItemId,
-                        rewardQuantity: values.rewardQuantity,
-                        rewardType: values.rewardType,
-                        rewardDiscountPercent: values.rewardDiscountPercent
-                    } as any] : []
-                }];
-            } else {
-                // Logic cho voucher/combo
-                submitData.lines = [{
-                    description: values.description,
-                    condition: {
-                        points: values.pointToRedeem,
-                        quantity: values.quantity
-                    },
-                    discount: {
-                        type: values.discountType!,
-                        value: values.discountValue!,
-                        maxValue: values.maxValue
-                    },
-                    details: []
-                }];
-                // Các trường cũ để tương thích với backend
-                submitData.quantity = values.quantity;
-                submitData.discountPercent = values.discountValue;
-                submitData.pointToRedeem = values.pointToRedeem;
-            }
             
             await onSubmit(submitData);
         } catch (error) {
@@ -252,8 +192,34 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                 form={form}
                 layout="vertical"
                 onFinish={handleSubmit}
-                autoComplete="off"
+                autoComplete="off"khi mới
             >
+                {/* 1.1 Mã khuyến mãi */}
+                <Form.Item
+                    name="promotionalCode"
+                    label="Mã khuyến mãi"
+                    tooltip="Mã viết tắt để nhập tay khi áp dụng, vd: KM001, KM002"
+                    rules={[
+                        { required: true, message: 'Vui lòng nhập mã khuyến mãi!' },
+                        { pattern: /^KM\d{3}$/, message: 'Mã khuyến mãi phải có định dạng KM001, KM002, ...' },
+                        {
+                            validator: (_, value) => {
+                                if (!value) return Promise.resolve();
+                                const existingVoucher = existingVouchers.find(v =>
+                                    v.promotionalCode === value &&
+                                    (!voucher || v._id !== voucher._id)
+                                );
+                                if (existingVoucher) {
+                                    return Promise.reject(new Error('Mã khuyến mãi này đã tồn tại!'));
+                                }
+                                return Promise.resolve();
+                            }
+                        }
+                    ]}
+                >
+                    <Input placeholder="KM001, KM002, ..." size="large" />
+                </Form.Item>
+
                 {/* 1. Tên Khuyến mãi */}
                 <Form.Item
                     name="name"
@@ -266,7 +232,7 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                 >
                     <Input
                         ref={nameInputRef}
-                        placeholder="Ví dụ: Mã giảm giá 15%"
+                        placeholder="Ví dụ: Ưu đãi tháng 09"
                         size="large"
                     />
                 </Form.Item>
@@ -285,7 +251,17 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                             size="large"
                             style={{ width: '100%' }}
                             format="DD/MM/YYYY"
-                            disabledDate={(current) => current && current < dayjs().startOf('day')}
+                            disabledDate={(current) => {
+                                if (!current) return false;
+                                // Khóa ngày trong quá khứ
+                                if (current < dayjs().startOf('day')) return true;
+                                // Khóa ngày trùng lặp với voucher khác
+                                return isDateInOverlapRange(current);
+                            }}
+                            onChange={(date) => {
+                                const endDate = form.getFieldValue('endDate');
+                                updateStatusBasedOnDates(date, endDate);
+                            }}
                         />
                     </Form.Item>
 
@@ -314,51 +290,41 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                             style={{ width: '100%' }}
                             format="DD/MM/YYYY"
                             disabledDate={(current) => {
+                                if (!current) return false;
                                 const startDate = form.getFieldValue('startDate');
-                                return current && (current < dayjs().startOf('day') || (startDate && current < startDate));
+                                // Khóa ngày trong quá khứ
+                                if (current < dayjs().startOf('day')) return true;
+                                // Khóa ngày trước startDate
+                                if (startDate && current < startDate) return true;
+                                // Khóa ngày trùng lặp với voucher khác
+                                return isDateInOverlapRange(current);
+                            }}
+                            onChange={(date) => {
+                                const startDate = form.getFieldValue('startDate');
+                                updateStatusBasedOnDates(startDate, date);
                             }}
                         />
                     </Form.Item>
                 </div>
 
-                {/* 4. Trạng thái, 5. Loại */}
-                <div className="grid grid-cols-2 gap-4">
-                    <Form.Item
-                        name="status"
-                        label="Trạng thái"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn trạng thái!' }
+                {/* 4. Trạng thái */}
+                <Form.Item
+                    name="status"
+                    label="Trạng thái"
+                    rules={[
+                        { required: true, message: 'Vui lòng chọn trạng thái!' }
+                    ]}
+                >
+                    <Select
+                        placeholder="Chọn trạng thái"
+                        size="large"
+                        disabled={statusLocked}
+                        options={[
+                            { value: 'hoạt động', label: 'Hoạt động' },
+                            { value: 'không hoạt động', label: 'Không hoạt động' }
                         ]}
-                    >
-                        <Select
-                            placeholder="Chọn trạng thái"
-                            size="large"
-                            options={[
-                                { value: 'hoạt động', label: 'Hoạt động' },
-                                { value: 'không hoạt động', label: 'Không hoạt động' }
-                            ]}
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="applyType"
-                        label="Loại"
-                        rules={[
-                            { required: true, message: 'Vui lòng chọn loại!' }
-                        ]}
-                    >
-                        <Select
-                            placeholder="Chọn loại"
-                            size="large"
-                            options={[
-                                { value: 'voucher', label: 'Voucher' },
-                                { value: 'combo', label: 'Combo' },
-                                { value: 'ticket', label: 'Ticket' }
-                            ]}
-                            onChange={handleApplyTypeChange}
-                        />
-                    </Form.Item>
-                </div>
+                    />
+                </Form.Item>
 
                 {/* 6. Mô tả */}
                 <Form.Item
@@ -371,59 +337,13 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                     ]}
                 >
                     <Input.TextArea
-                        placeholder="Ví dụ: Giảm 15% toàn hóa đơn"
+                        placeholder="Ví dụ: Tổng hợp ưu đãi trong tháng 09"
                         size="large"
                         rows={3}
                     />
                 </Form.Item>
 
-                {/* 7. Điểm, 8. Số lượng - Chỉ hiển thị cho voucher/combo */}
-                <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.applyType !== currentValues.applyType}>
-                    {({ getFieldValue }) => {
-                        const applyType = getFieldValue('applyType');
-                        if (applyType === 'ticket' || applyType === 'combo') {
-                            return null; // Ẩn cho ticket và combo
-                        }
-                        return (
-                <div className="grid grid-cols-2 gap-4">
-                    <Form.Item
-                        name="pointToRedeem"
-                        label="Điểm để đổi"
-                        rules={[
-                            { required: true, message: 'Vui lòng nhập điểm để đổi!' },
-                            { type: 'number', min: 50, message: 'Điểm để đổi phải ít nhất 50 điểm!' }
-                        ]}
-                    >
-                        <InputNumber
-                            placeholder="Nhập số điểm"
-                            size="large"
-                            min={50}
-                            max={10000}
-                            style={{ width: '100%' }}
-                            addonAfter="điểm"
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="quantity"
-                        label="Số lượng"
-                        rules={[
-                            { required: true, message: 'Vui lòng nhập số lượng!' },
-                            { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0!' }
-                        ]}
-                    >
-                        <InputNumber
-                            placeholder="Nhập số lượng"
-                            size="large"
-                            min={1}
-                            max={10000}
-                            style={{ width: '100%' }}
-                        />
-                    </Form.Item>
-                </div>
-                        );
-                    }}
-                </Form.Item>
+                {/* (Đã loại bỏ) Điểm để đổi / Số lượng */}
 
                 {/* 7.1. Các trường cho ticket/combo */}
                 <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.applyType !== currentValues.applyType}>
@@ -814,141 +734,9 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                     }}
                 </Form.Item>
 
-                {/* 9. Loại giảm giá - Chỉ hiển thị cho voucher/combo */}
-                <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.applyType !== currentValues.applyType}>
-                    {({ getFieldValue }) => {
-                        const applyType = getFieldValue('applyType');
-                        if (applyType === 'ticket' || applyType === 'combo') {
-                            return null; // Ẩn cho ticket và combo
-                        }
-                        return (
-                <Form.Item
-                    name="discountType"
-                    label="Loại giảm giá"
-                    rules={[
-                        { required: true, message: 'Vui lòng chọn loại giảm giá!' }
-                    ]}
-                >
-                    <Select
-                        placeholder="Chọn loại"
-                        size="large"
-                                    options={applyType === 'voucher' 
-                                        ? [{ value: 'percent', label: 'Phần trăm (%)' }]
-                                        : [
-                            { value: 'percent', label: 'Phần trăm (%)' },
-                            { value: 'amount', label: 'Số tiền (VNĐ)' }
-                        ]}
-                                    value={getFieldValue('discountType')}
-                                    disabled={applyType === 'voucher'}
-                                    onChange={(value) => {
-                                        // Tự động reset về 'percent' khi chọn voucher
-                                        if (applyType === 'voucher' && value !== 'percent') {
-                                            form.setFieldValue('discountType', 'percent');
-                                        }
-                                        // Reset giá trị giảm giá khi thay đổi loại
-                                        handleDiscountTypeChange();
-                                    }}
-                                />
-                            </Form.Item>
-                        );
-                    }}
-                </Form.Item>
+                {/* (Đã loại bỏ) Loại giảm giá */}
 
-                {/* 10. Giá trị giảm giá */}
-                <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.applyType !== currentValues.applyType || prevValues.discountType !== currentValues.discountType}>
-                    {({ getFieldValue }) => {
-                        const applyType = getFieldValue('applyType');
-                        const discountType = getFieldValue('discountType');
-                        
-                        if (applyType === 'ticket' || applyType === 'combo') {
-                            return null; // Ẩn cho ticket và combo
-                        }
-                        
-                        return (
-                <Form.Item
-                    name="discountValue"
-                    label="Giá trị giảm giá"
-                    rules={[
-                        { required: true, message: 'Vui lòng nhập giá trị giảm giá!' },
-                                    {
-                            validator(_, value) {
-                                if (!value) return Promise.resolve();
-                                
-                                if (discountType === 'percent') {
-                                    if (value < 1 || value > 100) {
-                                        return Promise.reject(new Error('Giá trị giảm giá phải từ 1-100%!'));
-                                    }
-                                } else if (discountType === 'amount') {
-                                    if (value < 1000) {
-                                        return Promise.reject(new Error('Giá trị giảm giá phải ít nhất 1,000 VNĐ!'));
-                                    }
-                                }
-                                return Promise.resolve();
-                            },
-                                    },
-                    ]}
-                >
-                            <InputNumber
-                                placeholder={discountType === 'percent' ? "Nhập phần trăm" : "Nhập số tiền"}
-                                size="large"
-                                min={discountType === 'percent' ? 1 : 1000}
-                                max={discountType === 'percent' ? 100 : 1000000}
-                                style={{ width: '100%' }}
-                                addonAfter={discountType === 'percent' ? '%' : 'VNĐ'}
-                                formatter={discountType === 'amount' ? value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : undefined}
-                                parser={discountType === 'amount' ? value => {
-                                    const num = Number(value!.replace(/\$\s?|(,*)/g, ''));
-                                    return Math.max(1000, Math.min(1000000, num)) as 1000 | 1000000;
-                                } : undefined}
-                            />
-                            </Form.Item>
-                        );
-                    }}
-                </Form.Item>
-
-                {/* 11. Giảm tối đa - hiển thị riêng để có thể ẩn/hiện */}
-                <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.applyType !== currentValues.applyType || prevValues.discountType !== currentValues.discountType}>
-                    {({ getFieldValue }) => {
-                        const applyType = getFieldValue('applyType');
-                        const discountType = getFieldValue('discountType');
-                        
-                        if (applyType === 'ticket' || applyType === 'combo' || discountType === 'amount') {
-                            return null; // Ẩn cho ticket, combo hoặc khi discountType là 'amount'
-                        }
-                        return (
-                            <Form.Item
-                                name="maxValue"
-                                label={<span>Giảm tối đa (VNĐ) <span className="text-red-500">*</span></span>}
-                                rules={[
-                                    { required: true, message: 'Vui lòng nhập giá trị tối đa!' },
-                                    {
-                                        validator(_, value) {
-                                            if (!value) return Promise.resolve();
-                                            if (value < 1000) {
-                                                return Promise.reject(new Error('Giá trị tối đa phải ít nhất 1,000 VNĐ!'));
-                                            }
-                                            return Promise.resolve();
-                                        },
-                                    },
-                                ]}
-                            >
-                            <InputNumber
-                                placeholder="Nhập giá trị tối đa"
-                                size="large"
-                                min={1000}
-                                max={1000000}
-                                style={{ width: '100%' }}
-                                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                parser={value => {
-                                    const num = Number(value!.replace(/\$\s?|(,*)/g, ''));
-                                    return Math.max(1000, Math.min(1000000, num)) as 1000 | 1000000;
-                                }}
-                                addonAfter="VNĐ"
-                            />
-                            </Form.Item>
-                        );
-                    }}
-                </Form.Item>
+                {/* (Đã loại bỏ) Giảm tối đa */}
 
                 <div className="flex justify-end gap-4 mt-3">
                     <motion.button

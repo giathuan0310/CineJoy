@@ -35,6 +35,17 @@ class SeatController {
         }
     }
 
+     // Get unique seat types
+     async getUniqueSeatTypes(req: Request, res: Response) {
+        try {
+            const seatTypes = await SeatService.getUniqueSeatTypes();
+            successResponse(res, 200, 'Lấy danh sách loại ghế thành công', seatTypes);
+        } catch (error: unknown) {
+            console.error('Lỗi khi lấy danh sách loại ghế:', error);
+            errorResponse(res, 500, 'Lỗi server khi lấy danh sách loại ghế');
+        }
+    }
+
     // Get seat by ID
     async getSeatById(req: Request, res: Response) {
         try {

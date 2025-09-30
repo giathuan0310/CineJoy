@@ -13,6 +13,9 @@ router.get('/room/:roomId', verifyToken, SeatController.getSeatsByRoom);
 // Get seat statistics for a room
 router.get('/room/:roomId/statistics', verifyToken, SeatController.getSeatStatistics);
 
+// Get unique seat types
+router.get('/types', verifyToken, SeatController.getUniqueSeatTypes);
+
 // Get seat by ID
 router.get('/:id', verifyToken, SeatController.getSeatById);
 

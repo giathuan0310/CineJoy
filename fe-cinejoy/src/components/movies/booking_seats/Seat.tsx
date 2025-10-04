@@ -52,7 +52,6 @@ const Seat: React.FC<SeatProps> = ({
 
   // Helper function to handle seat selection (including couple seats)
   const handleSeatSelection = (seatName: string) => {
-    console.log("handleSeatSelection called with seatName:", seatName);
     const seatType = seatMap[seatName]?.type;
     
     if (seatType === 'couple') {
@@ -77,30 +76,25 @@ const Seat: React.FC<SeatProps> = ({
         if (isSeatSelected || isPairSelected) {
           // If either is selected, deselect both
           if (onSelectMultiple) {
-            console.log("Calling onSelectMultiple for deselection:", [seatName, pairSeatName]);
             onSelectMultiple([seatName, pairSeatName]);
           } else {
             // Fallback to individual selection if onSelectMultiple is not provided
             // Only call onSelect once to avoid duplicate validation
-            console.log("Calling onSelect for deselection:", seatName);
             onSelect(seatName);
           }
         } else {
           // If neither is selected, select both
           if (onSelectMultiple) {
-            console.log("Calling onSelectMultiple for selection:", [seatName, pairSeatName]);
             onSelectMultiple([seatName, pairSeatName]);
           } else {
             // Fallback to individual selection if onSelectMultiple is not provided
             // Only call onSelect once to avoid duplicate validation
-            console.log("Calling onSelect for selection:", seatName);
             onSelect(seatName);
           }
         }
       }
     } else {
       // For non-couple seats, use normal selection
-      console.log("Calling onSelect for non-couple seat:", seatName);
       onSelect(seatName);
     }
   };
@@ -108,16 +102,8 @@ const Seat: React.FC<SeatProps> = ({
   // Load seats from API
   useEffect(() => {
     const loadSeats = async () => {
-      // Debug: log the props to see what's missing
-      console.log("Seat component props:", {
-        showtimeId,
-        date,
-        startTime,
-        room,
-      });
 
       if (!showtimeId || !date || !startTime) {
-        console.log("Missing required props for API call, using static data");
         // Fallback to static data if no API params provided
         return;
       }
@@ -126,12 +112,6 @@ const Seat: React.FC<SeatProps> = ({
         setLoading(true);
         setError(null);
         // Call the API to get seats
-        console.log("Calling API with params:", {
-          showtimeId,
-          date,
-          startTime,
-          room,
-        });
 
         const response = await getSeatsForShowtimeApi(
           showtimeId,
@@ -196,7 +176,7 @@ const Seat: React.FC<SeatProps> = ({
     };
 
     loadSeats();
-  }, [showtimeId, date, startTime, room]); // Removed onSeatsLoaded from dependencies
+  }, [showtimeId, date, startTime, room]);
 
 
 

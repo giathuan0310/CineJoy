@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
-import { message } from "antd";
+import { message, Spin } from "antd";
 import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
@@ -295,12 +295,7 @@ export const SelectSeat = () => {
           isDarkMode ? "bg-[#23272f]" : "bg-[#e7ede7]"
         } min-h-screen py-6 flex items-center justify-center`}
       >
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className={`text-lg ${isDarkMode ? "text-white" : "text-gray-700"}`}>
-            Đang giải phóng ghế...
-          </p>
-        </div>
+        <Spin size="large" tip="Đang cập nhật trạng thái ghế..." />
       </div>
     );
   }

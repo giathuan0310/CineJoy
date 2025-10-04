@@ -110,7 +110,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice, pr
       }
 
       if (result.status) {
-        message.success("Đã đặt ghế thành công! Bạn có 5 phút để hoàn tất thanh toán.");
+        // message.success("Đã đặt ghế thành công! Bạn có 5 phút để hoàn tất thanh toán.");
         // Lưu info để còn release khi rời trang payment
         const info = { showtimeId, date: movie.date, startTime: movie.time, room: movie.room, seatIds: movie.seats, userId };
         sessionStorage.setItem('booking_reserved_info', JSON.stringify(info));

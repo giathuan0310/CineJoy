@@ -12,6 +12,31 @@ export default class ShowtimeController {
     }
   }
 
+  // API giải phóng ghế theo userId
+  async releaseSeatsByUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { showtimeId, date, startTime, room, seatIds, userId } = req.body;
+      if (!showtimeId || !date || !startTime || !room || !Array.isArray(seatIds) || !userId) {
+        res.status(400).json({ status: false, error: 400, message: 'Thiếu thông tin bắt buộc', data: null });
+        return;
+      }
+
+      // Ủy quyền cho service dùng reservedBy để kiểm tra quyền
+      const result = await showtimeService.setSeatsStatus(
+        showtimeId,
+        date,
+        startTime,
+        room,
+        seatIds,
+        'available',
+        userId
+      );
+
+      res.status(200).json({ status: true, error: 0, message: 'Đã giải phóng ghế', data: result });
+    } catch (error) {
+      res.status(500).json({ status: false, error: 500, message: error instanceof Error ? error.message : 'Lỗi server', data: null });
+    }
+  }
   async getShowtimeById(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     try {
@@ -191,7 +216,7 @@ export default class ShowtimeController {
     }
   }
 
-  // Đặt ghế (cập nhật trạng thái ghế)
+  // Đặt ghế (cập nhật trạng thái ghế) - API cũ cho admin
   async bookSeats(req: Request, res: Response): Promise<void> {
     try {
       const { id: showtimeId } = req.params;
@@ -247,6 +272,73 @@ export default class ShowtimeController {
       });
     } catch (error) {
       console.error("Book seats error:", error);
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: error instanceof Error ? error.message : "Lỗi server",
+        data: null,
+      });
+    }
+  }
+
+  // API mới cho frontend - đặt ghế với trạng thái selected (giữ ghế 5 phút)
+  async bookSeatsForFrontend(req: Request, res: Response): Promise<void> {
+    try {
+      const { showtimeId, date, startTime, room, seatIds, userId } = req.body;
+
+      console.log("BookSeatsForFrontend received:", {
+        showtimeId,
+        date,
+        startTime,
+        room,
+        seatIds,
+      });
+
+      if (
+        !showtimeId ||
+        !date ||
+        !startTime ||
+        !room ||
+        !seatIds ||
+        !Array.isArray(seatIds)
+      ) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "Thiếu thông tin bắt buộc",
+          data: null,
+        });
+        return;
+      }
+
+      const result = await showtimeService.bookSeats(
+        showtimeId,
+        date,
+        startTime,
+        room,
+        seatIds,
+        'selected',
+        userId
+      );
+
+      if (!result) {
+        res.status(404).json({
+          status: false,
+          error: 404,
+          message: "Không thể đặt ghế",
+          data: null,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: true,
+        error: 0,
+        message: "Đặt ghế thành công. Bạn có 5 phút để hoàn tất thanh toán.",
+        data: result,
+      });
+    } catch (error) {
+      console.error("Book seats for frontend error:", error);
       res.status(500).json({
         status: false,
         error: 500,

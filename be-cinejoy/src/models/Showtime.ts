@@ -4,6 +4,7 @@ export interface IShowtimeSeat {
     seat: Schema.Types.ObjectId; // Reference to Seat model
     status: 'available' | 'selected' | 'maintenance';
     reservedUntil?: Date; // Temporary reservation
+    reservedBy?: Schema.Types.ObjectId; // User who reserved temporarily
 }
 
 export interface IShowtime extends Document {
@@ -38,7 +39,8 @@ const ShowtimeSchema = new Schema<IShowtime>({
                         default: 'available',
                         required: true
                     },
-                    reservedUntil: { type: Date }
+                    reservedUntil: { type: Date },
+                    reservedBy: { type: Schema.Types.ObjectId, ref: "User" }
                 },
             ],
         },

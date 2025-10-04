@@ -53,15 +53,22 @@ class ShowtimeService {
         throw new Error("Thiếu dữ liệu bắt buộc để tạo suất chiếu");
       }
 
-      // Chuẩn hóa mảng showTimes: khởi tạo seats tự động nếu thiếu/không hợp lệ
+      // Chuẩn hóa mảng showTimes: LUÔN khởi tạo seats từ database để đảm bảo tính nhất quán
       const normalizedShowTimes = await Promise.all(
         (showtimeData.showTimes as any[]).map(async (st: any) => {
           st.start = new Date(st.start);
           st.end = new Date(st.end);
-          if (!Array.isArray(st.seats) || st.seats.length === 0 || (st.seats[0] && !st.seats[0].seat)) {
-            const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
-            st.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
+          
+          // Luôn khởi tạo lại seats từ database để đảm bảo có đầy đủ thông tin
+          const roomSeats = await SeatModel.find({ room: st.room }).select("_id status");
+          if (roomSeats.length === 0) {
+            throw new Error(`Không tìm thấy ghế nào trong phòng ${st.room}. Vui lòng tạo ghế cho phòng trước khi tạo suất chiếu.`);
           }
+          st.seats = roomSeats.map((s) => ({ 
+            seat: s._id, 
+            status: s.status || "available" 
+          }));
+          
           return st;
         })
       );
@@ -210,11 +217,15 @@ class ShowtimeService {
           // Bỏ giới hạn tối đa 2 suất/ca/phòng. Vẫn tiếp tục thêm suất chiếu nếu không trùng.
           const totalInSession = inThisSession.length + alsoIncoming.length;
 
-          // Khởi tạo seats tự động nếu thiếu trước khi push
-          if (!Array.isArray(incoming.seats) || incoming.seats.length === 0 || (incoming.seats[0] && !incoming.seats[0].seat)) {
-            const roomSeats = await SeatModel.find({ room: incoming.room }).select("_id status");
-            incoming.seats = roomSeats.map((s) => ({ seat: s._id as any, status: s.status || "available" }));
+          // Luôn khởi tạo lại seats từ database để đảm bảo tính nhất quán
+          const roomSeats = await SeatModel.find({ room: incoming.room }).select("_id status");
+          if (roomSeats.length === 0) {
+            throw new Error(`Không tìm thấy ghế nào trong phòng ${incoming.room}. Vui lòng tạo ghế cho phòng trước khi tạo suất chiếu.`);
           }
+          incoming.seats = roomSeats.map((s) => ({ 
+            seat: s._id, 
+            status: s.status || "available" 
+          }));
 
           doc.showTimes.push(incoming);
       }
@@ -710,7 +721,8 @@ class ShowtimeService {
     startTime: string,
     room: string,
     seatIds: string[],
-    status: "available" | "selected" = "selected"
+    status: "available" | "selected" = "selected",
+    reservedByUserId?: string
   ): Promise<any> {
     try {
       // showtimeId là parentId (ID của document cha)
@@ -828,7 +840,15 @@ class ShowtimeService {
           console.log("[BookSeats][DEBUG] Seat entry not found in showtime for seatId:", doc.seatId, "(seat _id:", doc._id?.toString?.(), ")");
           unavailableSeats.push(`${doc.seatId} (không tồn tại)`);
         } else if (entry.status !== "available") {
-          unavailableSeats.push(`${doc.seatId} (đã được đặt)`);
+          // Nếu ghế đã được đặt, kiểm tra xem có phải của user hiện tại không
+          const currentReservedBy = (entry as any).reservedBy?.toString();
+          const requestingUserId = reservedByUserId?.toString();
+          
+          // Nếu không phải của user hiện tại, thì ghế không khả dụng
+          if (currentReservedBy && currentReservedBy !== requestingUserId) {
+            unavailableSeats.push(`${doc.seatId} (đã được đặt)`);
+          }
+          // Nếu là của user hiện tại hoặc không có reservedBy, cho phép đặt lại
         }
       });
 
@@ -852,8 +872,12 @@ class ShowtimeService {
           // hold 5 minutes when selected
           if (status === 'selected') {
             (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = new Date(Date.now() + 5 * 60 * 1000);
+            if (reservedByUserId) {
+              (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedBy = reservedByUserId as any;
+            }
           } else {
             (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = undefined;
+            (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedBy = undefined;
           }
         }
       });
@@ -920,6 +944,7 @@ class ShowtimeService {
           showtime.showTimes[showtimeIndex].seats[seatIndex].status =
             "available";
           (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedUntil = undefined;
+          (showtime.showTimes[showtimeIndex].seats[seatIndex] as any).reservedBy = undefined;
         }
       });
 
@@ -944,7 +969,8 @@ class ShowtimeService {
     startTime: string,
     room: string,
     seatIds: string[],
-    status: "selected" | "available" | "maintenance"
+    status: "selected" | "available" | "maintenance",
+    onlyIfReservedByUserId?: string
   ): Promise<void> {
     const showtime = await Showtime.findById(showtimeId)
       .populate({ path: "showTimes.room", select: "name" })
@@ -985,10 +1011,19 @@ class ShowtimeService {
     seatIds.forEach((seatId) => {
       const seatIndex = specificShowtime.seats.findIndex(
         (s) => ((s.seat as any)?.seatId === seatId) || ((s as any)?.seatId === seatId)
-        );
-        if (seatIndex !== -1) {
+      );
+      if (seatIndex !== -1) {
+        if (onlyIfReservedByUserId) {
+          const current = specificShowtime.seats[seatIndex] as any;
+          if (current.reservedBy && current.reservedBy.toString() !== onlyIfReservedByUserId) {
+            return; // skip not owned
+          }
+        }
         specificShowtime.seats[seatIndex].status = status as any;
         (specificShowtime.seats[seatIndex] as any).reservedUntil = status === 'selected' ? new Date(Date.now() + 5 * 60 * 1000) : undefined;
+        if (status === 'available') {
+          (specificShowtime.seats[seatIndex] as any).reservedBy = undefined;
+        }
       }
     });
 

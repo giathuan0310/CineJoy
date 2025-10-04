@@ -73,6 +73,8 @@ const PaymentPage = () => {
   const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'VNPAY'>('MOMO');
 
+  // Không cần cleanup ở đây nữa, logic đã chuyển sang SelectSeat
+
   useEffect(() => {
     const loadServicesFromPriceList = async () => {
       try {

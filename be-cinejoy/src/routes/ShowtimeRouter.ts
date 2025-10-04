@@ -27,6 +27,14 @@ router.post(
   showtimeController.bookSeats.bind(showtimeController)
 );
 router.post(
+  "/book-seats",
+  showtimeController.bookSeatsForFrontend.bind(showtimeController)
+);
+router.post(
+  "/release-by-user",
+  showtimeController.releaseSeatsByUser.bind(showtimeController)
+);
+router.post(
   "/:id/initialize-seats",
   showtimeController.initializeSeats.bind(showtimeController)
 );

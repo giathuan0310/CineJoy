@@ -303,6 +303,56 @@ export const deleteAllSeatsInRoomApi = async (roomId: string) => {
   await axios.delete(`/seats/room/${roomId}/all`);
 };
 
+// Book seats API - đặt ghế với trạng thái selected
+export const bookSeatsApi = async (data: {
+  showtimeId: string;
+  date: string;
+  startTime: string;
+  room: string;
+  seatIds: string[];
+  userId?: string;
+}) => {
+  try {
+    const response = await axios.post<IBackendResponse<any>>(
+      "/showtimes/book-seats",
+      data
+    );
+    return response.data;
+  } catch (error: any) {
+    const status = error?.response?.status ?? 500;
+    const message = error?.response?.data?.message || error?.message || 'Request failed';
+    
+    return {
+      status: false,
+      error: status,
+      message,
+      data: null,
+    } as unknown as IBackendResponse<any>;
+  }
+};
+
+// Release seats by user
+export const releaseSeatsByUserApi = async (data: {
+  showtimeId: string;
+  date: string;
+  startTime: string;
+  room: string;
+  seatIds: string[];
+  userId: string;
+}) => {
+  try {
+    const response = await axios.post<IBackendResponse<any>>(
+      "/showtimes/release-by-user",
+      data
+    );
+    return response.data;
+  } catch (error: any) {
+    const status = error?.response?.status ?? 500;
+    const message = error?.response?.data?.message || error?.message || 'Request failed';
+    return { status: false, error: status, message, data: null } as unknown as IBackendResponse<any>;
+  }
+};
+
 // Order APIs
 export const createOrderApi = async (orderData: {
   userId: string;

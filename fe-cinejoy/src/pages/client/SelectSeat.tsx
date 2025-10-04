@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { message } from "antd";
 import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
+import { releaseSeatsByUserApi } from "@/services/api";
 import type { IPriceList } from "@/apiservice/apiPriceList";
 
 export const SelectSeat = () => {
@@ -17,12 +18,13 @@ export const SelectSeat = () => {
   const [ticketPrices, setTicketPrices] = useState<Record<string, number>>({});
   const [totalTicketPrice, setTotalTicketPrice] = useState<number>(0);
   const [hasTicketPriceGap, setHasTicketPriceGap] = useState<boolean>(false);
+  const [isReleasingSeats, setIsReleasingSeats] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const navigationType = useNavigationType(); // 'POP' khi back/forward
   const location = useLocation();
   
-  const { isDarkMode } = useAppStore();
+  const { isDarkMode, user } = useAppStore();
   const { movie, cinema, date, time, room, showtimeId, theaterId } = location.state || {};
   
   // Debug log để kiểm tra dữ liệu nhận được
@@ -30,6 +32,58 @@ export const SelectSeat = () => {
 
   const displayTime = time;
   const apiTime = time;
+
+  // Sử dụng useLayoutEffect để gọi API release trước khi render
+  useLayoutEffect(() => {
+    const releaseSeatsIfNeeded = async () => {
+      try {
+        const raw = sessionStorage.getItem('booking_reserved_info');
+        console.log('[SelectSeat] Raw sessionStorage:', raw);
+        
+        if (!raw) {
+          console.log('[SelectSeat] No booking_reserved_info found');
+          return;
+        }
+        
+        setIsReleasingSeats(true);
+        
+        const stored = JSON.parse(raw);
+        const userId = stored?.userId || user?._id || sessionStorage.getItem('current_user_id') || '';
+        
+        console.log('[SelectSeat] Parsed data:', { stored, userId, userFromStore: user?._id });
+        
+        if (stored?.showtimeId && stored?.seatIds?.length && userId) {
+          console.log('[SelectSeat] Releasing seats:', {
+            showtimeId: stored.showtimeId,
+            date: stored.date,
+            startTime: stored.startTime,
+            room: stored.room,
+            seatIds: stored.seatIds,
+            userId
+          });
+          
+          // Gọi API giải phóng ghế ngay lập tức
+          const result = await releaseSeatsByUserApi({
+            showtimeId: stored.showtimeId,
+            date: stored.date,
+            startTime: stored.startTime,
+            room: stored.room,
+            seatIds: stored.seatIds,
+            userId
+          });
+          
+          console.log('[SelectSeat] Release result:', result);
+          sessionStorage.removeItem('booking_reserved_info');
+        }
+      } catch (error) {
+        console.error('Error releasing seats:', error);
+      } finally {
+        setIsReleasingSeats(false);
+      }
+    };
+
+    releaseSeatsIfNeeded();
+  }, [user?._id]);
 
   // Load giá vé từ bảng giá đang hoạt động
   useEffect(() => {
@@ -210,6 +264,15 @@ export const SelectSeat = () => {
 
         if (seatItem.type) {
           typeMap[seatId] = seatItem.type;
+        } else {
+          // Fallback: xác định loại ghế dựa trên vị trí nếu API không trả về type
+          let fallbackType = 'normal';
+          if (fallbackRow >= 3 && fallbackRow <= 6 && fallbackCol >= 3 && fallbackCol <= 6) {
+            fallbackType = 'vip';
+          } else if (fallbackRow >= 8 && fallbackCol >= 0 && fallbackCol <= 9) {
+            fallbackType = 'couple';
+          }
+          typeMap[seatId] = fallbackType;
         }
 
         // New statuses: selected | available | maintenance
@@ -223,6 +286,24 @@ export const SelectSeat = () => {
       setSeatTypeMap(typeMap);
     }
   };
+
+  // Hiển thị loading khi đang giải phóng ghế
+  if (isReleasingSeats) {
+    return (
+      <div
+        className={`${
+          isDarkMode ? "bg-[#23272f]" : "bg-[#e7ede7]"
+        } min-h-screen py-6 flex items-center justify-center`}
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className={`text-lg ${isDarkMode ? "text-white" : "text-gray-700"}`}>
+            Đang giải phóng ghế...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -258,6 +339,7 @@ export const SelectSeat = () => {
           }}
           totalPrice={totalTicketPrice}
           priceError={hasTicketPriceGap}
+          showtimeId={showtimeId}
           onContinue={() => {
             
             navigate("/payment", {

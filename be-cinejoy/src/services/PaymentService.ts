@@ -214,7 +214,8 @@ class PaymentService {
                 { path: 'movieId', select: 'title' },
                 { path: 'theaterId', select: 'name' }
               ]
-            });
+            })
+            .populate('foodCombos.comboId', 'name');
           
           if (populatedOrder && populatedOrder.showtimeId) {
             const seatIds = populatedOrder.seats.map(seat => seat.seatId);
@@ -242,7 +243,8 @@ class PaymentService {
                 { path: 'movieId', select: 'title' },
                 { path: 'theaterId', select: 'name' }
               ]
-            });
+            })
+            .populate('foodCombos.comboId', 'name');
           
           
           if (populatedOrder && populatedOrder.userId) {
@@ -259,7 +261,12 @@ class PaymentService {
               ticketPrice: populatedOrder.ticketPrice || 0,
               comboPrice: populatedOrder.comboPrice || 0,
               totalAmount: populatedOrder.totalAmount || 0,
-              qrCodeDataUrl: ''
+              qrCodeDataUrl: '',
+              foodCombos: populatedOrder.foodCombos?.map(combo => ({
+                comboName: (combo.comboId as any)?.name || 'Combo',
+                quantity: combo.quantity,
+                price: combo.price
+              })) || []
             };
             
             
@@ -383,7 +390,8 @@ class PaymentService {
                 { path: 'movieId', select: 'title' },
                 { path: 'theaterId', select: 'name' }
               ]
-            });
+            })
+            .populate('foodCombos.comboId', 'name');
           
           
           if (populatedOrder && populatedOrder.userId) {

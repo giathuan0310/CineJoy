@@ -58,6 +58,11 @@ interface PaymentEmailData {
   comboPrice?: number;
   totalAmount: number;
   qrCodeDataUrl: string;
+  foodCombos?: Array<{
+    comboName: string;
+    quantity: number;
+    price: number;
+  }>;
 }
 
 const getPaymentSuccessTemplate = (data: PaymentEmailData) => {
@@ -84,8 +89,8 @@ const getPaymentSuccessTemplate = (data: PaymentEmailData) => {
             </p>
           </div>
           
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #e50914; margin-top: 0; text-align: center; border-bottom: 2px solid #e50914; padding-bottom: 10px; font-size: 16px;">THÔNG TIN VÉ</h3>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; padding-bottom: 0;">
+            <h3 style="color: #e50914; margin: 0; text-align: center; font-size: 16px; padding: 5px 0;">THÔNG TIN VÉ</h3>
             <table style="width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word;">
               <tr>
                 <td style="padding: 5px 0; font-weight: bold; width: 30%; font-size: 14px; word-wrap: break-word;">Mã vé:</td>
@@ -115,14 +120,28 @@ const getPaymentSuccessTemplate = (data: PaymentEmailData) => {
                 <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Giá vé:</td>
                 <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${seats.length} x ${ticketPrice.toLocaleString('vi-VN')}₫</td>
               </tr>
-              ${comboPrice ? `
+              ${(comboPrice || 0) > 0 ? `
               <tr>
                 <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Combo:</td>
-                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${comboPrice.toLocaleString('vi-VN')}₫</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${(comboPrice || 0).toLocaleString('vi-VN')}₫</td>
               </tr>
               ` : ''}
             </table>
           </div>
+          
+          ${(comboPrice || 0) > 0 ? `
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; padding-top: 0;">
+            <h3 style="color: #e50914; margin: 0; text-align: center; font-size: 16px; padding: 5px 0;">CHI TIẾT CONCESSION</h3>
+            ${data.foodCombos && data.foodCombos.length > 0 ? data.foodCombos.map(combo => `
+              <table style="width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word;">
+                <tr>
+                  <td style="padding: 5px 0; font-weight: bold; width: 30%; font-size: 14px; word-wrap: break-word;">${combo.comboName || 'Combo'}</td>
+                  <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${combo.quantity} x ${combo.price.toLocaleString('vi-VN')}₫</td>
+                </tr>
+              </table>
+            `).join('') : ''}
+          </div>
+          ` : ''}
           
           <div style="background-color: #e50914; color: white; padding: 12px; border-radius: 5px; text-align: center; margin: 20px 0;">
             <h2 style="margin: 0; font-size: 14px;">Tổng cộng: ${totalAmount.toLocaleString('vi-VN')}₫</h2>

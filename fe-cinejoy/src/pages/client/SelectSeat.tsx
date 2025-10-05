@@ -38,10 +38,8 @@ export const SelectSeat = () => {
     const releaseSeatsIfNeeded = async () => {
       try {
         const raw = sessionStorage.getItem('booking_reserved_info');
-        console.log('[SelectSeat] Raw sessionStorage:', raw);
         
         if (!raw) {
-          console.log('[SelectSeat] No booking_reserved_info found');
           return;
         }
         
@@ -50,29 +48,12 @@ export const SelectSeat = () => {
         const stored = JSON.parse(raw);
         const userId = stored?.userId || user?._id || sessionStorage.getItem('current_user_id') || '';
         
-        console.log('[SelectSeat] Parsed data:', { stored, userId, userFromStore: user?._id });
         
         if (stored?.showtimeId && stored?.seatIds?.length && userId) {
-          console.log('[SelectSeat] Releasing seats:', {
-            showtimeId: stored.showtimeId,
-            date: stored.date,
-            startTime: stored.startTime,
-            room: stored.room,
-            seatIds: stored.seatIds,
-            userId
-          });
           
-          // Gọi API giải phóng ghế ngay lập tức
-          const result = await releaseSeatsByUserApi({
-            showtimeId: stored.showtimeId,
-            date: stored.date,
-            startTime: stored.startTime,
-            room: stored.room,
-            seatIds: stored.seatIds,
-            userId
-          });
+          // Tạm thời TẮT logic release ghế khi mount lại SelectSeat
+          // Chỉ clear sessionStorage mà không gọi API release
           
-          console.log('[SelectSeat] Release result:', result);
           sessionStorage.removeItem('booking_reserved_info');
         }
       } catch (error) {

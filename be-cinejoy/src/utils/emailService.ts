@@ -1,4 +1,5 @@
 import nodemailer, { Transporter, SendMailOptions } from "nodemailer";
+import QRCode from "qrcode";
 
 const transporter: Transporter = nodemailer.createTransport({
   service: "gmail",
@@ -12,7 +13,7 @@ const getResetPasswordTemplate = (userName: string, otp: string) => {
   return {
     subject: "Mã xác nhận đặt lại mật khẩu",
     html: `
-      <h1>Yêu cầu đặt lại mật khẩu</h1>
+      <h1>Yêu cầu đặt lại mật khẩu</h1>ngrok htt
       <p>Xin chào ${userName},</p>
       <p>Bạn đã yêu cầu đặt lại mật khẩu. Đây là mã xác nhận của bạn:</p>
       <h2 style="color: #d32f2f;">${otp}</h2>
@@ -43,6 +44,100 @@ const getWelcomeTemplate = (userName: string) => {
         </div>
       `,
     };
+};
+
+interface PaymentEmailData {
+  userName: string;
+  orderId: string;
+  movieName: string;
+  cinema: string;
+  room: string;
+  showtime: string;
+  seats: string[];
+  ticketPrice: number;
+  comboPrice?: number;
+  totalAmount: number;
+  qrCodeDataUrl: string;
+}
+
+const getPaymentSuccessTemplate = (data: PaymentEmailData) => {
+  const { userName, orderId, movieName, cinema, room, showtime, seats, ticketPrice, comboPrice, totalAmount, qrCodeDataUrl } = data;
+  
+  return {
+    subject: "CineJoy: Giao Dịch Thành Công",
+      html: `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; overflow-x: hidden;">
+        
+        <div style="padding: 10px; background-color: white;">
+          <div style="text-align: center; margin: 15px 0;">
+            <img src="cid:qr-code" alt="QR Code - Mã vé: ${orderId}" style="max-width: 150px; border: 2px solid #000000; border-radius: 10px;" />
+          </div>
+
+          <div style="text-align: center; margin-bottom: 20px;">
+            <p style="margin: 0; color: #856404; font-size: 12px;">
+              Vui lòng đưa mã QR này đến quầy vé CineJoy để nhận vé của bạn
+            </p>
+
+            <p style="margin: 0; color: #856404; font-size: 12px; margin-top: 3px;">
+              <strong>*Lưu ý:</strong> Vui lòng sử dụng loại vé đúng với độ tuổi theo quy định của CineJoy. 
+              Chi tiết xem tại <a href="#" style="color: #e50914;">đây!</a>
+            </p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="color: #e50914; margin-top: 0; text-align: center; border-bottom: 2px solid #e50914; padding-bottom: 10px; font-size: 16px;">THÔNG TIN VÉ</h3>
+            <table style="width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; word-wrap: break-word;">
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; width: 30%; font-size: 14px; word-wrap: break-word;">Mã vé:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${orderId}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Tên phim:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${movieName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Rạp:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${cinema}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Phòng chiếu:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${room}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Suất chiếu:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${showtime}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Ghế:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${seats.join(', ')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Giá vé:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${seats.length} x ${ticketPrice.toLocaleString('vi-VN')}₫</td>
+              </tr>
+              ${comboPrice ? `
+              <tr>
+                <td style="padding: 5px 0; font-weight: bold; font-size: 14px; word-wrap: break-word;">Combo:</td>
+                <td style="padding: 5px 0; word-wrap: break-word; overflow-wrap: break-word;">${comboPrice.toLocaleString('vi-VN')}₫</td>
+              </tr>
+              ` : ''}
+            </table>
+          </div>
+          
+          <div style="background-color: #e50914; color: white; padding: 12px; border-radius: 5px; text-align: center; margin: 20px 0;">
+            <h2 style="margin: 0; font-size: 14px;">Tổng cộng: ${totalAmount.toLocaleString('vi-VN')}₫</h2>
+          </div>
+          
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="color: #e50914; margin-top: 0; font-size: 14px;">CineJoy Cinemas Việt Nam</h3>
+            <p style="margin: 5px 0; word-wrap: break-word; overflow-wrap: break-word;"><strong>Địa chỉ:</strong> Lầu 2, 7/28 Thành Thái, Phường 14, Quận 10, TP.HCM</p>
+            <p style="margin: 5px 0; word-wrap: break-word; overflow-wrap: break-word;"><strong>Email hỗ trợ:</strong> <a href="mailto:hoidap@cinejoy.vn" style="color: #e50914;">hoidap@cinejoy.vn</a></p>
+            <p style="margin: 5px 0; word-wrap: break-word; overflow-wrap: break-word;"><strong>Hotline:</strong> 1900 6017</p>
+          </div>
+        </div>
+      </div>
+    `,
+  };
 };
   
 
@@ -104,7 +199,59 @@ const sendWelcomeEmail = async (to: string, userName: string) => {
   }
 };
 
+const sendPaymentSuccessEmail = async (to: string, data: PaymentEmailData) => {
+  try {
+    
+    // Tạo QR code từ order ID
+    const qrCodeBuffer = await QRCode.toBuffer(data.orderId, {
+      width: 100,  // Giảm kích thước
+      margin: 1,   // Giảm margin
+      color: {
+        dark: '#000000',  // Màu đen bình thường
+        light: '#FFFFFF'
+      }
+    });
+
+    const template = getPaymentSuccessTemplate({
+      ...data,
+      qrCodeDataUrl: '' // Không dùng base64 nữa
+    });
+
+    const mailOptions: SendMailOptions = {
+      from: process.env.EMAIL_FROM as string,
+      to: to,
+      subject: template.subject,
+      html: template.html,
+      attachments: [
+        {
+          filename: `qr-code-${data.orderId}.png`,
+          content: qrCodeBuffer,
+          cid: 'qr-code' // Content ID để reference trong HTML
+        }
+      ]
+    };
+
+    await transporter.sendMail(mailOptions);
+    return {
+      status: true,
+      error: 0,
+      message: "Email xác nhận thanh toán đã được gửi thành công",
+      data: null,
+    };
+  } catch (error) {
+    console.error("Lỗi gửi email thanh toán:", error);
+    return {
+      status: false,
+      error: 1,
+      message: "Không thể gửi email: " + (error as Error).message,
+      data: null,
+    };
+  }
+};
+
 export {
   sendResetPasswordEmail,
   sendWelcomeEmail,
+  sendPaymentSuccessEmail,
+  type PaymentEmailData,
 };

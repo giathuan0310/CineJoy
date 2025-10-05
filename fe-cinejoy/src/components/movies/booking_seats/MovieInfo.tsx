@@ -94,6 +94,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice, pr
       // Gọi API đặt ghế với trạng thái selected (giữ ghế 5 phút)
       // Lấy userId từ store hoặc sessionStorage
       const userId = sessionStorage.getItem('current_user_id') || localStorage.getItem('current_user_id') || '';
+      
       const result = await bookSeatsApi({
         showtimeId,
         date: movie.date,

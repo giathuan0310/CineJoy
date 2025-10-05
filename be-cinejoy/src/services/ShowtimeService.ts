@@ -65,9 +65,9 @@ class ShowtimeService {
             throw new Error(`Không tìm thấy ghế nào trong phòng ${st.room}. Vui lòng tạo ghế cho phòng trước khi tạo suất chiếu.`);
           }
           st.seats = roomSeats.map((s) => ({ 
-            seat: s._id, 
-            status: s.status || "available" 
-          }));
+          seat: s._id, 
+          status: s.status || "available" 
+        }));
           
           return st;
         })
@@ -223,12 +223,12 @@ class ShowtimeService {
             throw new Error(`Không tìm thấy ghế nào trong phòng ${incoming.room}. Vui lòng tạo ghế cho phòng trước khi tạo suất chiếu.`);
           }
           incoming.seats = roomSeats.map((s) => ({ 
-            seat: s._id, 
-            status: s.status || "available" 
-          }));
+              seat: s._id, 
+              status: s.status || "available" 
+            }));
 
           doc.showTimes.push(incoming);
-      }
+          }
 
       await doc.save();
       return doc;
@@ -802,26 +802,11 @@ class ShowtimeService {
         .select("_id seatId")
         .lean();
 
-      // DEBUG: log dữ liệu đầu vào và mapping ghế tìm được từ collection Seat
-      try {
-        console.log("[BookSeats][DEBUG] Input:", {
-          showtimeId,
-          date,
-          startTime,
-          room,
-          seatIds,
-          roomId: roomId?.toString?.() || roomId,
-        });
-        console.log("[BookSeats][DEBUG] Seat docs from collection:", seatDocs.map((d: any) => ({ id: d?._id?.toString?.(), seatId: d?.seatId })));
-        console.log("[BookSeats][DEBUG] specificShowtime seats length:", specificShowtime?.seats?.length);
-        console.log("[BookSeats][DEBUG] First 5 seats in specificShowtime:", (specificShowtime?.seats || []).slice(0, 5).map((s: any) => ({ seat: s?.seat?.toString?.(), status: s?.status })));
-      } catch {}
 
       const requestedSet = new Set(seatIds.map((s) => s.toUpperCase().trim()));
       const foundSet = new Set(seatDocs.map((d: any) => d.seatId));
       const missing = [...requestedSet].filter((s) => !foundSet.has(s));
       if (missing.length > 0) {
-        console.log("[BookSeats][DEBUG] Missing in Seat collection:", missing);
         throw new Error(`Ghế không tồn tại trong phòng: ${missing.join(", ")}`);
       }
 
@@ -837,18 +822,24 @@ class ShowtimeService {
           return matchById || matchByObjId || matchByStr || matchBySeatId;
         });
         if (!entry) {
-          console.log("[BookSeats][DEBUG] Seat entry not found in showtime for seatId:", doc.seatId, "(seat _id:", doc._id?.toString?.(), ")");
           unavailableSeats.push(`${doc.seatId} (không tồn tại)`);
         } else if (entry.status !== "available") {
           // Nếu ghế đã được đặt, kiểm tra xem có phải của user hiện tại không
           const currentReservedBy = (entry as any).reservedBy?.toString();
           const requestingUserId = reservedByUserId?.toString();
           
+          
           // Nếu không phải của user hiện tại, thì ghế không khả dụng
-          if (currentReservedBy && currentReservedBy !== requestingUserId) {
+          if (currentReservedBy && requestingUserId && currentReservedBy !== requestingUserId) {
             unavailableSeats.push(`${doc.seatId} (đã được đặt)`);
+          } else if (!currentReservedBy && entry.status === "selected") {
+            // Nếu ghế đã selected nhưng không có reservedBy, cũng coi là không khả dụng
+            unavailableSeats.push(`${doc.seatId} (đã được đặt)`);
+          } else if (!requestingUserId) {
+            // Nếu không có requestingUserId, vẫn cho phép đặt lại nếu reservedBy khớp
+            // Đây là fallback cho trường hợp userId không được truyền đúng
           }
-          // Nếu là của user hiện tại hoặc không có reservedBy, cho phép đặt lại
+          // Nếu là của user hiện tại, cho phép đặt lại
         }
       });
 
@@ -975,8 +966,9 @@ class ShowtimeService {
     const showtime = await Showtime.findById(showtimeId)
       .populate({ path: "showTimes.room", select: "name" })
       .populate({ path: "showTimes.seats.seat", select: "seatId" });
+    
     if (!showtime) throw new Error("Không tìm thấy suất chiếu");
-
+    
     const showtimeIndex = showtime.showTimes.findIndex((st) => {
       const showDate = new Date(st.date);
       const showDateVietnam = new Date(showDate.getTime() + 7 * 60 * 60 * 1000);
@@ -1008,10 +1000,12 @@ class ShowtimeService {
     if (showtimeIndex === -1) throw new Error("Không tìm thấy suất chiếu cụ thể");
 
     const specificShowtime = showtime.showTimes[showtimeIndex];
+    
     seatIds.forEach((seatId) => {
       const seatIndex = specificShowtime.seats.findIndex(
         (s) => ((s.seat as any)?.seatId === seatId) || ((s as any)?.seatId === seatId)
-      );
+        );
+        
       if (seatIndex !== -1) {
         if (onlyIfReservedByUserId) {
           const current = specificShowtime.seats[seatIndex] as any;
@@ -1019,6 +1013,7 @@ class ShowtimeService {
             return; // skip not owned
           }
         }
+        
         specificShowtime.seats[seatIndex].status = status as any;
         (specificShowtime.seats[seatIndex] as any).reservedUntil = status === 'selected' ? new Date(Date.now() + 5 * 60 * 1000) : undefined;
         if (status === 'available') {

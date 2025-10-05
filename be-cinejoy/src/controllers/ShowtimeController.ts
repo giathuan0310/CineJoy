@@ -155,12 +155,6 @@ export default class ShowtimeController {
       const { id: showtimeId } = req.params;
       const { date, startTime, room } = req.query;
 
-      console.log("Controller received params:", {
-        showtimeId,
-        date,
-        startTime,
-        room,
-      });
 
       if (!showtimeId) {
         res.status(400).json({
@@ -222,13 +216,6 @@ export default class ShowtimeController {
       const { id: showtimeId } = req.params;
       const { date, startTime, room, seats } = req.body;
 
-      console.log("BookSeats controller received:", {
-        showtimeId,
-        date,
-        startTime,
-        room,
-        seats,
-      });
 
       if (
         !showtimeId ||
@@ -286,13 +273,6 @@ export default class ShowtimeController {
     try {
       const { showtimeId, date, startTime, room, seatIds, userId } = req.body;
 
-      console.log("BookSeatsForFrontend received:", {
-        showtimeId,
-        date,
-        startTime,
-        room,
-        seatIds,
-      });
 
       if (
         !showtimeId ||

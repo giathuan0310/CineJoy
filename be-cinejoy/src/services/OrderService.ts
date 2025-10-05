@@ -440,6 +440,7 @@ class OrderService {
       // Release ghế trong showtime khi hủy order
       try {
         const seatIds = order.seats.map((seat) => seat.seatId);
+        
         // Cập nhật trạng thái ghế về available (dùng setSeatsStatus để so khớp theo tên phòng/seatId)
         await showtimeService.setSeatsStatus(
           order.showtimeId.toString(),

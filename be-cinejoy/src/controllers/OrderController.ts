@@ -395,16 +395,21 @@ class OrderController {
             error.response?.data || error.message
           );
 
-          // Uncomment dòng dưới để xem chi tiết lỗi MoMo thay vì dùng mock
-          // throw new Error(`MoMo Error: ${error.response?.data?.message || error.message}`);
-
-          // Fallback to mock payment for testing
-          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${order.finalAmount}`;
-          console.log("🔧 Using mock payment URL for testing:", paymentUrl);
+          // Sử dụng mock payment để test tính năng email (MoMo sandbox có vấn đề)
+          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${order.finalAmount}&paymentMethod=${paymentMethod}`;
         }
       } else if (paymentMethod === "VNPAY") {
-        // TODO: Implement VNPay integration
-        throw new Error("VNPay chưa được tích hợp");
+        try {
+          paymentUrl = await PaymentService.createVNPayPayment(payment);
+        } catch (error: any) {
+          console.error(
+            "VNPay payment creation failed:",
+            error.response?.data || error.message
+          );
+
+          // Sử dụng mock payment để test tính năng email (VNPay sandbox có vấn đề)
+          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${order.finalAmount}&paymentMethod=${paymentMethod}`;
+        }
       }
 
       res.status(200).json({

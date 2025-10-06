@@ -115,6 +115,11 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice, pr
         // Lưu info để còn release khi rời trang payment
         const info = { showtimeId, date: movie.date, startTime: movie.time, room: movie.room, seatIds: movie.seats, userId };
         sessionStorage.setItem('booking_reserved_info', JSON.stringify(info));
+        
+        // Lưu ghế đã chọn để khôi phục khi quay lại SelectSeat
+        const storageKey = `booking:selected:${showtimeId}`;
+        sessionStorage.setItem(storageKey, JSON.stringify(movie.seats));
+        
         setConfirmOpen(false);
         setIsModalOpen(false);
         onContinue();

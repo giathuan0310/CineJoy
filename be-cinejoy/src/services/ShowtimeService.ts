@@ -963,6 +963,7 @@ class ShowtimeService {
     status: "selected" | "available" | "maintenance",
     onlyIfReservedByUserId?: string
   ): Promise<void> {
+
     const showtime = await Showtime.findById(showtimeId)
       .populate({ path: "showTimes.room", select: "name" })
       .populate({ path: "showTimes.seats.seat", select: "seatId" });

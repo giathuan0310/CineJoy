@@ -102,9 +102,15 @@ const Seat: React.FC<SeatProps> = ({
   // Load seats from API
   useEffect(() => {
     const loadSeats = async () => {
+      console.log("🔄 Seat component loading seats with params:", {
+        showtimeId,
+        date,
+        startTime,
+        room
+      });
 
       if (!showtimeId || !date || !startTime) {
-        // Fallback to static data if no API params provided
+        console.log("❌ Missing required params for seat loading");
         return;
       }
 
@@ -119,6 +125,8 @@ const Seat: React.FC<SeatProps> = ({
           startTime,
           room
         );
+        
+        console.log("✅ Seat API response:", response);
 
         if (response.status && response.data) {
           // Cast the API response to match our SeatLayout interface
@@ -161,6 +169,12 @@ const Seat: React.FC<SeatProps> = ({
           }
           
           setSeatMap(map);
+          
+          // Debug: Log seat statuses
+          console.log("🪑 Seat map created:", map);
+          const selectedSeats = Object.entries(map).filter(([_, info]) => info.status === 'selected');
+          console.log("🔍 Selected seats found:", selectedSeats);
+          
           if (onSeatsLoadedRef.current) {
             onSeatsLoadedRef.current(response.data);
           }

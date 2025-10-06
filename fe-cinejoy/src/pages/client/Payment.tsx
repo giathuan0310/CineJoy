@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button, Typography, Row, Col, message } from "antd";
-import { validateVoucherApi, applyVoucherApi, createOrderApi, processPaymentApi } from "@/services/api";
+import { validateVoucherApi, applyVoucherApi, createOrderApi, processPaymentApi, releaseSeatsByUserApi } from "@/services/api";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
 import type { IPriceList, IPriceListLine } from "@/apiservice/apiPriceList";
@@ -73,7 +73,71 @@ const PaymentPage = () => {
   const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'VNPAY'>('MOMO');
 
-  // Không cần cleanup ở đây nữa, logic đã chuyển sang SelectSeat
+  // Logic giải phóng ghế khi rời khỏi trang payment
+  const releaseSeatsOnExit = useCallback(async () => {
+    try {
+      if (showtimeId && seats && seats.length > 0 && user?._id) {
+        await releaseSeatsByUserApi({
+          showtimeId,
+          date,
+          startTime: time,
+          room,
+          seatIds: seats,
+          userId: user._id
+        });
+        
+        // Thêm delay để đảm bảo backend đã xử lý xong
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      console.error("Error releasing seats:", error);
+    }
+  }, [showtimeId, seats, date, time, room, user?._id]);
+
+  // Setup event listeners (chỉ chạy 1 lần khi component mount)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Release ghế khi đóng tab/refresh
+      releaseSeatsOnExit();
+    };
+
+    const handleRouteChange = () => {
+      // Release ghế khi navigate away
+      releaseSeatsOnExit();
+    };
+
+    // Lắng nghe sự kiện beforeunload (đóng tab, refresh, navigate away)
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Lắng nghe sự kiện popstate (back/forward button)
+    window.addEventListener('popstate', handleRouteChange);
+
+    // Cleanup function - chỉ remove event listeners
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []); // Không có dependency để tránh re-run
+
+  // Cleanup logic riêng biệt (chỉ chạy khi component unmount thật sự)
+  useEffect(() => {
+    return () => {
+      // Kiểm tra xem có đang redirect đến payment gateway không
+      const isRedirectingToPayment = sessionStorage.getItem('payment_redirecting');
+      
+      if (!isRedirectingToPayment) {
+        // Chỉ release ghế khi KHÔNG đang redirect đến payment gateway
+        releaseSeatsOnExit();
+      }
+      
+      // Đảm bảo cờ redirecting được xóa khi component unmount
+      try {
+        sessionStorage.removeItem('payment_redirecting');
+      } catch (e) {
+        console.error('Error clearing payment_redirecting on unmount:', e);
+      }
+    };
+  }, []); // Không có dependency để tránh re-run
 
   useEffect(() => {
     const loadServicesFromPriceList = async () => {
@@ -218,7 +282,7 @@ const PaymentPage = () => {
       setVoucherError("Có lỗi xảy ra khi kiểm tra voucher");
       setAppliedVoucher(null);
     } finally {
-    setVoucherLoading(false);
+      setVoucherLoading(false);
     }
   };
 
@@ -330,6 +394,12 @@ const PaymentPage = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const paymentUrl = (paymentResult as any)?.data?.paymentUrl || (paymentResult as any)?.paymentUrl;
         if (paymentUrl) {
+          // Set flag để không release ghế khi redirect đến payment gateway
+          try {
+            sessionStorage.setItem('payment_redirecting', '1');
+          } catch (e) {
+            console.error('Error setting payment_redirecting flag:', e);
+          }
           window.location.href = paymentUrl;
         } else {
           const payMsg = (paymentResult as any)?.message || 'Không tạo được đường dẫn thanh toán.';
@@ -455,15 +525,26 @@ const PaymentPage = () => {
             } flex-1 rounded-2xl p-6 mb-6 md:mb-0 shadow-lg transition-colors duration-200`}
           >
             <div className="flex items-center justify-between -mt-2">
-              <button
-                onClick={() => navigate(-1)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium select-none cursor-pointer transition-all duration-200 ${
-                    isDarkMode
-                    ? "text-white hover:underline"
-                    : "text-gray-700 hover:underline"
-                }`}
-                aria-label="Quay lại"
-              >
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    // Release ghế khi người dùng chủ động bấm "Quay lại"
+                    await releaseSeatsOnExit();
+                    // Clear cache để force refresh dữ liệu ghế
+                    try {
+                      sessionStorage.removeItem('booking_reserved_info');
+                    } catch (e) {
+                      console.error('Error clearing booking cache:', e);
+                    }
+                    navigate(-1);
+                  }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium select-none cursor-pointer transition-all duration-200 ${
+                      isDarkMode
+                      ? "text-white hover:underline"
+                      : "text-gray-700 hover:underline"
+                  }`}
+                  aria-label="Quay lại"
+                >
                 <svg
                   className="w-4 h-4"
                   fill="none"
@@ -478,7 +559,9 @@ const PaymentPage = () => {
                   />
                 </svg>
                 Quay lại
-              </button>
+                </button>
+                
+              </div>
               </div>
             {/* Phần nhập thông tin thanh toán đã được chuyển sang panel bên phải */}
 

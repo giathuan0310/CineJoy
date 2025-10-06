@@ -5,7 +5,6 @@ import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
-import { releaseSeatsByUserApi } from "@/services/api";
 import type { IPriceList } from "@/apiservice/apiPriceList";
 
 export const SelectSeat = () => {
@@ -48,12 +47,9 @@ export const SelectSeat = () => {
         const stored = JSON.parse(raw);
         const userId = stored?.userId || user?._id || sessionStorage.getItem('current_user_id') || '';
         
-        
         if (stored?.showtimeId && stored?.seatIds?.length && userId) {
-          
           // Tạm thời TẮT logic release ghế khi mount lại SelectSeat
           // Chỉ clear sessionStorage mà không gọi API release
-          
           sessionStorage.removeItem('booking_reserved_info');
         }
       } catch (error) {
@@ -90,15 +86,15 @@ export const SelectSeat = () => {
     loadTicketPrices();
   }, []);
 
-  // Khôi phục ghế đã chọn nếu quay lại từ trang thanh toán
+  // Khôi phục ghế đã chọn từ sessionStorage (chỉ khi quay lại từ payment)
   useEffect(() => {
     const storageKey = `booking:selected:${showtimeId || 'unknown'}`;
     const cameFromBack = navigationType === 'POP';
-    if (!cameFromBack) return; // chỉ khôi phục khi quay lại
 
     try {
       const raw = sessionStorage.getItem(storageKey);
-      if (raw) {
+      
+      if (raw && cameFromBack) {
         const restored: string[] = JSON.parse(raw);
         if (Array.isArray(restored)) {
           setSelectedSeats(restored);
@@ -236,31 +232,31 @@ export const SelectSeat = () => {
       const typeMap: Record<string, string> = {};
       const occupiedSeats: string[] = [];
       
-      // Tạo mapping từ index đến seatId (giống như trong Seat component)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      seatsData.forEach((seatItem: any, index: number) => {
-        const fallbackRow = Math.floor(index / apiSeatLayout.cols);
-        const fallbackCol = index % apiSeatLayout.cols;
-        const seatId = seatItem.seatId || `${String.fromCharCode(65 + fallbackRow)}${fallbackCol + 1}`;
-
-        if (seatItem.type) {
-          typeMap[seatId] = seatItem.type;
-        } else {
-          // Fallback: xác định loại ghế dựa trên vị trí nếu API không trả về type
-          let fallbackType = 'normal';
-          if (fallbackRow >= 3 && fallbackRow <= 6 && fallbackCol >= 3 && fallbackCol <= 6) {
-            fallbackType = 'vip';
-          } else if (fallbackRow >= 8 && fallbackCol >= 0 && fallbackCol <= 9) {
-            fallbackType = 'couple';
-          }
-          typeMap[seatId] = fallbackType;
-        }
-
-        // New statuses: selected | available | maintenance
-        if (seatItem.status === "selected") {
-          occupiedSeats.push(seatId);
-        }
-      });
+         // Tạo mapping từ index đến seatId (giống như trong Seat component)
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         seatsData.forEach((seatItem: any, index: number) => {
+           const fallbackRow = Math.floor(index / apiSeatLayout.cols);
+           const fallbackCol = index % apiSeatLayout.cols;
+           const seatId = seatItem.seatId || `${String.fromCharCode(65 + fallbackRow)}${fallbackCol + 1}`;
+     
+           if (seatItem.type) {
+             typeMap[seatId] = seatItem.type;
+           } else {
+             // Fallback: xác định loại ghế dựa trên vị trí nếu API không trả về type
+             let fallbackType = 'normal';
+             if (fallbackRow >= 3 && fallbackRow <= 6 && fallbackCol >= 3 && fallbackCol <= 6) {
+               fallbackType = 'vip';
+             } else if (fallbackRow >= 8 && fallbackCol >= 0 && fallbackCol <= 9) {
+               fallbackType = 'couple';
+             }
+             typeMap[seatId] = fallbackType;
+           }
+     
+           // New statuses: selected | available | maintenance
+           if (seatItem.status === "selected") {
+             occupiedSeats.push(seatId);
+           }
+         });
       
       setHas4dx(Object.values(typeMap).some((t) => t === '4dx'));
       setSoldSeats(occupiedSeats);

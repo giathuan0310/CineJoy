@@ -137,7 +137,7 @@ const PaymentPage = () => {
         console.error('Error clearing payment_redirecting on unmount:', e);
       }
     };
-  }, []); // Không có dependency để tránh re-run
+  }, []); // Không có dependency để tránh <re-run></re-run>
 
   useEffect(() => {
     const loadServicesFromPriceList = async () => {

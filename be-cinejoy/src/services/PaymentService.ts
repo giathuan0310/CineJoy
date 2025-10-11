@@ -88,6 +88,7 @@ class PaymentService {
       const orderId = order.orderCode;
       const orderInfo = `Thanh toán đơn hàng CineJoy ${orderId}`;
       const amount = payment.amount;
+      
       const extraData = "";
       const requestType = "captureWallet";
       // Set payment expiration to 5 minutes
@@ -197,6 +198,7 @@ class PaymentService {
             $set: {
               paymentStatus: "PAID",
               orderStatus: "CONFIRMED",
+              expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Extend to 1 year
               "paymentInfo.transactionId": callbackData.vnp_TransactionNo,
               "paymentInfo.paymentDate": new Date(),
               "paymentInfo.paymentGatewayResponse": callbackData,
@@ -204,7 +206,27 @@ class PaymentService {
           }),
         ]);
 
-               // Cập nhật trạng thái ghế thành 'selected' (đã thanh toán thành công)
+
+        // Mark voucher as used khi thanh toán thành công (VNPay)
+        if (order.voucherId && order.voucherDiscount > 0) {
+          try {
+            const { UserVoucher } = await import("../models/UserVoucher");
+            const updateResult = await UserVoucher.findByIdAndUpdate(
+              order.voucherId,
+              {
+                $set: {
+                  status: "used",
+                  usedAt: new Date(),
+                },
+              }
+            );
+            
+          } catch (error) {
+            console.error(`❌ Error marking voucher as used:`, error);
+          }
+        }
+
+               // Cập nhật trạng thái ghế thành 'occupied' (đã thanh toán thành công)
                try {
           const populatedOrder = await Order.findById(order._id)
             .populate('userId', 'email fullName')
@@ -223,9 +245,9 @@ class PaymentService {
               (populatedOrder.showtimeId as any)._id.toString(),
               populatedOrder.showDate,
               populatedOrder.showTime,
-              (populatedOrder.showtimeId as any).room?.name || populatedOrder.room,
+              populatedOrder.room, // Sử dụng room string từ Order
               seatIds,
-              'selected'
+              'occupied'
             );
           }
                } catch (seatUpdateError) {
@@ -261,6 +283,13 @@ class PaymentService {
               ticketPrice: populatedOrder.ticketPrice || 0,
               comboPrice: populatedOrder.comboPrice || 0,
               totalAmount: populatedOrder.totalAmount || 0,
+              voucherDiscount: populatedOrder.voucherDiscount || 0,
+              voucherCode: undefined, // voucherCode không có trong Order model
+              amountDiscount: populatedOrder.amountDiscount || 0,
+              amountDiscountDescription: populatedOrder.amountDiscountInfo?.description || undefined,
+              itemPromotions: populatedOrder.itemPromotions || [],
+              percentPromotions: populatedOrder.percentPromotions || [],
+              finalAmount: populatedOrder.finalAmount || 0,
               qrCodeDataUrl: '',
               foodCombos: populatedOrder.foodCombos?.map(combo => ({
                 comboName: (combo.comboId as any)?.name || 'Combo',
@@ -350,6 +379,7 @@ class PaymentService {
             $set: {
               paymentStatus: "PAID",
               orderStatus: "CONFIRMED",
+              expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Extend to 1 year
               "paymentInfo.transactionId": transId,
               "paymentInfo.paymentDate": new Date(),
               "paymentInfo.paymentGatewayResponse": callbackData,
@@ -357,8 +387,28 @@ class PaymentService {
           }),
         ]);
 
+
+        // Mark voucher as used khi thanh toán thành công
+        if (order.voucherId && order.voucherDiscount > 0) {
+          try {
+            const { UserVoucher } = await import("../models/UserVoucher");
+            const updateResult = await UserVoucher.findByIdAndUpdate(
+              order.voucherId,
+              {
+                $set: {
+                  status: "used",
+                  usedAt: new Date(),
+                },
+              }
+            );
+            
+          } catch (error) {
+            console.error(`❌ Error marking voucher as used:`, error);
+          }
+        }
+
         
-        // Cập nhật trạng thái ghế thành 'selected' (đã thanh toán thành công)
+        // Cập nhật trạng thái ghế thành 'occupied' (đã thanh toán thành công)
         try {
           const populatedOrder = await Order.findById(order._id)
             .populate('showtimeId');
@@ -369,9 +419,9 @@ class PaymentService {
               (populatedOrder.showtimeId as any)._id.toString(),
               populatedOrder.showDate,
               populatedOrder.showTime,
-              (populatedOrder.showtimeId as any).room?.name || populatedOrder.room,
+              populatedOrder.room, // Sử dụng room string từ Order
               seatIds,
-              'selected'
+              'occupied'
             );
           }
         } catch (seatUpdateError) {
@@ -408,7 +458,19 @@ class PaymentService {
               ticketPrice: populatedOrder.ticketPrice || 0,
               comboPrice: populatedOrder.comboPrice || 0,
               totalAmount: populatedOrder.totalAmount || 0,
-              qrCodeDataUrl: '' // Sẽ được tạo trong sendPaymentSuccessEmail từ orderId
+              voucherDiscount: populatedOrder.voucherDiscount || 0,
+              voucherCode: undefined, // voucherCode không có trong Order model
+              amountDiscount: populatedOrder.amountDiscount || 0,
+              amountDiscountDescription: populatedOrder.amountDiscountInfo?.description || undefined,
+              itemPromotions: populatedOrder.itemPromotions || [],
+              percentPromotions: populatedOrder.percentPromotions || [],
+              finalAmount: populatedOrder.finalAmount || 0,
+              qrCodeDataUrl: '', // Sẽ được tạo trong sendPaymentSuccessEmail từ orderId
+              foodCombos: populatedOrder.foodCombos?.map(combo => ({
+                comboName: (combo.comboId as any)?.name || 'Combo',
+                quantity: combo.quantity,
+                price: combo.price
+              })) || []
             };
             
             
@@ -440,7 +502,6 @@ class PaymentService {
           }),
         ]);
 
-        console.log("Payment failed for order:", orderId, "Message:", message);
         return { status: "error", message: message || "Payment failed" };
       }
     } catch (error) {

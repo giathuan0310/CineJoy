@@ -105,13 +105,6 @@ export const getSeatsForShowtimeApi = async (
   startTime: string,
   room?: string
 ) => {
-  // Debug: log all parameters
-  console.log("getSeatsForShowtimeApi called with:", {
-    showtimeId,
-    date,
-    startTime,
-    room,
-  });
 
   if (!showtimeId || showtimeId.trim() === "") {
     throw new Error("showtimeId is required and cannot be empty");
@@ -121,10 +114,8 @@ export const getSeatsForShowtimeApi = async (
     date,
     startTime,
     ...(room && { room }),
+    _t: Date.now().toString(), // Cache busting
   });
-
-  const url = `/showtimes/${showtimeId}/seats?${params.toString()}`;
-  console.log("API URL:", url);
 
   const response = await axiosClient.get<
     IBackendResponse<{
@@ -149,6 +140,7 @@ export const getSeatsForShowtimeApi = async (
       };
     }>
   >(`/showtimes/${showtimeId}/seats?${params.toString()}`);
+  
   return response.data;
 };
 
@@ -194,6 +186,106 @@ export const initializeSeatsForShowtime = async (
     return response.data;
   } catch (error) {
     console.error("Error initializing seats:", error);
+    throw error;
+  }
+};
+
+// API mới cho seat reservation
+export const getSeatsWithReservationStatusApi = async (
+  showtimeId: string,
+  date: string,
+  startTime: string,
+  room: string,
+  isFromPaymentReturn: boolean = false
+) => {
+  try {
+    const response = await axiosClient.get<
+      IBackendResponse<Array<{
+        seatId: string;
+        status: string;
+        reservedBy?: string;
+        reservedUntil?: string;
+        isReservedByMe: boolean;
+      }>>
+    >(`/v1/api/showtimes/seats-with-reservation`, {
+      params: { 
+        showtimeId, 
+        date, 
+        startTime, 
+        room,
+        fromPaymentReturn: isFromPaymentReturn.toString(),
+        _t: Date.now().toString(), // Cache busting
+      },
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching seats with reservation status:", error);
+    throw error;
+  }
+};
+
+export const reserveSeatsApi = async (
+  showtimeId: string,
+  date: string,
+  startTime: string,
+  room: string,
+  seatIds: string[]
+) => {
+  try {
+    const response = await axiosClient.post<
+      IBackendResponse<{
+        seatIds: string[];
+        reservedUntil: string;
+      }>
+    >(`/v1/api/showtimes/reserve-seats`, {
+      showtimeId,
+      date,
+      startTime,
+      room,
+      seatIds,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error reserving seats:", error);
+    throw error;
+  }
+};
+
+export const releaseSeatsApi = async (
+  showtimeId: string,
+  date: string,
+  startTime: string,
+  room: string,
+  seatIds: string[]
+) => {
+  try {
+    const response = await axiosClient.post<
+      IBackendResponse<{ released: boolean }>
+    >(`/v1/api/showtimes/release-by-user`, {
+      showtimeId,
+      date,
+      startTime,
+      room,
+      seatIds,
+      // Không cần gửi userId vì backend sẽ lấy từ auth middleware
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error releasing seats:", error);
+    throw error;
+  }
+};
+
+// API giải phóng tất cả ghế tạm giữ của user khi chọn suất chiếu mới
+export const releaseUserReservedSeatsApi = async () => {
+  try {
+    const response = await axiosClient.post<
+      IBackendResponse<{ released: number; releasedSeats: string[] }>
+    >(`/v1/api/showtimes/release-user-seats`);
+    return response.data;
+  } catch (error) {
+    console.error("Error releasing user reserved seats:", error);
     throw error;
   }
 };

@@ -4,7 +4,9 @@ import {
   getUserById as getUserByIdService,
   createUser as createUserService,
   updateUser as updateUserService,
-  deleteUser as deleteUserService
+  deleteUser as deleteUserService,
+  updateUserPoints,
+  addBirthdayPoints
 } from "../services/UserService";
 
 export const getAllUsers = async (req: Request, res: Response) => {
@@ -159,6 +161,100 @@ export const deleteUser = async (req: Request, res: Response) => {
       status: false,
       error: 500,
       message: "Lỗi server",
+      data: null,
+    });
+  }
+};
+
+export const updateUserPointsController = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { point } = req.body;
+
+    if (typeof point !== 'number' || point < 0) {
+      res.status(400).json({
+        status: false,
+        error: 400,
+        message: "Điểm phải là số dương",
+        data: null,
+      });
+      return;
+    }
+
+    const updatedUser = await updateUserPoints(userId, point);
+    
+    if (!updatedUser) {
+      res.status(404).json({
+        status: false,
+        error: 404,
+        message: "Không tìm thấy user",
+        data: null,
+      });
+      return;
+    }
+
+    const { password, ...userWithoutPassword } = updatedUser.toObject();
+    res.status(200).json({
+      status: true,
+      error: 0,
+      message: "Cập nhật điểm thành công!",
+      data: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error("Update user points error:", error);
+    res.status(500).json({
+      status: false,
+      error: 500,
+      message: "Lỗi server",
+      data: null,
+    });
+  }
+};
+
+export const addBirthdayPointsController = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const { pointsToAdd = 100 } = req.body;
+
+    if (typeof pointsToAdd !== 'number' || pointsToAdd <= 0) {
+      res.status(400).json({
+        status: false,
+        error: 400,
+        message: "Số điểm phải là số dương",
+        data: null,
+      });
+      return;
+    }
+
+    const result = await addBirthdayPoints(userId, pointsToAdd);
+    
+    if (!result.user) {
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: "Lỗi khi cập nhật user",
+        data: null,
+      });
+      return;
+    }
+    
+    const { password, ...userWithoutPassword } = result.user.toObject();
+    res.status(200).json({
+      status: true,
+      error: 0,
+      message: `Cộng ${result.pointsAdded} điểm sinh nhật thành công!`,
+      data: {
+        user: userWithoutPassword,
+        pointsAdded: result.pointsAdded,
+        newTotalPoints: result.newTotalPoints
+      },
+    });
+  } catch (error: any) {
+    console.error("Add birthday points error:", error);
+    res.status(500).json({
+      status: false,
+      error: 500,
+      message: error.message || "Lỗi server",
       data: null,
     });
   }

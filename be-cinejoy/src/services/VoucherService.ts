@@ -29,6 +29,59 @@ export default class VoucherService {
     return voucher.save();
   }
 
+  async getAmountDiscount(orderTotal: number): Promise<{
+    discountAmount: number;
+    description: string;
+    minOrderValue: number;
+    discountValue: number;
+  } | null> {
+    try {
+      // Tìm các voucher có promotionType = "amount" và status = "hoạt động"
+      const activeAmountVouchers = await Voucher.find({
+        "lines.promotionType": "amount",
+        "lines.status": "hoạt động",
+        status: "hoạt động"
+      });
+
+      let bestDiscount = 0;
+      let bestDiscountInfo = null;
+
+      // Tìm amount discount phù hợp nhất (cao nhất nhưng không vượt quá orderTotal)
+      for (const voucher of activeAmountVouchers) {
+        for (const line of voucher.lines || []) {
+          if (line.promotionType === "amount" && line.status === "hoạt động" && line.detail) {
+            const detail = line.detail as any; // Type assertion để access amount fields
+            const minOrderValue = detail.minOrderValue || 0;
+            const discountValue = detail.discountValue || 0;
+            const now = new Date();
+
+            // Kiểm tra điều kiện thời gian và giá trị đơn hàng
+            if (
+              orderTotal >= minOrderValue &&
+              discountValue > bestDiscount &&
+              line.validityPeriod &&
+              now >= new Date(line.validityPeriod.startDate) &&
+              now <= new Date(line.validityPeriod.endDate)
+            ) {
+              bestDiscount = discountValue;
+              bestDiscountInfo = {
+                discountAmount: discountValue,
+                description: detail.description || `Giảm ${discountValue.toLocaleString('vi-VN')}₫ cho hóa đơn từ ${minOrderValue.toLocaleString('vi-VN')}₫`,
+                minOrderValue,
+                discountValue,
+              };
+            }
+          }
+        }
+      }
+
+      return bestDiscountInfo;
+    } catch (error) {
+      console.error("Error getting amount discount:", error);
+      return null;
+    }
+  }
+
   updateVoucher(id: string, data: Partial<IVoucher>): Promise<IVoucher | null> {
     return Voucher.findByIdAndUpdate(id, data, { new: true });
   }
@@ -327,5 +380,300 @@ export default class VoucherService {
     await userVoucher.save();
     const populatedUserVoucher = await UserVoucher.findById(userVoucher._id).populate('voucherId');
     return populatedUserVoucher;
+  }
+
+  // Lấy danh sách khuyến mãi hàng đang hoạt động
+  async getActiveItemPromotions(): Promise<{
+    status: boolean;
+    error: number;
+    message: string;
+    data: any;
+  }> {
+    try {
+      const now = new Date();
+      
+      // Tìm tất cả voucher có status = 'hoạt động' và có ít nhất 1 line với promotionType = 'item'
+      // Không filter theo ngày tháng, chỉ dựa vào trạng thái
+      const vouchers = await Voucher.find({
+        status: "hoạt động",
+        "lines.promotionType": "item"
+      });
+
+      
+      const itemPromotions: any[] = [];
+
+      vouchers.forEach(voucher => {
+        voucher.lines.forEach(line => {
+          if (line.promotionType === "item" && line.status === "hoạt động") {
+            // Chỉ kiểm tra trạng thái, không kiểm tra ngày tháng
+            const itemDetail = line.detail as any;
+            itemPromotions.push({
+              voucherId: voucher._id,
+              voucherName: voucher.name,
+              promotionalCode: voucher.promotionalCode,
+              lineIndex: voucher.lines.indexOf(line),
+              promotionType: line.promotionType,
+              validityPeriod: line.validityPeriod,
+              status: line.status,
+              detail: line.detail,
+              rule: line.rule
+            });
+          }
+        });
+      });
+
+      return {
+        status: true,
+        error: 0,
+        message: "Lấy danh sách khuyến mãi hàng thành công",
+        data: itemPromotions
+      };
+    } catch (error) {
+      console.error("Error getting active item promotions:", error);
+      return {
+        status: false,
+        error: 1,
+        message: "Có lỗi xảy ra khi lấy danh sách khuyến mãi hàng",
+        data: null
+      };
+    }
+  }
+
+  // Áp dụng khuyến mãi chiết khấu (percent) dựa trên combo được chọn
+  async applyPercentPromotions(
+    selectedCombos: Array<{ comboId: string; quantity: number; name: string; price: number }>,
+    appliedPromotions: any[] = []
+  ): Promise<{
+    status: boolean;
+    error: number;
+    message: string;
+    data: any;
+  }> {
+    try {
+      // Tìm tất cả voucher có lines với promotionType = 'percent' và status = 'hoạt động'
+      const now = new Date();
+      const vouchers = await Voucher.find({
+        status: "hoạt động",
+        "lines.promotionType": "percent"
+      });
+
+      
+      const percentPromotions: any[] = [];
+
+      vouchers.forEach(voucher => {
+        voucher.lines.forEach(line => {
+          if (line.promotionType === "percent" && line.status === "hoạt động") {
+            const percentDetail = line.detail as any;
+            percentPromotions.push({
+              voucherId: voucher._id,
+              voucherName: voucher.name,
+              promotionalCode: voucher.promotionalCode,
+              lineIndex: voucher.lines.indexOf(line),
+              promotionType: line.promotionType,
+              validityPeriod: line.validityPeriod,
+              status: line.status,
+              detail: line.detail,
+              rule: line.rule
+            });
+          }
+        });
+      });
+
+      const applicablePromotions: any[] = [];
+      const exclusionGroups = new Map<string, any[]>();
+
+
+      // Duyệt qua từng khuyến mãi chiết khấu
+      for (const promotion of percentPromotions) {
+        const detail = promotion.detail;
+        
+        
+        // Kiểm tra điều kiện áp dụng
+        if (detail.applyType === "combo") {
+          const selectedCombo = selectedCombos.find(combo => combo.comboId === detail.comboId);
+          
+          if (selectedCombo && selectedCombo.quantity > 0) {
+            // Tính số tiền giảm
+            const totalComboPrice = selectedCombo.price * selectedCombo.quantity;
+            const discountAmount = Math.round((totalComboPrice * detail.comboDiscountPercent) / 100);
+            
+            if (discountAmount > 0) {
+              const promotionResult = {
+                ...promotion,
+                comboName: detail.comboName,
+                comboId: detail.comboId,
+                discountPercent: detail.comboDiscountPercent,
+                discountAmount: discountAmount,
+                totalComboPrice: totalComboPrice
+              };
+
+              // Xử lý quy tắc loại trừ theo nhóm
+              if (promotion.rule?.stackingPolicy === "EXCLUSIVE_WITH_GROUP") {
+                const exclusionGroup = promotion.rule.exclusionGroup;
+                
+                
+                if (!exclusionGroups.has(exclusionGroup)) {
+                  exclusionGroups.set(exclusionGroup, []);
+                }
+                exclusionGroups.get(exclusionGroup)!.push(promotionResult);
+              } else {
+                // Có thể cộng dồn
+                applicablePromotions.push(promotionResult);
+              }
+            }
+          }
+        }
+      }
+
+      // Xử lý các nhóm loại trừ - chỉ lấy khuyến mãi tốt nhất trong mỗi nhóm
+      for (const [groupName, groupPromotions] of exclusionGroups) {
+        if (groupPromotions.length > 0) {
+          
+          // Sắp xếp theo discountPercent giảm dần để lấy khuyến mãi có % giảm cao nhất
+          groupPromotions.sort((a: any, b: any) => b.discountPercent - a.discountPercent);
+          const bestPromotion = groupPromotions[0];
+          
+          applicablePromotions.push(bestPromotion);
+        }
+      }
+
+      
+      // Loại bỏ các khuyến mãi đã được áp dụng
+      const newPromotions = applicablePromotions.filter((promo: any) => 
+        !appliedPromotions.some((applied: any) => 
+          applied.voucherId === promo.voucherId && applied.lineIndex === promo.lineIndex
+        )
+      );
+      
+      return {
+        status: true,
+        error: 0,
+        message: "Áp dụng khuyến mãi chiết khấu thành công",
+        data: {
+          applicablePromotions: newPromotions,
+          totalDiscountAmount: newPromotions.reduce((sum: number, promo: any) => sum + promo.discountAmount, 0)
+        }
+      };
+    } catch (error: any) {
+      console.error("Error applying percent promotions:", error);
+      return {
+        status: false,
+        error: 1,
+        message: "Có lỗi xảy ra khi áp dụng khuyến mãi chiết khấu",
+        data: null
+      };
+    }
+  }
+
+  // Áp dụng khuyến mãi hàng dựa trên combo được chọn
+  async applyItemPromotions(
+    selectedCombos: Array<{ comboId: string; quantity: number; name: string }>,
+    appliedPromotions: any[] = []
+  ): Promise<{
+    status: boolean;
+    error: number;
+    message: string;
+    data: any;
+  }> {
+    try {
+      const activePromotions = await this.getActiveItemPromotions();
+      
+      if (!activePromotions.status || !activePromotions.data) {
+        return {
+          status: false,
+          error: 1,
+          message: "Không thể lấy danh sách khuyến mãi",
+          data: null
+        };
+      }
+
+      const applicablePromotions: any[] = [];
+      const exclusionGroups = new Map<string, any[]>(); // Nhóm loại trừ
+
+      
+      // Duyệt qua từng khuyến mãi hàng
+      for (const promotion of activePromotions.data) {
+        const detail = promotion.detail;
+        
+        
+        // Kiểm tra điều kiện áp dụng
+        if (detail.applyType === "combo") {
+          const selectedCombo = selectedCombos.find(combo => combo.comboId === detail.comboId);
+          
+          
+          if (selectedCombo && selectedCombo.quantity >= detail.buyQuantity) {
+            // Khuyến mãi hàng: chỉ tặng 1 lần khi đạt đủ điều kiện, không cộng dồn
+            // VD: mua 2 combo family tặng 1 snack poca
+            // Nếu mua 4 combo family vẫn chỉ tặng 1 snack poca
+            const rewardQuantity = detail.rewardQuantity;
+            
+            const promotionResult = {
+              ...promotion,
+              applicableQuantity: rewardQuantity,
+              triggerQuantity: detail.buyQuantity,
+              rewardItem: detail.rewardItem,
+              rewardQuantity: rewardQuantity,
+              rewardType: detail.rewardType,
+              rewardDiscountPercent: detail.rewardDiscountPercent || 0
+            };
+
+            // Xử lý quy tắc loại trừ theo nhóm
+            if (promotion.rule?.stackingPolicy === "EXCLUSIVE_WITH_GROUP") {
+              const exclusionGroup = promotion.rule.exclusionGroup;
+              
+              
+              if (!exclusionGroups.has(exclusionGroup)) {
+                exclusionGroups.set(exclusionGroup, []);
+              }
+              exclusionGroups.get(exclusionGroup)!.push(promotionResult);
+            } else {
+              // Có thể cộng dồn
+              applicablePromotions.push(promotionResult);
+            }
+          }
+        }
+      }
+
+      // Xử lý các nhóm loại trừ - chỉ lấy khuyến mãi tốt nhất trong mỗi nhóm
+      for (const [groupName, groupPromotions] of exclusionGroups) {
+        if (groupPromotions.length > 0) {
+          
+          // Sắp xếp theo buyQuantity giảm dần để lấy khuyến mãi yêu cầu mua nhiều nhất (tốt nhất)
+          // VD: mua 5 combo tặng bắp phô mai tốt hơn mua 2 combo tặng snack poca
+          groupPromotions.sort((a: any, b: any) => b.detail.buyQuantity - a.detail.buyQuantity);
+          const bestPromotion = groupPromotions[0];
+          
+          applicablePromotions.push(bestPromotion);
+        }
+      }
+
+      
+      // Loại bỏ các khuyến mãi đã được áp dụng
+      const newPromotions = applicablePromotions.filter((promo: any) => 
+        !appliedPromotions.some((applied: any) => 
+          applied.voucherId === promo.voucherId && applied.lineIndex === promo.lineIndex
+        )
+      );
+      
+
+
+      return {
+        status: true,
+        error: 0,
+        message: "Áp dụng khuyến mãi hàng thành công",
+        data: {
+          applicablePromotions: newPromotions,
+          totalRewardItems: newPromotions.reduce((sum: number, promo: any) => sum + promo.rewardQuantity, 0)
+        }
+      };
+    } catch (error: any) {
+      console.error("Error applying item promotions:", error);
+      return {
+        status: false,
+        error: 1,
+        message: "Có lỗi xảy ra khi áp dụng khuyến mãi hàng",
+        data: null
+      };
+    }
   }
 }

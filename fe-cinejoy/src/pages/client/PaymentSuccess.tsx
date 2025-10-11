@@ -44,7 +44,7 @@ const PaymentSuccess: React.FC = () => {
   };
 
   const handleViewOrders = () => {
-    navigate('/members');
+    navigate('/booking-history');
   };
 
   if (!orderInfo) {
@@ -94,7 +94,7 @@ const PaymentSuccess: React.FC = () => {
                 onClick={handleViewOrders}
                 className="border-blue-600 text-blue-600 hover:bg-blue-50"
               >
-                Xem đơn hàng
+                Xem lịch sử đặt vé
               </Button>
             </Space>
           }

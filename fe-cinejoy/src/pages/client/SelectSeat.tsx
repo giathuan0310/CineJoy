@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
-import { message, Spin } from "antd";
+import { message } from "antd";
 import useAppStore from "@/store/app.store";
 import MovieInfo from "@/components/movies/booking_seats/MovieInfo";
 import SeatLayout from "@/components/movies/booking_seats/SeatLayout";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
 import type { IPriceList } from "@/apiservice/apiPriceList";
+import { reserveSeatsApi, getSeatsWithReservationStatusApi } from "@/apiservice/apiShowTime";
 
 export const SelectSeat = () => {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
@@ -17,50 +18,46 @@ export const SelectSeat = () => {
   const [ticketPrices, setTicketPrices] = useState<Record<string, number>>({});
   const [totalTicketPrice, setTotalTicketPrice] = useState<number>(0);
   const [hasTicketPriceGap, setHasTicketPriceGap] = useState<boolean>(false);
-  const [isReleasingSeats, setIsReleasingSeats] = useState<boolean>(false);
 
   const navigate = useNavigate();
-  const navigationType = useNavigationType(); // 'POP' khi back/forward
   const location = useLocation();
+  const navigationType = useNavigationType();
   
   const { isDarkMode, user } = useAppStore();
   const { movie, cinema, date, time, room, showtimeId, theaterId } = location.state || {};
-  
-  // Debug log để kiểm tra dữ liệu nhận được
   
 
   const displayTime = time;
   const apiTime = time;
 
-  // Sử dụng useLayoutEffect để gọi API release trước khi render
-  useLayoutEffect(() => {
-    const releaseSeatsIfNeeded = async () => {
-      try {
-        const raw = sessionStorage.getItem('booking_reserved_info');
-        
-        if (!raw) {
-          return;
-        }
-        
-        setIsReleasingSeats(true);
-        
-        const stored = JSON.parse(raw);
-        const userId = stored?.userId || user?._id || sessionStorage.getItem('current_user_id') || '';
-        
-        if (stored?.showtimeId && stored?.seatIds?.length && userId) {
-          // Tạm thời TẮT logic release ghế khi mount lại SelectSeat
-          // Chỉ clear sessionStorage mà không gọi API release
-          sessionStorage.removeItem('booking_reserved_info');
-        }
-      } catch (error) {
-        console.error('Error releasing seats:', error);
-      } finally {
-        setIsReleasingSeats(false);
-      }
-    };
+  // Validation để đảm bảo có đủ thông tin cần thiết
+  if (!showtimeId || !date || !apiTime || !room) {
+    console.error('❌ Missing required data for seat selection:', {
+      showtimeId,
+      date,
+      apiTime,
+      room
+    });
+  }
 
-    releaseSeatsIfNeeded();
-  }, [user?._id]);
+  // Kiểm tra user đã đăng nhập chưa
+  if (!user || !user._id) {
+    console.error('❌ User not authenticated:', user);
+  }
+
+  // Không release ghế khi mount lại SelectSeat - để ghế tạm giữ vẫn hiển thị
+  useLayoutEffect(() => {
+    // Chỉ clear sessionStorage mà KHÔNG gọi API release
+    // Điều này cho phép ghế tạm giữ vẫn hiển thị trên UI
+    try {
+      const raw = sessionStorage.getItem('booking_reserved_info');
+      if (raw) {
+        sessionStorage.removeItem('booking_reserved_info');
+      }
+    } catch (error) {
+      console.error('Error clearing sessionStorage:', error);
+    }
+  }, []);
 
   // Load giá vé từ bảng giá đang hoạt động
   useEffect(() => {
@@ -86,32 +83,61 @@ export const SelectSeat = () => {
     loadTicketPrices();
   }, []);
 
-  // Khôi phục ghế đã chọn từ sessionStorage (chỉ khi quay lại từ payment)
-  useEffect(() => {
+  // Khôi phục ghế đã chọn từ sessionStorage (khi quay lại từ payment)
+  useLayoutEffect(() => {
     const storageKey = `booking:selected:${showtimeId || 'unknown'}`;
-    const cameFromBack = navigationType === 'POP';
 
     try {
-      const raw = sessionStorage.getItem(storageKey);
+      // Kiểm tra navigation type và referrer để đảm bảo chỉ restore khi quay lại từ payment
+      const perf = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+      const isBackForward = navigationType === 'POP' || (!!perf && perf.type === 'back_forward');
+      const referrerIsPayment = document.referrer.includes('/payment');
+      const hasPaymentFlag = sessionStorage.getItem('from_payment_page') === 'true';
       
-      if (raw && cameFromBack) {
+      // Chỉ restore khi:
+      // 1. Navigation type là POP (back button) 
+      // 2. VÀ (có flag from_payment_page HOẶC referrer là payment page)
+      // Ưu tiên flag hơn referrer vì flag đáng tin cậy hơn
+      const shouldRestore = isBackForward && (hasPaymentFlag || referrerIsPayment);
+      
+      
+      if (!shouldRestore) {
+        // Không phải quay lại từ payment → xóa cache
+        sessionStorage.removeItem(storageKey);
+        // Không xóa flag from_payment_page ở đây để tránh xóa quá sớm
+        return;
+      }
+      
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
         const restored: string[] = JSON.parse(raw);
-        if (Array.isArray(restored)) {
+        if (Array.isArray(restored) && restored.length > 0) {
+          // Restore ghế khi quay lại từ payment
           setSelectedSeats(restored);
+          
+          // Xóa flag sau khi restore thành công
+          sessionStorage.removeItem('from_payment_page');
         }
       }
     } catch (error) {
-      console.error("Error restoring selected seats:", error);
+      console.error("Error restoring selected seats in useLayoutEffect:", error);
+      // Xóa sessionStorage nếu có lỗi
+      sessionStorage.removeItem(storageKey);
     }
-  }, [navigationType, showtimeId]);
+  }, [showtimeId, navigationType]); // Depend on showtimeId và navigationType
 
   // Khi đã có seatTypeMap, nếu có ghế đã khôi phục mà chưa có loại, set selectedSeatType
   useEffect(() => {
     if (selectedSeats.length > 0 && !selectedSeatType) {
       const t = seatTypeMap[selectedSeats[0]];
-      if (t) setSelectedSeatType(t);
+      if (t) {
+        setSelectedSeatType(t);
+      }
     }
   }, [selectedSeats, selectedSeatType, seatTypeMap]);
+
+  // Removed duplicate restoration logic to avoid conflicts
+
 
   // Helper function to validate seat type selection
   const validateSeatTypeSelection = useCallback((newSeatType: string): boolean => {
@@ -139,7 +165,26 @@ export const SelectSeat = () => {
     return false;
   }, [selectedSeatType]);
 
-  const handleSelectSeat = useCallback((seat: string) => {
+  const handleSelectSeat = useCallback(async (seat: string) => {
+    // Validation để đảm bảo có đủ thông tin cần thiết
+    if (!showtimeId || !date || !apiTime || !room) {
+      console.error('❌ Cannot select seat - missing required data:', {
+        showtimeId,
+        date,
+        apiTime,
+        room
+      });
+      message.error('Thiếu thông tin suất chiếu. Vui lòng thử lại.');
+      return;
+    }
+
+    // Kiểm tra user đã đăng nhập chưa
+    if (!user || !user._id) {
+      console.error('❌ Cannot select seat - user not authenticated:', user);
+      message.error('Vui lòng đăng nhập để chọn ghế.');
+      return;
+    }
+
     const seatType = seatTypeMap[seat];
     if (!seatType) {
       message.error("Không thể xác định loại ghế! Vui lòng tải lại trang.");
@@ -149,6 +194,8 @@ export const SelectSeat = () => {
     const isCurrentlySelected = selectedSeats.includes(seat);
 
     if (isCurrentlySelected) {
+      // Hủy chọn ghế - chỉ cập nhật UI, KHÔNG gọi API release
+      // Ghế sẽ được giải phóng khi user nhấn "Quay về" từ trang Payment
       const newSeats = selectedSeats.filter((s) => s !== seat);
       setSelectedSeats(newSeats);
       if (newSeats.length === 0) {
@@ -157,19 +204,38 @@ export const SelectSeat = () => {
       return;
     }
 
+    // Kiểm tra giới hạn tối đa 8 ghế
+    if (selectedSeats.length >= 8) {
+      message.warning('Bạn chỉ có thể chọn tối đa 8 ghế. Vui lòng bỏ chọn một số ghế trước khi chọn ghế mới.');
+      return;
+    }
+
     // Selecting a new seat
     if (!validateSeatTypeSelection(seatType)) {
       return;
     }
 
+    // Just select seat locally (no API call yet)
     if (selectedSeatType === null) {
       setSelectedSeatType(seatType);
     }
     setSelectedSeats([...selectedSeats, seat]);
-  }, [seatTypeMap, selectedSeats, selectedSeatType, validateSeatTypeSelection]);
+  }, [seatTypeMap, selectedSeats, selectedSeatType, validateSeatTypeSelection, showtimeId, date, apiTime, room, user]);
 
-  const handleSelectMultipleSeats = useCallback((seats: string[]) => {
+  const handleSelectMultipleSeats = useCallback(async (seats: string[]) => {
     if (seats.length === 0) return;
+
+    // Validation để đảm bảo có đủ thông tin cần thiết
+    if (!showtimeId || !date || !apiTime || !room) {
+      console.error('❌ Cannot select multiple seats - missing required data:', {
+        showtimeId,
+        date,
+        apiTime,
+        room
+      });
+      message.error('Thiếu thông tin suất chiếu. Vui lòng thử lại.');
+      return;
+    }
 
     const seatType = seatTypeMap[seats[0]]; // Type of the first seat in the couple
     if (!seatType) {
@@ -180,6 +246,8 @@ export const SelectSeat = () => {
     const isCurrentlySelected = selectedSeats.includes(seats[0]);
 
     if (isCurrentlySelected) {
+      // Hủy chọn couple seats - chỉ cập nhật UI, KHÔNG gọi API release
+      // Ghế sẽ được giải phóng khi user nhấn "Quay về" từ trang Payment
       const newSeats = selectedSeats.filter((s) => !seats.includes(s));
       setSelectedSeats(newSeats);
       if (newSeats.length === 0) {
@@ -188,16 +256,23 @@ export const SelectSeat = () => {
       return;
     }
 
+    // Kiểm tra giới hạn tối đa 8 ghế (với ghế cặp đôi, cần kiểm tra cả 2 ghế)
+    if (selectedSeats.length + seats.length > 8) {
+      message.warning('Bạn chỉ có thể chọn tối đa 8 ghế. Vui lòng bỏ chọn một số ghế trước khi chọn ghế cặp đôi mới.');
+      return;
+    }
+
     // Selecting new couple seats
     if (!validateSeatTypeSelection(seatType)) {
       return;
     }
 
+    // Just select couple seats locally (no API call yet)
     if (selectedSeatType === null) {
       setSelectedSeatType(seatType);
     }
     setSelectedSeats([...selectedSeats, ...seats]);
-  }, [seatTypeMap, selectedSeats, selectedSeatType, validateSeatTypeSelection]);
+  }, [seatTypeMap, selectedSeats, selectedSeatType, validateSeatTypeSelection, showtimeId, date, apiTime, room]);
 
   // Tính tổng tiền vé theo loại ghế và giá từ bảng giá
   useEffect(() => {
@@ -220,9 +295,48 @@ export const SelectSeat = () => {
     setHasTicketPriceGap(missing);
   }, [selectedSeats, seatTypeMap, ticketPrices]);
 
+  // No cleanup needed since we don't reserve seats immediately
+  // Seats are only reserved when user clicks Continue
+
+  // Load seats with reservation status if user is authenticated
+  const loadSeatsWithReservation = useCallback(async () => {
+    if (!user || !user._id || !showtimeId || !date || !apiTime || !room) {
+      return;
+    }
+
+    try {
+      const response = await getSeatsWithReservationStatusApi(
+        showtimeId,
+        date,
+        apiTime,
+        room
+      );
+      
+      if (response.status && response.data) {
+        // Update sold seats with reservation info
+        const reservedSeats = response.data
+          .filter((seat: { status: string; seatId: string }) => seat.status === 'reserved' || seat.status === 'selected')
+          .map((seat: { status: string; seatId: string }) => seat.seatId);
+        
+        setSoldSeats(prev => [...new Set([...prev, ...reservedSeats])]);
+      }
+    } catch (error) {
+      console.error('Error loading seats with reservation:', error);
+    }
+  }, [user, showtimeId, date, apiTime, room]);
+
+  // Load reservation status when user is authenticated
+  useEffect(() => {
+    if (user && user._id) {
+      loadSeatsWithReservation();
+    }
+  }, [loadSeatsWithReservation, user]);
+
   // Callback to update sold seats from API data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSeatsLoaded = (seatData: any) => {
+  const handleSeatsLoaded = (seatData: {
+    seats?: Array<{ seatId?: string; status: string; type?: string }>;
+    seatLayout?: { rows: number; cols: number };
+  }) => {
     if (seatData?.seats && seatData?.seatLayout) {
       const apiSeatLayout = seatData.seatLayout;
       const seatsData = seatData.seats || [];
@@ -258,24 +372,14 @@ export const SelectSeat = () => {
            }
          });
       
+      
       setHas4dx(Object.values(typeMap).some((t) => t === '4dx'));
       setSoldSeats(occupiedSeats);
       setSeatTypeMap(typeMap);
     }
   };
 
-  // Hiển thị loading khi đang giải phóng ghế
-  if (isReleasingSeats) {
-    return (
-      <div
-        className={`${
-          isDarkMode ? "bg-[#23272f]" : "bg-[#e7ede7]"
-        } min-h-screen py-6 flex items-center justify-center`}
-      >
-        <Spin size="large" tip="Đang cập nhật trạng thái ghế..." />
-      </div>
-    );
-  }
+  // Removed loading state since we don't release seats on mount anymore
 
   return (
     <div
@@ -312,7 +416,25 @@ export const SelectSeat = () => {
           totalPrice={totalTicketPrice}
           priceError={hasTicketPriceGap}
           showtimeId={showtimeId}
-          onContinue={() => {
+          onContinue={async () => {
+            // Reserve seats when user clicks Continue (this will reset reservation time to 8 minutes)
+            if (selectedSeats.length > 0) {
+              try {
+                await reserveSeatsApi(showtimeId, date, apiTime, room, selectedSeats);
+              } catch (error) {
+                console.error('❌ Error reserving seats:', error);
+                message.error('Không thể tạm giữ ghế. Vui lòng thử lại.');
+                return; // Don't navigate if reservation fails
+              }
+            }
+            
+            // Lưu selectedSeats vào sessionStorage để có thể khôi phục khi quay lại
+            try {
+              const storageKey = `booking:selected:${showtimeId}`;
+              sessionStorage.setItem(storageKey, JSON.stringify(selectedSeats));
+            } catch (error) {
+              console.error('Error saving selected seats to sessionStorage:', error);
+            }
             
             navigate("/payment", {
               state: {

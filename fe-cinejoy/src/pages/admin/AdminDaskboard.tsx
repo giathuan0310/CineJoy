@@ -33,7 +33,7 @@ import {
   getRegionById,
   updateRegion,
 } from "@/apiservice/apiRegion";
-import { getBlogs } from "@/apiservice/apiBlog";
+import { getBlogs, addBlog, updateBlog, deleteBlog } from "@/apiservice/apiBlog";
 import {
   getShowTimes,
   deleteShowtime,
@@ -43,6 +43,7 @@ import ShowtimeForm from "@/pages/admin/Form/ShowtimeForm";
 import FoodComboForm from "@/pages/admin/Form/FoodComboForm";
 import VoucherForm from "@/pages/admin/Form/VoucherForm";
 import RegionForm from "@/pages/admin/Form/RegionForm";
+import BlogForm from "@/pages/admin/Form/BlogForm";
 import TheaterForm from "@/pages/admin/Form/TheaterForm";
 import UserForm from "@/pages/admin/Form/UserForm";
 import RoomForm from "./Form/RoomForm";
@@ -87,6 +88,9 @@ const Dashboard: React.FC = () => {
   const [vouchers, setVouchers] = useState<IVoucher[]>([]);
   const [foodCombos, setFoodCombos] = useState<IFoodCombo[]>([]);
   const [blogs, setBlogs] = useState<IBlog[]>([]);
+  const [detailBlog, setDetailBlog] = useState<IBlog | null>(null);
+  const [showBlogForm, setShowBlogForm] = useState<boolean>(false);
+  const [selectedBlog, setSelectedBlog] = useState<IBlog | undefined>(undefined);
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
   const [users, setUsers] = useState<IUser[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -429,12 +433,10 @@ const Dashboard: React.FC = () => {
     });
 
   // Show Sessions
-  console.log("Current showSessions state:", showSessions);
   const { paginated: paginatedShowSessions, totalPages: totalShowSessionPages } =
     filterAndPaginate<IShowSession>(showSessions, (session) =>
       (session.name?.toLowerCase() ?? "").includes(searchTerm.toLowerCase())
     );
-  console.log("Paginated show sessions:", paginatedShowSessions);
 
   // Reset page when tab/searchTerm thay đổi
   React.useEffect(() => {
@@ -625,9 +627,7 @@ const Dashboard: React.FC = () => {
   // Load functions for Show Sessions
   const loadShowSessions = async () => {
     try {
-      console.log("Loading show sessions...");
       const response = await getAllShowSessionsApi();
-      console.log("Show sessions response:", response);
       setShowSessions(response || []);
     } catch (error) {
       console.error("Error loading show sessions:", error);
@@ -695,9 +695,6 @@ const Dashboard: React.FC = () => {
           // Gộp success và warning thành 1 thông báo
           toast.success("Thêm bảng giá thành công!" + detailMessage);
           
-          if (skippedItems.length > 0) {
-            console.log("Các sản phẩm/combo đã bỏ qua:", skippedItems);
-          }
         } else {
         toast.success("Thêm bảng giá thành công!");
         }
@@ -1050,7 +1047,6 @@ const updateVoucherStatuses = async (vouchers: IVoucher[]) => {
   for (const update of vouchersToUpdate) {
     try {
       await updateVoucher(update.id, { status: update.status } as any);
-      console.log(`Đã cập nhật trạng thái voucher ${update.id} thành ${update.status}`);
     } catch (error) {
       console.error(`Lỗi cập nhật trạng thái voucher ${update.id}:`, error);
     }
@@ -1643,6 +1639,61 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
             </div>
           )}
 
+          {detailBlog && (
+            <Modal
+              open
+              title={<div className="text-center text-lg">Nội dung tin tức</div>}
+              onCancel={() => setDetailBlog(null)}
+              footer={null}
+              width={700}
+              centered
+            >
+              <div className="space-y-3" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <div>
+                  <strong>Tiêu đề:</strong> {detailBlog.title}
+                </div>
+                <div>
+                  <strong>Mô tả:</strong> {detailBlog.description}
+                </div>
+                <div>
+                  <strong>Nội dung:</strong>
+                </div>
+                <div className="whitespace-pre-line leading-7">
+                  {detailBlog.content}
+                </div>
+              </div>
+            </Modal>
+          )}
+
+          {showBlogForm && (
+            <BlogForm
+              blog={selectedBlog}
+              onSubmit={async (data) => {
+                try {
+                  if (selectedBlog) {
+                    const updated = await updateBlog(selectedBlog._id, data);
+                    setBlogs((prev) => prev.map(b => b._id === updated._id ? updated : b));
+                    toast.success("Cập nhật tin tức thành công!");
+                  } else {
+                    const created = await addBlog(data as IBlog);
+                    setBlogs((prev) => [...prev, created]);
+                    toast.success("Thêm tin tức thành công!");
+                  }
+                  setShowBlogForm(false);
+                  setSelectedBlog(undefined);
+                } catch (error) {
+                  console.error("Error adding/updating blog:", error);
+                  const errMsg = (error as any)?.response?.data?.message || (error as any)?.message;
+                  toast.error(errMsg || (selectedBlog ? "Cập nhật tin tức thất bại!" : "Thêm tin tức thất bại!"));
+                }
+              }}
+              onCancel={() => {
+                setShowBlogForm(false);
+                setSelectedBlog(undefined);
+              }}
+            />
+          )}
+
           {/* Blogs Tab */}
           {activeTab === "blogs" && (
             <div>
@@ -1657,19 +1708,28 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-                <div>
+                <div className="flex items-center gap-3">
+                  <motion.button
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { setSelectedBlog(undefined); setShowBlogForm(true); }}
+                  >
+                    Thêm tin tức
+                  </motion.button>
+                  {/* Optional quick check for duplicate code can be added before submit using getBlogByCode */}
                   <span>
                     Trang {currentPage} / {totalBlogPages}
                   </span>
                   <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage((p) => p - 1)}
                   >
                     Trước
                   </button>
                   <button
-                    className="ml-2 px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1 bg-gray-200 text-black rounded disabled:opacity-50 cursor-pointer"
                     disabled={currentPage === totalBlogPages}
                     onClick={() => setCurrentPage((p) => p + 1)}
                   >
@@ -1682,10 +1742,14 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                   <thead className="bg-gray-100 text-black border-b border-gray-200">
                     <tr>
                       <th className="p-3 text-left font-semibold text-black">STT</th>
+                      <th className="p-3 text-left font-semibold text-black">Mã tin</th>
                       <th className="p-3 text-left font-semibold text-black">Tiêu đề</th>
+                      <th className="p-3 text-left font-semibold text-black">Mô tả</th>
                       <th className="p-3 text-left font-semibold text-black">Ngày đăng</th>
+                      <th className="p-3 text-left font-semibold text-black">Trạng thái</th>
                       <th className="p-3 text-left font-semibold text-black">Nội dung</th>
-                      <th className="p-3 text-left font-semibold text-black">Ảnh</th>
+                      <th className="p-3 text-left font-semibold text-black">Ảnh Poster</th>
+                      <th className="p-3 text-left font-semibold text-black">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1694,15 +1758,66 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                         <td className="p-3">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
+                        <td className="p-3 font-semibold text-black">{blog.blogCode}</td>
                         <td className="p-3">{blog.title}</td>
-                        <td className="p-3">{blog.postedDate}</td>
-                        <td className="p-3">{blog.content}</td>
+                        <td className="pl-2 pr-3 py-3 max-w-xs text-left">
+                          <div className="truncate text-left" title={blog.description}>
+                            {blog.description}
+                          </div>
+                        </td>
+                        <td className="p-3">{new Date(blog.postedDate).toLocaleDateString("vi-VN")}</td>
                         <td className="p-3">
-                          <img
-                            src={blog.image}
-                            alt={blog.title}
-                            className="w-16 h-16 object-cover rounded"
-                          />
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            blog.status === 'Hiển thị' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {blog.status || 'Hiển thị'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <button
+                            className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                            style={{ textDecoration: 'none' }}
+                            onClick={() => setDetailBlog(blog)}
+                          >
+                            Xem chi tiết
+                          </button>
+                        </td>
+                        <td className="p-3">
+                          <img src={blog.posterImage} alt={blog.title} className="w-16 h-16 object-cover rounded" />
+                        </td>
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <motion.button
+                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 cursor-pointer"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => { setSelectedBlog(blog); setShowBlogForm(true); }}
+                            >
+                              Sửa
+                            </motion.button>
+                            <Popconfirm
+                              title="Xóa tin tức"
+                              description={`Bạn có chắc chắn muốn xóa "${blog.title}"?`}
+                              okText="Xóa"
+                              cancelText="Hủy"
+                              onConfirm={async () => {
+                                try {
+                                  await deleteBlog(blog._id);
+                                  setBlogs(prev => prev.filter(b => b._id !== blog._id));
+                                  toast.success("Xóa tin tức thành công!");
+                                } catch (e) {
+                                  console.error("Error deleting blog:", e);
+                                  toast.error("Xóa tin tức thất bại!");
+                                }
+                              }}
+                            >
+                              <motion.button className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 cursor-pointer" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                Xóa
+                              </motion.button>
+                            </Popconfirm>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -3067,15 +3182,12 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
               <Table
                 dataSource={selectedShowtime.showTimes.map((time: any, index: number) => {
                   const roomVal = time.room;
-                  console.log('Room data:', roomVal, typeof roomVal);
                   
                   // Tìm room trong danh sách rooms đã load bằng _id
                   const roomInfo = rooms.find(r => r._id === roomVal._id);
-                  console.log('Found room info:', roomInfo);
                   
                   const roomDisplay = roomInfo?.name || roomVal?.name || 'N/A';
                   const roomType = roomInfo?.roomType || '';
-                  console.log('Room type:', roomType);
                   
                   const seatsArr = Array.isArray(time.seats) ? time.seats : [];
                   return {
@@ -3155,16 +3267,16 @@ const handleOverlappingVouchers = async (vouchers: IVoucher[]) => {
                     key: 'room',
                       render: (room: string, record: any) => (
                         <Space direction="vertical" size="small">
-                          <Tag color="purple" className="font-medium">
-                            {room}
-                          </Tag>
+                      <Tag color="purple" className="font-medium">
+                        {room}
+                      </Tag>
                           {record.roomType && (
                             <div className="text-xs text-gray-600 text-center">
                               {record.roomType}
                             </div>
                           )}
                         </Space>
-                      )
+                    )
                   },
                   {
                     title: '💺 Tình trạng ghế',

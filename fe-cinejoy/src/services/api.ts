@@ -131,6 +131,32 @@ export const updateUserApi = async (
   return response.data;
 };
 
+export const updateUserPointsApi = async (
+  id: string,
+  points: number
+) => {
+  const response = await axios.put<IBackendResponse<IUser>>(
+    `/v1/api/user/${id}/points`,
+    { point: points }
+  );
+  return response.data;
+};
+
+export const addBirthdayPointsApi = async (
+  id: string,
+  pointsToAdd: number = 100
+) => {
+  const response = await axios.post<IBackendResponse<{
+    user: IUser;
+    pointsAdded: number;
+    newTotalPoints: number;
+  }>>(
+    `/v1/api/user/${id}/birthday-points`,
+    { pointsToAdd }
+  );
+  return response.data;
+};
+
 export const deleteUserApi = async (id: string) => {
   const response = await axios.delete<IBackendResponse<null>>(
     `/v1/api/user/${id}`
@@ -156,14 +182,14 @@ export const uploadAvatarApi = async (file: File) => {
 
 export const getMyVouchersApi = async () => {
   const response = await axios.get<IBackendResponse<IUserVoucher[]>>(
-    "/vouchers/my-vouchers"
+    "/v1/api/vouchers/my-vouchers"
   );
   return response.data;
 };
 
 export const redeemVoucherApi = async (voucherId: string, detailId?: string) => {
   const response = await axios.post<IBackendResponse<IUserVoucher>>(
-    "/vouchers/redeem",
+    "/v1/api/vouchers/redeem",
     {
       voucherId,
       detailId,
@@ -205,6 +231,20 @@ export const applyVoucherApi = async (
   return response.data;
 };
 
+export const getAmountDiscountApi = async (orderTotal: number) => {
+  const response = await axios.post<
+    IBackendResponse<{
+      discountAmount: number;
+      description: string;
+      minOrderValue: number;
+      discountValue: number;
+    } | null>
+  >("/v1/api/vouchers/amount-discount", {
+    orderTotal,
+  });
+  return response.data;
+};
+
 export const markVoucherAsUsedApi = async (
   code?: string,
   userVoucherId?: string
@@ -216,6 +256,49 @@ export const markVoucherAsUsedApi = async (
       userVoucherId,
     }
   );
+  return response.data;
+};
+
+// API cho khuyến mãi hàng
+export const getActiveItemPromotionsApi = async () => {
+  const response = await axios.get<IBackendResponse<any[]>>(
+    "/v1/api/vouchers/item-promotions"
+  );
+  return response.data;
+};
+
+export const applyItemPromotionsApi = async (
+  selectedCombos: Array<{ comboId: string; quantity: number; name: string }>,
+  appliedPromotions: any[] = []
+) => {
+  const response = await axios.post<IBackendResponse<{
+    applicablePromotions: any[];
+    totalRewardItems: number;
+  }>>("/v1/api/vouchers/apply-item-promotions", {
+    selectedCombos,
+    appliedPromotions
+  });
+  return response.data;
+};
+
+export const getActivePercentPromotionsApi = async () => {
+  const response = await axios.get<IBackendResponse<any[]>>(
+    "/v1/api/vouchers/percent-promotions"
+  );
+  return response.data;
+};
+
+export const applyPercentPromotionsApi = async (
+  selectedCombos: Array<{ comboId: string; quantity: number; name: string; price: number }>,
+  appliedPromotions: any[] = []
+) => {
+  const response = await axios.post<IBackendResponse<{
+    applicablePromotions: any[];
+    totalDiscountAmount: number;
+  }>>("/v1/api/vouchers/apply-percent-promotions", {
+    selectedCombos,
+    appliedPromotions
+  });
   return response.data;
 };
 

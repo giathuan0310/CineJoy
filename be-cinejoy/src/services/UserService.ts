@@ -26,3 +26,34 @@ export const deleteUser = async (userId: string) => {
     const deletedUser = await User.findByIdAndDelete(userId);
     return deletedUser;
 };
+
+export const updateUserPoints = async (userId: string, points: number) => {
+    const updatedUser = await User.findByIdAndUpdate(
+        userId, 
+        { point: points }, 
+        { new: true }
+    );
+    return updatedUser;
+};
+
+export const addBirthdayPoints = async (userId: string, pointsToAdd: number) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    
+    const currentPoints = user.point || 0;
+    const newPoints = currentPoints + pointsToAdd;
+    
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { point: newPoints },
+        { new: true }
+    );
+    
+    return {
+        user: updatedUser,
+        pointsAdded: pointsToAdd,
+        newTotalPoints: newPoints
+    };
+};

@@ -4,7 +4,9 @@ import {
   getUserById, 
   updateUser, 
   deleteUser, 
-  createUser 
+  createUser,
+  updateUserPointsController,
+  addBirthdayPointsController
 } from "../controllers/UserController";
 import { verifyToken } from "../middlewares/AuthMiddleware";
 
@@ -24,5 +26,11 @@ router.put("/:id", verifyToken, updateUser);
 
 // Xóa user
 router.delete("/:id", verifyToken, deleteUser);
+
+// Cập nhật điểm của user
+router.put("/:id/points", verifyToken, updateUserPointsController);
+
+// Cộng điểm sinh nhật
+router.post("/:id/birthday-points", verifyToken, addBirthdayPointsController);
 
 export default router;

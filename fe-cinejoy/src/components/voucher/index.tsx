@@ -137,17 +137,7 @@ const VoucherTab = () => {
     return (
         <>
             <div className="w-full max-w-6xl mx-auto mt-2">
-                <h2 className="text-2xl font-bold text-center mb-1" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Voucher của tôi</h2>
-                <div className="flex justify-center mb-4">
-                    <div
-                        className={clsx(
-                            'px-3 py-1 rounded-full text-sm font-semibold',
-                            isDarkMode ? 'bg-[#1f2937] text-[#93c5fd] border border-[#374151]' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        )}
-                    >
-                        Điểm hiện có: <span className="ml-1">{(user?.point ?? 0).toLocaleString('vi-VN')} điểm</span>
-                    </div>
-                </div>
+                <h2 className="text-2xl font-bold text-center mb-6" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Voucher của tôi</h2>
                 {loadingMyVouchers ? (
                     <div className="flex items-center justify-center py-8">
                         <Spin />

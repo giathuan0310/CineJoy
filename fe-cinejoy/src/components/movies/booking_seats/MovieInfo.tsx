@@ -244,6 +244,7 @@ const MovieInfo: React.FC<MovieInfoProps> = ({ movie, onContinue, totalPrice, pr
         </div>
       )}
 
+
       <button
         className={`mt-2 px-6 py-2 w-full rounded font-semibold transition-all duration-200 ${
           hasSelectedSeats && !priceError

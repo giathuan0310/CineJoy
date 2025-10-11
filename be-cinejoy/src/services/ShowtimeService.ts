@@ -572,6 +572,7 @@ class ShowtimeService {
           const finalStatus = (seatInfo?.status === 'maintenance' || fromRoom?.status === 'maintenance')
             ? 'maintenance'
             : seatItem.status;
+            
           
           // Type priority: RoomLayout.type (most up-to-date from admin) -> SeatModel.type -> 'normal'
           const finalType = fromRoom?.type || seatInfo?.type || 'normal';
@@ -960,8 +961,9 @@ class ShowtimeService {
     startTime: string,
     room: string,
     seatIds: string[],
-    status: "selected" | "available" | "maintenance",
-    onlyIfReservedByUserId?: string
+    status: "selected" | "available" | "maintenance" | "reserved" | "occupied",
+    onlyIfReservedByUserId?: string,
+    reservedByUserId?: string
   ): Promise<void> {
 
     const showtime = await Showtime.findById(showtimeId)
@@ -1008,44 +1010,201 @@ class ShowtimeService {
         );
         
       if (seatIndex !== -1) {
+        const current = specificShowtime.seats[seatIndex] as any;
+        
+        
         if (onlyIfReservedByUserId) {
-          const current = specificShowtime.seats[seatIndex] as any;
           if (current.reservedBy && current.reservedBy.toString() !== onlyIfReservedByUserId) {
             return; // skip not owned
           }
         }
         
-        specificShowtime.seats[seatIndex].status = status as any;
-        (specificShowtime.seats[seatIndex] as any).reservedUntil = status === 'selected' ? new Date(Date.now() + 5 * 60 * 1000) : undefined;
-        if (status === 'available') {
-          (specificShowtime.seats[seatIndex] as any).reservedBy = undefined;
+        const seat = specificShowtime.seats[seatIndex] as any;
+        seat.status = status as any;
+        
+        // Logic cho reservation
+        if (status === 'selected' || status === 'reserved') {
+          // Tạm giữ ghế 8 phút khi user chọn ghế và vào trang payment
+          seat.reservedUntil = new Date(Date.now() + 8 * 60 * 1000); // 8 minutes
+          seat.reservedBy = reservedByUserId ? new mongoose.Types.ObjectId(reservedByUserId) : seat.reservedBy;
+        } else if (status === 'occupied') {
+          // Ghế đã được thanh toán thành công - không còn tạm giữ
+          seat.reservedUntil = undefined;
+          seat.reservedBy = undefined;
+        } else if (status === 'available') {
+          // Giải phóng ghế
+          seat.reservedUntil = undefined;
+          seat.reservedBy = undefined;
         }
       }
     });
 
+    
     await showtime.save();
+    
+    
   }
 
-  // Release all expired reservations (selected but exceed reservedUntil)
+  // Lấy thông tin ghế với trạng thái reservation cho user hiện tại
+  async getSeatsWithReservationStatus(
+    showtimeId: string,
+    date: string,
+    startTime: string,
+    room: string,
+    currentUserId?: string,
+    isFromPaymentReturn?: boolean
+  ): Promise<{
+    seatId: string;
+    status: string;
+    reservedBy?: string;
+    reservedUntil?: Date;
+    isReservedByMe: boolean;
+  }[]> {
+    const showtime = await Showtime.findById(showtimeId)
+      .populate({ path: "showTimes.room", select: "name" })
+      .populate({ path: "showTimes.seats.seat", select: "seatId" });
+    
+    if (!showtime) throw new Error("Không tìm thấy suất chiếu");
+    
+    const showtimeIndex = showtime.showTimes.findIndex((st) => {
+      const showDate = new Date(st.date);
+      const showDateVietnam = new Date(showDate.getTime() + 7 * 60 * 60 * 1000);
+      const showDateStr = showDateVietnam.toISOString().split("T")[0];
+      const dateMatch = showDateStr === date;
+
+      let timeMatch = false;
+      if (startTime.includes("T")) {
+        const showStartTime = new Date(st.start);
+        const targetStartTime = new Date(startTime);
+        timeMatch = Math.abs(showStartTime.getTime() - targetStartTime.getTime()) < 60000;
+      } else if (startTime.includes(" ")) {
+        const showStartTime = new Date(st.start);
+        const targetTimeStr = `${date} ${startTime}`;
+        const targetStartTime = new Date(targetTimeStr);
+        timeMatch = Math.abs(showStartTime.getTime() - targetStartTime.getTime()) < 60000;
+      } else {
+        const showStartTime = new Date(st.start);
+        const vietnamHour = (showStartTime.getUTCHours() + 7) % 24;
+        const vietnamMin = showStartTime.getUTCMinutes();
+        const [targetHour, targetMin] = startTime.split(":").map(Number);
+        timeMatch = vietnamHour === targetHour && vietnamMin === targetMin;
+      }
+
+      const roomMatch = (st.room as any)?.name === room;
+      return dateMatch && timeMatch && roomMatch;
+    });
+
+    if (showtimeIndex === -1) throw new Error("Không tìm thấy suất chiếu cụ thể");
+
+    const specificShowtime = showtime.showTimes[showtimeIndex];
+    const now = new Date();
+    let hasChanges = false;
+    
+    const result = specificShowtime.seats.map((seat: any) => {
+      const seatId = seat.seat?.seatId || seat.seatId;
+      const reservedBy = seat.reservedBy?.toString();
+      const reservedUntil = seat.reservedUntil;
+      const isReservedByMe = currentUserId && reservedBy === currentUserId;
+      
+      // Kiểm tra xem reservation có hết hạn không
+      const isExpired = reservedUntil && new Date(reservedUntil) < now;
+      
+      // Nếu không phải quay lại từ payment và ghế đang được user này reserved, 
+      // thì không hiển thị trạng thái selected/reserved
+      let finalStatus = isExpired ? 'available' : seat.status;
+      let finalReservedBy = isExpired ? undefined : reservedBy;
+      let finalIsReservedByMe = Boolean(isExpired ? false : isReservedByMe);
+      
+      if (!isFromPaymentReturn && isReservedByMe && (seat.status === 'selected' || seat.status === 'reserved')) {
+        // Nếu không phải quay lại từ payment, không hiển thị ghế đang chọn của user
+        // Và thực sự giải phóng ghế trong database
+        finalStatus = 'available';
+        finalReservedBy = undefined;
+        finalIsReservedByMe = false;
+        
+        // Cập nhật trạng thái trong database để giải phóng ghế
+        seat.status = 'available';
+        seat.reservedUntil = undefined;
+        seat.reservedBy = undefined;
+        hasChanges = true;
+        
+      }
+      
+      return {
+        seatId,
+        status: finalStatus,
+        reservedBy: finalReservedBy,
+        reservedUntil: isExpired ? undefined : reservedUntil,
+        isReservedByMe: finalIsReservedByMe
+      };
+    });
+    
+    // Lưu thay đổi nếu có
+    if (hasChanges) {
+      await showtime.save();
+    }
+    
+    return result;
+  }
+
+  // Release all expired reservations (selected/reserved but exceed reservedUntil)
   async releaseExpiredReservations(): Promise<{ released: number }> {
     const docs = await Showtime.find({});
     let released = 0;
     const now = new Date();
+    
     for (const doc of docs) {
       let changed = false;
       for (const st of (doc.showTimes as any[])) {
         for (const seat of st.seats) {
-          if (seat.status === 'selected' && seat.reservedUntil && new Date(seat.reservedUntil) < now) {
+          if ((seat.status === 'selected' || seat.status === 'reserved') && 
+              seat.reservedUntil && 
+              new Date(seat.reservedUntil) < now) {
+            
             seat.status = 'available';
             seat.reservedUntil = undefined;
+            seat.reservedBy = undefined;
             released++;
             changed = true;
+            
           }
         }
       }
       if (changed) await doc.save();
     }
+    
     return { released };
+  }
+
+  // Giải phóng tất cả ghế tạm giữ của user khi chọn suất chiếu mới
+  async releaseUserReservedSeats(userId: string): Promise<{ released: number; releasedSeats: string[] }> {
+    const docs = await Showtime.find({});
+    let released = 0;
+    const releasedSeats: string[] = [];
+    
+    for (const doc of docs) {
+      let changed = false;
+      for (const st of (doc.showTimes as any[])) {
+        for (const seat of st.seats) {
+          if ((seat.status === 'selected' || seat.status === 'reserved') && 
+              seat.reservedBy && 
+              seat.reservedBy.toString() === userId) {
+            
+            const seatId = seat.seat?.seatId || 'unknown';
+            seat.status = 'available';
+            seat.reservedUntil = undefined;
+            seat.reservedBy = undefined;
+            released++;
+            releasedSeats.push(seatId);
+            changed = true;
+            
+          }
+        }
+      }
+      if (changed) await doc.save();
+    }
+    
+    return { released, releasedSeats };
   }
 
   // Tạo dữ liệu ghế mặc định khi seats array rỗng
@@ -1137,9 +1296,6 @@ class ShowtimeService {
       showtime.showTimes[showtimeIndex].seats = defaultSeats;
 
       await showtime.save();
-      console.log(
-        `Initialized ${defaultSeats.length} seats for showtime ${showtimeId}`
-      );
       return true;
     } catch (error) {
       console.error("Error initializing seats:", error);

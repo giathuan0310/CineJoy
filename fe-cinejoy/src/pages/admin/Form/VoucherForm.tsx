@@ -78,7 +78,6 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
         } else {
             setStatusLocked(true); // Khóa trạng thái cả khi thêm mới
             // Tự động cập nhật trạng thái ban đầu cho form thêm mới
-            const today = dayjs();
             form.setFieldValue('status', 'không hoạt động'); // Mặc định là không hoạt động
         }
     }, [voucher, form]);
@@ -108,25 +107,6 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
         } else {
             form.setFieldValue('status', 'không hoạt động');
         }
-    };
-
-    // Kiểm tra trùng lặp khoảng thời gian
-    const checkDateOverlap = (startDate: dayjs.Dayjs, endDate: dayjs.Dayjs): boolean => {
-        if (!startDate || !endDate) return false;
-        
-        const currentStart = startDate.startOf('day');
-        const currentEnd = endDate.endOf('day');
-        
-        return existingVouchers.some(existingVoucher => {
-            // Bỏ qua voucher hiện tại khi edit
-            if (voucher && existingVoucher._id === voucher._id) return false;
-            
-            const existingStart = dayjs(existingVoucher.startDate).startOf('day');
-            const existingEnd = dayjs(existingVoucher.endDate).endOf('day');
-            
-            // Kiểm tra trùng lặp: (start1 <= end2) && (start2 <= end1)
-            return (currentStart.isSameOrBefore(existingEnd) && currentEnd.isSameOrAfter(existingStart));
-        });
     };
 
     // Kiểm tra ngày có bị trùng lặp không
@@ -192,7 +172,7 @@ const VoucherForm: React.FC<VoucherFormProps> = ({ voucher, onSubmit, onCancel }
                 form={form}
                 layout="vertical"
                 onFinish={handleSubmit}
-                autoComplete="off"khi mới
+                autoComplete="off"
             >
                 {/* 1.1 Mã khuyến mãi */}
                 <Form.Item

@@ -128,3 +128,24 @@
   background: none !important;
   box-shadow: none !important;
 }
+
+/* Hide scrollbar ONLY for the contact ticket content */
+.contact-ticket-scroll {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.contact-ticket-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Disabled DatePicker styling to match Input */
+.disabled-datepicker-dark .ant-picker-input > input {
+  color: #e0e0e0 !important;
+  background-color: #2d323b !important;
+}
+
+.disabled-datepicker-light .ant-picker-input > input {
+  color: #6b7280 !important;
+  background-color: #f3f4f6 !important;
+}

@@ -17,6 +17,11 @@ import Error from 'pages/client/Error';
 import Dashboard from 'pages/admin/AdminDaskboard';
 import VoucherDetail from 'pages/admin/VoucherDetail';
 import { ToastContainer } from 'react-toastify';
+import Contact from 'pages/client/Contact';
+import NewsPage from 'pages/client/News';
+import NewsDetailPage from 'pages/client/NewsDetail';
+import BookingHistory from 'pages/client/BookingHistory';
+import TransactionDetails from 'pages/client/TransactionDetails';
 
 const router = createBrowserRouter([
   {
@@ -26,6 +31,18 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />
+      },
+      {
+        path: "/news",
+        element: <NewsPage />
+      },
+      {
+        path: "/news/:blogCode",
+        element: <NewsDetailPage />
+      },
+      {
+        path: "/contact",
+        element: <Contact />
       },
       {
         path: "/movies",
@@ -42,6 +59,14 @@ const router = createBrowserRouter([
       {
         path: "/members",
         element: <Members />
+      },
+      {
+        path: "/booking-history",
+        element: <BookingHistory />
+      },
+      {
+        path: "/transaction-details/:orderId",
+        element: <TransactionDetails />
       },
       {
         path: "/payment",

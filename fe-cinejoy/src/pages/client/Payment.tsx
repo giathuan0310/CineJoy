@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Modal, Button, Typography, Row, Col, message } from "antd";
-import { validateVoucherApi, applyVoucherApi, createOrderApi, processPaymentApi, releaseSeatsByUserApi } from "@/services/api";
+import { validateVoucherApi, applyVoucherApi, createOrderApi, processPaymentApi, getAmountDiscountApi, getActiveItemPromotionsApi, applyItemPromotionsApi, applyPercentPromotionsApi } from "@/services/api";
 import { getFoodCombos } from "@/apiservice/apiFoodCombo";
 import { getCurrentPriceList } from "@/apiservice/apiPriceList";
 import type { IPriceList, IPriceListLine } from "@/apiservice/apiPriceList";
@@ -21,6 +21,7 @@ interface VoucherResponse {
     voucher: unknown;
     userVoucher: unknown;
     discount: number;
+    userVoucherId?: string;
   };
 }
 
@@ -66,6 +67,26 @@ const PaymentPage = () => {
     discountPercent: number;
     discountAmount: number;
     maxCap?: number;
+    userVoucherId?: string;
+  } | null>(null);
+
+  // State cho khuyến mãi hàng
+  const [appliedItemPromotions, setAppliedItemPromotions] = useState<any[]>([]);
+  
+  // State cho khuyến mãi chiết khấu
+  const [appliedPercentPromotions, setAppliedPercentPromotions] = useState<any[]>([]);
+
+  // Tính toán selectedCombos từ comboCounts - sử dụng useMemo để tránh tạo array mới mỗi lần render
+  const selectedCombos = useMemo(() => 
+    combos.filter(combo => comboCounts[combo._id] > 0).map(combo => ({
+      _id: combo._id,
+      quantity: comboCounts[combo._id],
+      name: combo.name
+    }))
+  , [combos, comboCounts]);
+  const [amountDiscount, setAmountDiscount] = useState<{
+    description: string;
+    discountAmount: number;
   } | null>(null);
   const [voucherLoading, setVoucherLoading] = useState<boolean>(false);
   const [voucherError, setVoucherError] = useState<string>("");
@@ -73,71 +94,72 @@ const PaymentPage = () => {
   const [isPaymentLoading, setIsPaymentLoading] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'VNPAY'>('MOMO');
 
-  // Logic giải phóng ghế khi rời khỏi trang payment
-  const releaseSeatsOnExit = useCallback(async () => {
-    try {
-      if (showtimeId && seats && seats.length > 0 && user?._id) {
-        await releaseSeatsByUserApi({
-          showtimeId,
-          date,
-          startTime: time,
-          room,
-          seatIds: seats,
-          userId: user._id
-        });
-        
-        // Thêm delay để đảm bảo backend đã xử lý xong
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    } catch (error) {
-      console.error("Error releasing seats:", error);
-    }
-  }, [showtimeId, seats, date, time, room, user?._id]);
+  // releaseSeatsOnExit function removed - seats should stay reserved when navigating back
 
-  // Setup event listeners (chỉ chạy 1 lần khi component mount)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Release ghế khi đóng tab/refresh
-      releaseSeatsOnExit();
-    };
+  // TEMPORARILY DISABLED - Setup event listeners (chỉ chạy 1 lần khi component mount)
+  // useEffect(() => {
+  //   const handleBeforeUnload = () => {
+  //     // Release ghế khi đóng tab/refresh
+  //     releaseSeatsOnExit();
+  //   };
 
-    const handleRouteChange = () => {
-      // Release ghế khi navigate away
-      releaseSeatsOnExit();
-    };
+  //   const handleRouteChange = () => {
+  //     // Release ghế khi navigate away
+  //     releaseSeatsOnExit();
+  //   };
 
-    // Lắng nghe sự kiện beforeunload (đóng tab, refresh, navigate away)
-    window.addEventListener('beforeunload', handleBeforeUnload);
+  //   // Lắng nghe sự kiện beforeunload (đóng tab, refresh, navigate away)
+  //   window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Lắng nghe sự kiện popstate (back/forward button)
-    window.addEventListener('popstate', handleRouteChange);
+  //   // Lắng nghe sự kiện popstate (back/forward button)
+  //   window.addEventListener('popstate', handleRouteChange);
 
-    // Cleanup function - chỉ remove event listeners
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('popstate', handleRouteChange);
-    };
-  }, []); // Không có dependency để tránh re-run
+  //   // Cleanup function - chỉ remove event listeners
+  //   return () => {
+  //     window.removeEventListener('beforeunload', handleBeforeUnload);
+  //     window.removeEventListener('popstate', handleRouteChange);
+  //   };
+  // }, []); // Không có dependency để tránh re-run
 
-  // Cleanup logic riêng biệt (chỉ chạy khi component unmount thật sự)
+  // TEMPORARILY DISABLED - Cleanup logic riêng biệt (chỉ chạy khi component unmount thật sự)
+  // useEffect(() => {
+  //   return () => {
+  //     // Kiểm tra xem có đang redirect đến payment gateway không
+  //     const isRedirectingToPayment = sessionStorage.getItem('payment_redirecting');
+      
+  //     if (!isRedirectingToPayment) {
+  //       // Chỉ release ghế khi KHÔNG đang redirect đến payment gateway
+  //       releaseSeatsOnExit();
+  //     }
+      
+  //     // Đảm bảo cờ redirecting được xóa khi component unmount
+  //     try {
+  //       sessionStorage.removeItem('payment_redirecting');
+  //     } catch (e) {
+  //       console.error('Error clearing payment_redirecting on unmount:', e);
+  //     }
+  //   };
+  // }, []); // Không có dependency để tránh re-run
+
+  // Set flag khi vào trang payment để đánh dấu có thể quay lại
   useEffect(() => {
+    try {
+      sessionStorage.setItem('from_payment_page', 'true');
+      console.log('🏷️ Set from_payment_page flag');
+    } catch (error) {
+      console.error('Error setting payment page flag:', error);
+    }
+
+    // Cleanup: xóa flag khi component unmount (user navigate đến trang khác)
     return () => {
-      // Kiểm tra xem có đang redirect đến payment gateway không
-      const isRedirectingToPayment = sessionStorage.getItem('payment_redirecting');
-      
-      if (!isRedirectingToPayment) {
-        // Chỉ release ghế khi KHÔNG đang redirect đến payment gateway
-        releaseSeatsOnExit();
-      }
-      
-      // Đảm bảo cờ redirecting được xóa khi component unmount
       try {
-        sessionStorage.removeItem('payment_redirecting');
-      } catch (e) {
-        console.error('Error clearing payment_redirecting on unmount:', e);
+        sessionStorage.removeItem('from_payment_page');
+        console.log('🧹 Removed from_payment_page flag on unmount');
+      } catch (error) {
+        console.error('Error removing payment page flag:', error);
       }
     };
-  }, []); // Không có dependency để tránh <re-run></re-run>
+  }, []);
 
   useEffect(() => {
     const loadServicesFromPriceList = async () => {
@@ -276,6 +298,7 @@ const PaymentPage = () => {
         discountPercent: percent,
         discountAmount: applyRes.data.discountAmount || 0,
         maxCap: cap,
+        userVoucherId: applyRes.data.userVoucherId,
       });
       setVoucherError("");
     } catch {
@@ -291,6 +314,83 @@ const PaymentPage = () => {
     setVoucherCode("");
     setVoucherError("");
   };
+
+  // Load danh sách khuyến mãi hàng đang hoạt động
+  const loadActiveItemPromotions = async () => {
+    try {
+      const response = await getActiveItemPromotionsApi();
+      if (response.status && response.data) {
+        console.log("Loaded active item promotions:", response.data);
+      }
+    } catch (error) {
+      console.error("Error loading item promotions:", error);
+    }
+  };
+
+
+
+  // Tự động áp dụng khuyến mãi hàng (không hiển thị message)
+  const applyItemPromotionsAuto = useCallback(async () => {
+    if (selectedCombos.length === 0) {
+      setAppliedItemPromotions([]);
+      return;
+    }
+
+    try {
+      const comboData = selectedCombos.map(combo => ({
+        comboId: combo._id,
+        quantity: combo.quantity,
+        name: combo.name
+      }));
+
+      const response = await applyItemPromotionsApi(comboData, []);
+      
+      console.log('🎯 Frontend API Response:', response);
+      console.log('🎯 Selected combos:', comboData);
+      
+      if (response.status && response.data) {
+        console.log('🎯 Setting applied promotions:', response.data.applicablePromotions);
+        setAppliedItemPromotions(response.data.applicablePromotions);
+      } else {
+        console.log('🎯 No promotions found');
+        setAppliedItemPromotions([]);
+      }
+    } catch (error) {
+      console.error("Error applying item promotions:", error);
+      setAppliedItemPromotions([]);
+    }
+  }, [selectedCombos]);
+
+  // Tự động áp dụng khuyến mãi chiết khấu (không hiển thị message)
+  const applyPercentPromotionsAuto = useCallback(async () => {
+    if (selectedCombos.length === 0) {
+      setAppliedPercentPromotions([]);
+      return;
+    }
+
+    try {
+      const comboData = selectedCombos.map(combo => {
+        const fullCombo = combos.find(c => c._id === combo._id);
+        return {
+          comboId: combo._id,
+          quantity: combo.quantity,
+          name: combo.name,
+          price: fullCombo?.price || 0
+        };
+      });
+
+      const response = await applyPercentPromotionsApi(comboData, []);
+      
+      if (response.status && response.data) {
+        setAppliedPercentPromotions(response.data.applicablePromotions);
+      } else {
+        setAppliedPercentPromotions([]);
+      }
+    } catch (error) {
+      console.error("Error applying percent promotions:", error);
+      setAppliedPercentPromotions([]);
+    }
+  }, [selectedCombos]);
 
   const handleOpenModal = () => {
     if (!editableUserInfo.fullName.trim()) {
@@ -346,7 +446,7 @@ const PaymentPage = () => {
               price: combo?.price || 0
             };
           }),
-        voucherId: appliedVoucher?.code || null,
+        voucherId: appliedVoucher?.userVoucherId || null,
         paymentMethod: paymentMethod,
         customerInfo: {
           fullName: editableUserInfo.fullName,
@@ -457,8 +557,12 @@ const PaymentPage = () => {
   // Tính lại discount khi combo total thay đổi
   const currentSubTotal = ticketTotal + comboTotal;
   const voucherDiscount = appliedVoucher?.discountAmount || 0;
+  const amountDiscountValue = amountDiscount?.discountAmount || 0;
 
-  const total = Math.max(0, currentSubTotal - voucherDiscount);
+  // Tính tổng discount từ percent promotions
+  const percentDiscountTotal = appliedPercentPromotions.reduce((sum, promo) => sum + (promo.discountAmount || 0), 0);
+  
+  const total = Math.max(0, currentSubTotal - voucherDiscount - amountDiscountValue - percentDiscountTotal);
 
   // Khi tổng thay đổi mà đã có voucher, gọi lại API apply để cập nhật số tiền giảm cho đúng trần
   useEffect(() => {
@@ -470,6 +574,7 @@ const PaymentPage = () => {
           setAppliedVoucher((prev) => prev ? {
             ...prev,
             discountAmount: (applyRes.data?.discountAmount as number) || 0,
+            userVoucherId: applyRes.data?.userVoucherId || prev.userVoucherId,
           } : prev);
         }
       } catch {
@@ -478,6 +583,33 @@ const PaymentPage = () => {
     };
     reapply();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSubTotal]);
+
+  // Tính amount discount khi currentSubTotal thay đổi
+  useEffect(() => {
+    const calculateAmountDiscount = async () => {
+      if (currentSubTotal <= 0) {
+        setAmountDiscount(null);
+        return;
+      }
+
+      try {
+        const response = await getAmountDiscountApi(currentSubTotal);
+        if (response.status && response.data) {
+          setAmountDiscount({
+            description: response.data.description,
+            discountAmount: response.data.discountAmount,
+          });
+        } else {
+          setAmountDiscount(null);
+        }
+      } catch (error) {
+        console.error("Error getting amount discount:", error);
+        setAmountDiscount(null);
+      }
+    };
+
+    calculateAmountDiscount();
   }, [currentSubTotal]);
 
   // Modal hết thời gian đã chuyển sang global ở Layout; không dùng modal cục bộ nữa
@@ -505,6 +637,22 @@ const PaymentPage = () => {
     return () => clearInterval(timer);
   }, [timeLeft, navigate]);
 
+  // Load khuyến mãi hàng khi component mount
+  useEffect(() => {
+    loadActiveItemPromotions();
+  }, []);
+
+  // Tự động áp dụng khuyến mãi hàng và chiết khấu khi selectedCombos thay đổi
+  useEffect(() => {
+    if (selectedCombos.length > 0) {
+      applyItemPromotionsAuto();
+      applyPercentPromotionsAuto();
+    } else {
+      setAppliedItemPromotions([]);
+      setAppliedPercentPromotions([]);
+    }
+  }, [selectedCombos, applyItemPromotionsAuto, applyPercentPromotionsAuto]);
+
   return (
     <>
       <div
@@ -528,14 +676,27 @@ const PaymentPage = () => {
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
-                    // Release ghế khi người dùng chủ động bấm "Quay lại"
-                    await releaseSeatsOnExit();
-                    // Clear cache để force refresh dữ liệu ghế
+                    // Release ghế khi quay lại từ trang thanh toán
+                    console.log('🔓 Releasing seats when navigating back from payment page');
+                    
                     try {
+                      // Import API function
+                      const { releaseSeatsApi } = await import('@/apiservice/apiShowTime');
+                      
+                      // Release ghế đã chọn
+                      if (showtimeId && date && time && room && seats.length > 0) {
+                        console.log('🔓 Releasing seats:', seats);
+                        await releaseSeatsApi(showtimeId, date, time, room, seats);
+                        console.log('✅ Successfully released seats when navigating back');
+                      }
+                      
+                      // Clear cache
                       sessionStorage.removeItem('booking_reserved_info');
-                    } catch (e) {
-                      console.error('Error clearing booking cache:', e);
+                    } catch (error) {
+                      console.error('❌ Error releasing seats when navigating back:', error);
+                      // Vẫn navigate back dù có lỗi
                     }
+                    
                     navigate(-1);
                   }}
                   className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium select-none cursor-pointer transition-all duration-200 ${
@@ -944,7 +1105,7 @@ const PaymentPage = () => {
                                 }
                               }}
                               placeholder="Nhập mã voucher"
-                              className={`flex-1 border rounded-md px-2.5 py-1.5 ${
+                              className={`flex-1 border rounded-md px-2.5 py-2 h-10 ${
                                 isDarkMode
                                   ? "bg-[#232c3b] text-white border-[#3a3d46] placeholder-gray-400"
                                   : "border-gray-300"
@@ -953,7 +1114,7 @@ const PaymentPage = () => {
                             <button
                               onClick={handleApplyVoucher}
                               disabled={voucherLoading || !voucherCode.trim()}
-                              className={`px-2 py-1.5 rounded font-semibold transition-all duration-200 ${
+                              className={`px-2 py-2 rounded font-semibold transition-all duration-200 h-10 whitespace-nowrap ${
                                 voucherLoading || !voucherCode.trim()
                                   ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                                   : isDarkMode
@@ -961,7 +1122,7 @@ const PaymentPage = () => {
                                   : "bg-blue-600 hover:bg-blue-500 text-white cursor-pointer"
                               }`}
                             >
-                              {voucherLoading ? "Đang kiểm tra..." : "Áp dụng"}
+                              {voucherLoading ? "Check..." : "Áp dụng"}
                             </button>
                           </div>
                           {voucherError && (
@@ -993,6 +1154,8 @@ const PaymentPage = () => {
                       )}
                     </div>
 
+                
+
                 {/* Thông tin thanh toán (đã chuyển sang bên phải) */}
                 <div className="mt-6">
                   <p className={`text-lg font-bold text-center mb-4 ${isDarkMode ? "text-cyan-400" : "text-blue-700"}`}>
@@ -1021,15 +1184,62 @@ const PaymentPage = () => {
                       <p className="label font-bold">Số tiền được giảm:</p>
                       <div className="value text-right">
                         <div className={`font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
-                         {voucherDiscount.toLocaleString() === "0" ? "0" : `- ${voucherDiscount.toLocaleString()}`} VNĐ 
+                         {(voucherDiscount + amountDiscountValue).toLocaleString() === "0" ? "0" : `- ${(voucherDiscount + amountDiscountValue).toLocaleString()}`} VNĐ 
                         </div>
                         {typeof appliedVoucher?.maxCap === 'number' && voucherDiscount >= (appliedVoucher?.maxCap || 0) && (
                           <div className="text-xs italic" style={{ color: isDarkMode ? '#9ae6b4' : '#16a34a' }}>
                             Đã đạt mức giảm tối đa
                           </div>
                         )}
+                        {amountDiscount && (
+                          <div className="text-xs italic" style={{ color: isDarkMode ? '#9ae6b4' : '#16a34a' }}>
+                            {(() => {
+                              const text = amountDiscount.description;
+                              const parts = text.split(/(\d+[Kk]?|\d+%)/);
+                              return parts.map((part: string, i: number) => 
+                                /^\d+[Kk]?$|^\d+%$/.test(part) ? (
+                                  <strong key={i}>{part}</strong>
+                                ) : (
+                                  part
+                                )
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
+                    
+                    {/* Hiển thị khuyến mãi chiết khấu */}
+                    {appliedPercentPromotions.length > 0 && (
+                      <div className="row flex justify-between text-sm">
+                        <p className="label font-bold">Khuyến mãi chiết khấu:</p>
+                        <div className="value text-right">
+                          {appliedPercentPromotions.map((promotion, index) => (
+                            <div key={index} className="text-xs italic mb-1" style={{ color: isDarkMode ? '#fbbf24' : '#ea580c' }}>
+                              {promotion.description || `Giảm ${promotion.discountPercent}% ${promotion.comboName}`}
+                              <div className="font-semibold" style={{ color: isDarkMode ? '#dc2626' : '#dc2626' }}>
+                                -{promotion.discountAmount.toLocaleString()}₫
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hiển thị khuyến mãi hàng */}
+                    {appliedItemPromotions.length > 0 && (
+                      <div className="row flex justify-between text-sm">
+                        <p className="label font-bold">Khuyến mãi hàng:</p>
+                        <div className="value text-right">
+                          {appliedItemPromotions.map((promotion, index) => (
+                            <div key={index} className="text-xs italic mb-1" style={{ color: isDarkMode ? '#9ae6b4' : '#16a34a' }}>
+                              {promotion.detail?.description || `Mua ${promotion.detail?.buyQuantity} ${promotion.detail?.buyItem} tặng ${promotion.rewardQuantity} ${promotion.rewardItem}`}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="row flex items-center justify-between text-sm">
                       <p className="label font-bold">Số tiền thanh toán:</p>
                       <p className={`value text-lg font-bold ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
@@ -1216,6 +1426,73 @@ const PaymentPage = () => {
                       }}
                     >
                       Không có dịch vụ nào
+                    </Text>
+                  )}
+                  
+                  {/* Hiển thị khuyến mãi chiết khấu */}
+                  {appliedPercentPromotions.map((promotion, index) => (
+                    <Text
+                      key={`percent-promotion-${index}`}
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        marginTop: "4px",
+                        color: "#16a34a",
+                        fontWeight: "500"
+                      }}
+                    >
+                      <span>
+                        {promotion.description ? (
+                          // Parse description để làm đậm số tiền và phần trăm
+                          (() => {
+                            const text = promotion.description;
+                            const parts = text.split(/(\d+[Kk]?|\d+%)/);
+                            return parts.map((part: string, i: number) => 
+                              /^\d+[Kk]?$|^\d+%$/.test(part) ? (
+                                <strong key={i}>{part}</strong>
+                              ) : (
+                                part
+                              )
+                            );
+                          })()
+                        ) : (
+                          // Fallback nếu không có description
+                          <>Giảm <strong>{promotion.discountPercent}%</strong> {promotion.comboName}</>
+                        )}
+                      </span>
+                      <span style={{ marginLeft: "8px", fontWeight: "bold" }}>
+                        -{promotion.discountAmount.toLocaleString()}₫
+                      </span>
+                    </Text>
+                  ))}
+                  
+                  {/* Hiển thị sản phẩm tặng từ khuyến mãi hàng */}
+                  {appliedItemPromotions.map((promotion, index) => (
+                    <Text
+                      key={`item-promotion-${index}`}
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        marginTop: "4px",
+                        color: "#16a34a",
+                        fontWeight: "500"
+                      }}
+                    >
+                      + {promotion.rewardQuantity} {promotion.rewardItem}
+                    </Text>
+                  ))}
+                  
+                  {amountDiscount && (
+                    <Text
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        marginTop: "8px",
+                        color: "#16a34a",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {amountDiscount.description}
                     </Text>
                   )}
                 </div>

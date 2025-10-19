@@ -5,6 +5,7 @@ import { getTheaters } from "@/apiservice/apiTheater";
 import { getRegions } from "@/apiservice/apiRegion";
 import { useNavigate, useParams } from "react-router-dom";
 import useAppStore from "@/store/app.store";
+import { useReleaseReservedSeats } from "@/hooks/useReleaseReservedSeats";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -44,13 +45,13 @@ const get7DaysFromToday = () => {
 };
 
 const getYoutubeEmbedUrl = (url?: string) => {
-  if (!url) return null; // ← Thay đổi
+  if (!url) return "";
   if (url.includes("embed")) return url;
   const match = url.match(/(?:\?v=|\/embed\/|\.be\/)([a-zA-Z0-9_-]{11})/);
   if (match && match[1]) {
     return `https://www.youtube.com/embed/${match[1]}`;
   }
-  return null; // ← Thay đổi từ `return url;` thành `return null;`
+  return url;
 };
 
 const formatVNTime = (iso: string) => {
@@ -60,8 +61,8 @@ const formatVNTime = (iso: string) => {
 const CardInfMovie = () => {
   const [showMoreDes, setShowMoreDes] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<
-    "nowShowing" | "upcoming" | "special" | "all"
-  >("nowShowing");
+    "Phim đang chiếu" | "Phim sắp chiếu" | "Suất chiếu đặc biệt" | "Đã kết thúc"
+  >("Phim đang chiếu");
   const [openModal, setOpenModal] = useState<boolean>(false);
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
@@ -70,13 +71,50 @@ const CardInfMovie = () => {
     get7DaysFromToday()
   );
   const [showtimes, setShowtimes] = useState<IShowtime[]>([]);
-  const { isDarkMode } = useAppStore();
-  const allShowTimes = showtimes.flatMap((st) => st.showTimes || []);
-  const showTimesOfSelectedDate = allShowTimes.filter(
-    (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
+  const [loadingMovie, setLoadingMovie] = useState<boolean>(true);
+  const [movieError, setMovieError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const { isDarkMode, user, setIsModalOpen } = useAppStore();
+
+
+  // Flatten showtimes and normalize room to string (same approach as ScheduleList)
+  const allShowTimes = showtimes.flatMap((st) =>
+    (st.showTimes || []).map((showTime) => ({
+      ...showTime,
+      parentId: st._id,
+      room:
+        typeof showTime.room === "string"
+          ? (showTime.room as string)
+          : ((showTime.room as { name?: string; _id?: string })?.name ||
+              (showTime.room as { name?: string; _id?: string })?._id ||
+              "Unknown Room"),
+    }))
   );
 
+  // Lọc theo ngày, và nếu là hôm nay thì ẩn suất đã quá giờ bắt đầu 5 phút
+  let showTimesOfSelectedDate = allShowTimes.filter(
+    (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
+  );
+  if (selectedDate === dayjs().format("YYYY-MM-DD")) {
+    const now = dayjs();
+    showTimesOfSelectedDate = showTimesOfSelectedDate.filter((st) => {
+      const start = dayjs(st.start);
+      const end = dayjs(st.end);
+      
+      // Xử lý trường hợp ca đêm qua ngày hôm sau
+      if (start.hour() >= 22 && end.hour() < 6) {
+        // Ca đêm: kiểm tra xem đã qua end time chưa
+        const endTimeToday = end.format("YYYY-MM-DD HH:mm");
+        return dayjs(endTimeToday).add(5, "minute").isAfter(now);
+      } else {
+        // Ca bình thường: kiểm tra start time
+        return start.add(5, "minute").isAfter(now);
+      }
+    });
+  }
+
   const navigate = useNavigate();
+  const { releaseUserReservedSeats } = useReleaseReservedSeats();
 
   const { id } = useParams<{ id: string }>();
   const [movie, setMovie] = useState<IMovie | null>(null);
@@ -103,13 +141,49 @@ const CardInfMovie = () => {
   useEffect(() => {
     const fetchMovie = async () => {
       try {
-        if (id) {
-          const response = await getMovieById(id);
-          console.log("Phim:", response);
-          setMovie(response || null); // Lấy object phim từ response.data
+        setLoadingMovie(true);
+        setMovieError(null);
+        
+        if (!id || id.trim() === '') {
+          setMovieError("ID phim không hợp lệ");
+          return;
         }
-      } catch (error) {
+
+        console.log("Fetching movie with ID:", id);
+        const response = await getMovieById(id);
+        
+        if (!response) {
+          setMovieError("Không tìm thấy thông tin phim");
+          return;
+        }
+        
+        setMovie(response);
+        console.log("Movie loaded successfully:", response.title);
+        console.log("Movie image URLs:", {
+          image: response.image,
+          posterImage: response.posterImage,
+          allKeys: Object.keys(response)
+        });
+      } catch (error: unknown) {
         console.error("Lỗi khi lấy thông tin phim:", error);
+        
+        // Xử lý các loại lỗi khác nhau
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { status?: number }; code?: string };
+          if (axiosError.response?.status === 404) {
+            setMovieError("Không tìm thấy phim với ID này");
+          } else if (axiosError.response?.status === 500) {
+            setMovieError("Lỗi server, vui lòng thử lại sau");
+          } else if (axiosError.code === 'NETWORK_ERROR') {
+            setMovieError("Lỗi kết nối, vui lòng kiểm tra mạng");
+          } else {
+            setMovieError("Có lỗi xảy ra khi tải thông tin phim");
+          }
+        } else {
+          setMovieError("Có lỗi xảy ra khi tải thông tin phim");
+        }
+      } finally {
+        setLoadingMovie(false);
       }
     };
 
@@ -125,7 +199,6 @@ const CardInfMovie = () => {
     const fetchTheater = async () => {
       try {
         const response = await getTheaters();
-        console.log("All theaters:", response);
         setTheater(Array.isArray(response) ? response : []);
       } catch (error) {
         console.error("Lỗi khi lấy thông tin rạp:", error);
@@ -137,12 +210,32 @@ const CardInfMovie = () => {
     fetchTheater();
   }, [id]);
 
-  const filteredMovies =
-    activeTab === "nowShowing"
-      ? movies.filter(
-        (movie) => movie.status === "nowShowing" || movie.status === "special"
-      )
-      : movies.filter((movie) => movie.status === activeTab);
+  const filteredMovies = (() => {
+    let filtered = [];
+    
+    switch (activeTab) {
+      case "Phim đang chiếu":
+        // Chỉ hiển thị phim đang chiếu, không bao gồm suất chiếu đặc biệt
+        filtered = movies.filter((movie) => movie.status === "Phim đang chiếu");
+        break;
+      case "Phim sắp chiếu":
+        // Chỉ hiển thị phim sắp chiếu
+        filtered = movies.filter((movie) => movie.status === "Phim sắp chiếu");
+        break;
+      case "Suất chiếu đặc biệt":
+        // Chỉ hiển thị suất chiếu đặc biệt
+        filtered = movies.filter((movie) => movie.status === "Suất chiếu đặc biệt");
+        break;
+      case "Đã kết thúc":
+        // Chỉ hiển thị phim đã kết thúc
+        filtered = movies.filter((movie) => movie.status === "Đã kết thúc");
+        break;
+      default:
+        filtered = movies;
+    }
+    
+    return filtered;
+  })();
 
   // Lọc rạp theo thành phố
   const filteredCinemas = theater.filter(
@@ -170,12 +263,15 @@ const CardInfMovie = () => {
         setSelectedCity(citiesWithCinemas[0]);
       }
     }
-  }, [theater]);
+  }, [theater, selectedCity]);
 
   // Khi đổi thành phố, chọn lại rạp đầu tiên hoặc reset nếu không có rạp
   useEffect(() => {
-    if (filteredCinemas.length > 0) {
-      setSelectedCinemaId(filteredCinemas[0]._id);
+    const filtered = theater.filter(
+      (c) => c.location.city === selectedCity
+    );
+    if (filtered.length > 0) {
+      setSelectedCinemaId(filtered[0]._id);
     } else {
       setSelectedCinemaId("");
     }
@@ -193,44 +289,148 @@ const CardInfMovie = () => {
     if (dates.length > 0) {
       setSelectedDate(dates[0].value);
     }
-  }, [selectedCinemaId]);
+  }, [selectedCinemaId, dates]);
+
+  // Hiển thị loading state
+  if (loadingMovie) {
+    return (
+      <div className={`${isDarkMode ? "bg-[#191b21]" : "bg-white"} pt-5 min-h-screen flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className={`${isDarkMode ? "text-white" : "text-gray-700"} text-lg`}>
+            Đang tải thông tin phim...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Hiển thị error state
+  if (movieError) {
+    return (
+      <div className={`${isDarkMode ? "bg-[#191b21]" : "bg-white"} pt-5 min-h-screen flex items-center justify-center`}>
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className={`${isDarkMode ? "text-white" : "text-gray-800"} text-2xl font-bold mb-4`}>
+            Không thể tải phim
+          </h2>
+          <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-6`}>
+            {movieError}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => window.history.back()}
+              className={`${
+                isDarkMode 
+                  ? "bg-gray-600 hover:bg-gray-700 text-white" 
+                  : "bg-gray-500 hover:bg-gray-600 text-white"
+              } px-6 py-2 rounded-lg font-medium transition-colors`}
+            >
+              Quay lại
+            </button>
+            {retryCount < 3 && (
+              <button
+                onClick={() => {
+                  setMovieError(null);
+                  setRetryCount(prev => prev + 1);
+                  // Trigger re-fetch by updating a dependency
+                  window.location.reload();
+                }}
+                className={`${
+                  isDarkMode 
+                    ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                    : "bg-blue-500 hover:bg-blue-600 text-white"
+                } px-6 py-2 rounded-lg font-medium transition-colors`}
+              >
+                Thử lại
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Hiển thị error nếu không có movie data
+  if (!movie) {
+    return (
+      <div className={`${isDarkMode ? "bg-[#191b21]" : "bg-white"} pt-5 min-h-screen flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="text-gray-500 text-6xl mb-4">🎬</div>
+          <h2 className={`${isDarkMode ? "text-white" : "text-gray-800"} text-2xl font-bold mb-4`}>
+            Không tìm thấy phim
+          </h2>
+          <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-6`}>
+            Phim này có thể đã bị xóa hoặc không tồn tại
+          </p>
+          <button
+            onClick={() => window.history.back()}
+            className={`${
+              isDarkMode 
+                ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                : "bg-blue-500 hover:bg-blue-600 text-white"
+            } px-6 py-2 rounded-lg font-medium transition-colors`}
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Phần thông tin chi tiết về phim */}
       <div
-        className="bg-cover bg-center min-h-[100px] py-2  relative"
-        style={{ backgroundImage: `url(${movie?.posterImage})` }}
+        className="bg-cover bg-center min-h-[100px] py-2 relative"
+        style={{ 
+          backgroundImage: movie?.image && movie.image.trim() !== '' 
+            ? `url(${movie.image})` 
+            : movie?.posterImage && movie.posterImage.trim() !== ''
+            ? `url(${movie.posterImage})` 
+            : 'none',
+          backgroundColor: '#1a1a1a' // Fallback background color
+        }}
       >
         {/* Thông tin phim */}
         <div className="flex flex-col md:flex-row items-start max-w-5xl mx-auto bg-black/40 rounded-xl p-8 gap-10">
           {/* Poster */}
           <div className="min-w-[280px] text-center">
             <img
-              src={movie?.image}
-              alt={movie?.title}
+              src={movie?.posterImage || movie?.image || 'https://via.placeholder.com/260x370/1a1a1a/ffffff?text=No+Image'}
+              alt={movie?.title || 'Movie Poster'}
               className="w-[260px] h-[370px] object-cover rounded-xl border-4 border-white shadow-lg mx-auto"
+              onError={(e) => {
+                console.error("Error loading poster image:", e);
+                const target = e.target as HTMLImageElement;
+                if (movie?.image && target.src !== movie.image) {
+                  target.src = movie.image;
+                } else {
+                  target.src = 'https://via.placeholder.com/260x370/1a1a1a/ffffff?text=No+Image';
+                }
+              }}
             />
             <button
               className={`mt-6 w-full py-3 rounded-md text-white font-semibold text-xl transition
-                            ${movie?.status === "nowShowing" ||
-                  movie?.status === "special"
-                  ? "bg-[#162d5a] hover:bg-[#1a376e] cursor-pointer"
-                  : "bg-[#ff642e] opacity-80 cursor-not-allowed"
-                }
+                            ${
+                              movie?.status === "Phim đang chiếu" ||
+                              movie?.status === "Suất chiếu đặc biệt"
+                                ? "bg-[#162d5a] hover:bg-[#1a376e] cursor-pointer"
+                                : "bg-[#ff642e] opacity-80 cursor-not-allowed"
+                            }
                         `}
               disabled={
-                movie?.status !== "nowShowing" && movie?.status !== "special"
+                movie?.status !== "Phim đang chiếu" && movie?.status !== "Suất chiếu đặc biệt"
               }
               onClick={() => setOpenModal(true)}
             >
-              {movie?.status === "nowShowing" || movie?.status === "special"
+              {movie?.status === "Phim đang chiếu" || movie?.status === "Suất chiếu đặc biệt"
                 ? "Đặt vé ngay"
-                : movie?.status === "close"
-                  ? "Đã đóng"
-                  : movie?.status === "upcoming"
-                    ? "Sắp chiếu"
-                    : "Đặt vé ngay"}
+                : movie?.status === "Đã kết thúc"
+                ? "Đã kết thúc"
+                : movie?.status === "Phim sắp chiếu"
+                ? "Sắp chiếu"
+                : "Đặt vé ngay"}
             </button>
           </div>
           {/* Info */}
@@ -238,10 +438,6 @@ const CardInfMovie = () => {
             <h2 className="text-4xl font-bold text-lime-300 mb-2">
               {movie?.title}
             </h2>
-            {/* <div className="text-2xl text-[#ff642e] mb-2 flex items-center gap-2">
-                            {"★".repeat(movie?.reviews.find((r) => r.rating)!.rating)}
-                            <span className="text-white text-lg ml-2">{(movie?.reviews.find((r) => r.rating)!.rating)}/5</span>
-                        </div> */}
             <div className="text-lg mb-1">
               <span className="text-yellow-300">Ngày phát hành :</span>{" "}
               {movie?.releaseDate
@@ -297,7 +493,7 @@ const CardInfMovie = () => {
             <iframe
               width="100%"
               height="320"
-              src={getYoutubeEmbedUrl(movie?.trailer) || undefined}
+              src={getYoutubeEmbedUrl(movie?.trailer)}
               title={movie?.title}
               className="rounded-xl border-none w-full max-w-[700px] h-[360px]"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -307,42 +503,59 @@ const CardInfMovie = () => {
           </div>
           {/* Danh sách phim bên phải */}
           <div
-            className={`w-full md:w-[400px] flex flex-col rounded-2xl ${isDarkMode ? "bg-gray-800 text-white" : "bg-[#F6F6F6]"
-              }`}
+            className={`w-full md:w-[400px] flex flex-col rounded-2xl ${
+              isDarkMode ? "bg-gray-800 text-white" : "bg-[#F6F6F6]"
+            }`}
           >
-            <div className="flex justify-center gap-4 mb-8 pt-3 pb-3 pl-3 pr-3">
+            <div className="flex justify-center gap-2 mb-4 p-4 flex-wrap">
               <button
-                className={`w-50 h-8 border rounded font-semibold transition cursor-pointer ${activeTab === "nowShowing"
-                  ? "bg-[#b55210] text-white text-sm"
-                  : isDarkMode
+                className={`px-3 py-1 border rounded font-semibold transition cursor-pointer text-sm ${
+                  activeTab === "Phim đang chiếu"
+                    ? "bg-[#b55210] text-white"
+                    : isDarkMode
                     ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
                     : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
-                  }`}
-                onClick={() => setActiveTab("nowShowing")}
+                }`}
+                onClick={() => setActiveTab("Phim đang chiếu")}
               >
-                Phim đang chiếu
+                Đang chiếu
               </button>
 
               <button
-                className={` w-50 h-8 border rounded font-semibold transition cursor-pointer ${activeTab === "upcoming"
-                  ? "bg-[#dd6c0f] text-white"
-                  : isDarkMode
+                className={`px-3 py-1 border rounded font-semibold transition cursor-pointer text-sm ${
+                  activeTab === "Phim sắp chiếu"
+                    ? "bg-[#dd6c0f] text-white"
+                    : isDarkMode
                     ? "bg-gray-700 text-white hover:bg-[#dd6c0f]"
                     : "bg-white text-[#2d3a5a] hover:bg-[#dd6c0f] hover:text-white"
-                  }`}
-                onClick={() => setActiveTab("upcoming")}
+                }`}
+                onClick={() => setActiveTab("Phim sắp chiếu")}
               >
-                Phim sắp chiếu
+                Sắp chiếu
+              </button>
+
+              <button
+                className={`px-3 py-1 border rounded font-semibold transition cursor-pointer text-sm ${
+                  activeTab === "Suất chiếu đặc biệt"
+                    ? "bg-[#8B5CF6] text-white"
+                    : isDarkMode
+                    ? "bg-gray-700 text-white hover:bg-[#8B5CF6]"
+                    : "bg-white text-[#2d3a5a] hover:bg-[#8B5CF6] hover:text-white"
+                }`}
+                onClick={() => setActiveTab("Suất chiếu đặc biệt")}
+              >
+                Đặc biệt
               </button>
             </div>
-            <ul className="space-y-4">
-              {filteredMovies.map((item) => (
+            <ul className="space-y-4 pb-4">
+              {filteredMovies.filter((item) => item._id !== movie?._id).map((item) => (
                 <li
                   key={item._id}
-                  className={`flex items-center gap-3 rounded-lg p-2 border-b mx-2 cursor-pointer transition-colors ${isDarkMode
-                    ? "border-gray-700 hover:bg-gray-700"
-                    : "border-gray-300 hover:bg-gray-100"
-                    }`}
+                  className={`flex items-center gap-3 rounded-lg p-2 border-b mx-2 cursor-pointer transition-colors ${
+                    isDarkMode
+                      ? "border-gray-700 hover:bg-gray-700"
+                      : "border-gray-300 hover:bg-gray-100"
+                  }`}
                   onClick={() => navigate(`/movies/${item._id}`)}
                 >
                   <img
@@ -352,8 +565,9 @@ const CardInfMovie = () => {
                   />
                   <div>
                     <div
-                      className={`font-semibold ${isDarkMode ? "text-white" : "text-black"
-                        }`}
+                      className={`font-semibold ${
+                        isDarkMode ? "text-white" : "text-black"
+                      }`}
                     >
                       {item.title}
                     </div>
@@ -380,20 +594,22 @@ const CardInfMovie = () => {
       {openModal && (
         <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40">
           <div
-            className={`rounded-2xl shadow-lg max-w-5xl w-full p-8 relative ${isDarkMode ? "bg-gray-900" : "bg-white"
-              }`}
+            className={`rounded-2xl shadow-lg max-w-5xl w-full p-8 relative ${
+              isDarkMode ? "bg-gray-900" : "bg-white"
+            }`}
           >
             {/* Thông tin phim trên modal */}
             <div className="flex items-start gap-6 mb-6">
               <img
-                src={movie?.image}
+                src={movie?.posterImage}
                 alt={movie?.title}
                 className="w-36 h-52 object-cover rounded-lg shadow"
               />
               <div>
                 <div
-                  className={`text-3xl font-semibold mb-2 ${isDarkMode ? "text-white" : "text-[#162d5a]"
-                    }`}
+                  className={`text-3xl font-semibold mb-2 ${
+                    isDarkMode ? "text-white" : "text-[#162d5a]"
+                  }`}
                 >
                   {movie?.title}
                 </div>
@@ -402,42 +618,48 @@ const CardInfMovie = () => {
                     {movie?.ageRating}
                   </span>
                   <span
-                    className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                      }`}
+                    className={`font-medium ${
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    }`}
                   >
                     Thời lượng:
                   </span>{" "}
                   <span
-                    className={`${isDarkMode ? "text-gray-100" : "text-gray-800"
-                      }`}
+                    className={`${
+                      isDarkMode ? "text-gray-100" : "text-gray-800"
+                    }`}
                   >
                     {movie?.duration} phút
                   </span>
                 </div>
                 <div className="mb-2">
                   <span
-                    className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                      }`}
+                    className={`font-medium ${
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    }`}
                   >
                     Thể loại:
                   </span>{" "}
                   <span
-                    className={`${isDarkMode ? "text-gray-100" : "text-gray-800"
-                      }`}
+                    className={`${
+                      isDarkMode ? "text-gray-100" : "text-gray-800"
+                    }`}
                   >
                     {movie?.genre.join(", ")}
                   </span>
                 </div>
                 <div>
                   <span
-                    className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                      }`}
+                    className={`font-medium ${
+                      isDarkMode ? "text-gray-300" : "text-gray-700"
+                    }`}
                   >
                     Diễn viên:
                   </span>{" "}
                   <span
-                    className={`${isDarkMode ? "text-gray-100" : "text-gray-800"
-                      }`}
+                    className={`${
+                      isDarkMode ? "text-gray-100" : "text-gray-800"
+                    }`}
                   >
                     {movie?.actors.join(", ")}
                   </span>
@@ -447,14 +669,16 @@ const CardInfMovie = () => {
             <div className="flex gap-4">
               {/* Left: Cinema List */}
               <div
-                className={`w-1/3 pr-4 ${isDarkMode ? "border-gray-700" : "border-r"
-                  }`}
+                className={`w-1/3 pr-4 ${
+                  isDarkMode ? "border-gray-700" : "border-r"
+                }`}
               >
                 <select
-                  className={`w-full border rounded px-3 py-2 mb-3 ${isDarkMode
-                    ? "bg-gray-800 text-white border-gray-600"
-                    : "bg-white border"
-                    }`}
+                  className={`w-full border rounded px-3 py-2 mb-3 ${
+                    isDarkMode
+                      ? "bg-gray-800 text-white border-gray-600"
+                      : "bg-white border"
+                  }`}
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
                 >
@@ -474,14 +698,15 @@ const CardInfMovie = () => {
                     filteredCinemas.map((cinema) => (
                       <button
                         key={cinema._id}
-                        className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${selectedCinemaId === cinema._id
-                          ? isDarkMode
-                            ? "bg-blue-800 border-blue-600 text-white"
-                            : "bg-blue-50 border-blue-700"
-                          : isDarkMode
+                        className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${
+                          selectedCinemaId === cinema._id
+                            ? isDarkMode
+                              ? "bg-blue-800 border-blue-600 text-white"
+                              : "bg-blue-50 border-blue-700"
+                            : isDarkMode
                             ? "bg-gray-700 border-gray-600 text-white"
                             : "bg-white border-gray-200"
-                          }`}
+                        }`}
                         onClick={() => setSelectedCinemaId(cinema._id)}
                       >
                         <img
@@ -492,8 +717,9 @@ const CardInfMovie = () => {
                         <div>
                           <div className="font-semibold">{cinema.name}</div>
                           <div
-                            className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                              }`}
+                            className={`text-xs ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
                           >
                             {cinema.location.address}
                           </div>
@@ -510,12 +736,13 @@ const CardInfMovie = () => {
                   {dates.map((date) => (
                     <button
                       key={date.value}
-                      className={`w-[80px] px-4 py-2 rounded font-medium cursor-pointer ${selectedDate === date.value
-                        ? "bg-blue-900 text-white"
-                        : isDarkMode
+                      className={`w-[80px] px-4 py-2 rounded font-medium cursor-pointer ${
+                        selectedDate === date.value
+                          ? "bg-blue-900 text-white"
+                          : isDarkMode
                           ? "bg-gray-700 text-blue-200"
                           : "bg-gray-100 text-blue-900"
-                        }`}
+                      }`}
                       onClick={() => setSelectedDate(date.value)}
                     >
                       {date.label.split("\n").map((line, idx) => (
@@ -537,37 +764,62 @@ const CardInfMovie = () => {
                     <>
                       <div className="flex items-center gap-2 mb-3">
                         <span
-                          className={`text-lg ${isDarkMode ? "text-gray-400" : "text-gray-700"
-                            }`}
+                          className={`text-lg ${
+                            isDarkMode ? "text-gray-400" : "text-gray-700"
+                          }`}
                         >
                           •
                         </span>
                         <span
-                          className={`font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                            }`}
+                          className={`font-medium ${
+                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}
                         >
-                          Suất chiếu ngày{" "}
-                          {selectedDate.split("-").reverse().join("/")}
+                          Suất chiếu ngày {selectedDate.split("-").reverse().join("/")}
                         </span>
                       </div>
                       <div className="flex gap-3 flex-wrap">
                         {showTimesOfSelectedDate.map((showtime, idx) => (
                           <button
                             key={idx}
-                            className={`border px-4 py-2 rounded cursor-pointer ${isDarkMode
-                              ? "text-gray-100 bg-gray-700 hover:bg-blue-800 border-gray-600"
-                              : "text-gray-800 bg-white hover:bg-blue-50"
-                              }`}
-                            onClick={() =>
+                            className={`border px-4 py-2 rounded cursor-pointer ${
+                              isDarkMode
+                                ? "text-gray-100 bg-gray-700 hover:bg-blue-800 border-gray-600"
+                                : "text-gray-800 bg-white hover:bg-blue-50"
+                            }`}
+                            onClick={async () => {
+                              // Kiểm tra user đã đăng nhập chưa
+                              if (!user || !user._id) {
+                                setIsModalOpen(true);
+                                return;
+                              }
+                              
+                              // Giải phóng ghế tạm giữ trước khi chọn suất chiếu mới
+                              await releaseUserReservedSeats();
+                              
                               navigate(`/selectSeat`, {
                                 state: {
                                   movie: {
+                                    ...movie,
                                     title: movie?.title,
-                                    poster: movie?.image,
+                                    poster: movie?.posterImage,
                                     format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                     genre: movie?.genre?.join(", "),
                                     duration: movie?.duration,
+                                    minAge:
+                                      movie?.ageRating === "T18+"
+                                        ? 18
+                                        : movie?.ageRating === "T16+"
+                                        ? 16
+                                        : movie?.ageRating === "T15+"
+                                        ? 15
+                                        : movie?.ageRating === "T12+"
+                                        ? 12
+                                        : 13,
+                                    theaterId: selectedCinemaId, // Thêm theaterId
                                   },
+                                  showtimeId: showtime.parentId,
+                                  theaterId: selectedCinemaId, // Thêm theaterId ở level state, // Use parent document ID
                                   cinema: filteredCinemas.find(
                                     (c) => c._id === selectedCinemaId
                                   )?.name,
@@ -576,19 +828,19 @@ const CardInfMovie = () => {
                                   room: showtime.room,
                                   seats: [], // sẽ cập nhật khi chọn ghế
                                 },
-                              })
-                            }
+                              });
+                            }}
                           >
-                            {formatVNTime(showtime.start)} -{" "}
-                            {formatVNTime(showtime.end)}
+                            {formatVNTime(showtime.start)} - {formatVNTime(showtime.end)}
                           </button>
                         ))}
                       </div>
                     </>
                   ) : (
                     <div
-                      className={`mt-6 ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                        }`}
+                      className={`mt-6 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
                     >
                       Không có suất chiếu
                     </div>
@@ -596,10 +848,11 @@ const CardInfMovie = () => {
                 </div>
                 <div className="flex justify-end mt-10">
                   <button
-                    className={`px-8 py-2 rounded font-semibold cursor-pointer ${isDarkMode
-                      ? "bg-gray-700 text-gray-300"
-                      : "bg-gray-300 text-gray-500"
-                      }`}
+                    className={`px-8 py-2 rounded font-semibold cursor-pointer ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-300"
+                        : "bg-gray-300 text-gray-500"
+                    }`}
                     onClick={() => setOpenModal(false)}
                   >
                     Hủy

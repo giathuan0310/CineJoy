@@ -5,19 +5,19 @@ import type { NotificationInstance } from "antd/es/notification/interface";
 import type { ReactNode } from "react";
 
 const AlertAppContext = createContext<{
-    messageApi: MessageInstance | null;
-    contextHolder: ReactNode | null;
-    notificationApi: NotificationInstance | null;
-    contextNotifiHolder: ReactNode | null;
+  messageApi: MessageInstance | null;
+  contextHolder: ReactNode | null;
+  notificationApi: NotificationInstance | null;
+  contextNotifiHolder: ReactNode | null;
 }>({
-    messageApi: null,
-    contextHolder: null,
-    notificationApi: null,
-    contextNotifiHolder: null,
+  messageApi: null,
+  contextHolder: null,
+  notificationApi: null,
+  contextNotifiHolder: null,
 });
 
 type TProps = {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }
 
 export const AlertContextProvider = (props: TProps) => {

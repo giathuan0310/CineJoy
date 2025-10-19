@@ -37,3 +37,15 @@
     background: #7d7d7d;
   }
 }
+
+/* Hide scrollbar for modal */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}

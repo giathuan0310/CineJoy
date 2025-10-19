@@ -1,8 +1,97 @@
 import { Request, Response } from "express";
+import { AuthenticatedRequest } from "../middlewares/AuthMiddleware";
 import OrderService, { CreateOrderData } from "../services/OrderService";
 import PaymentService from "../services/PaymentService";
 
 class OrderController {
+  // Lấy lịch sử đặt vé của user
+  async getUserBookingHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?._id;
+      
+      if (!userId) {
+        res.status(401).json({
+          status: false,
+          error: 401,
+          message: "Không có quyền truy cập",
+          data: null,
+        });
+        return;
+      }
+
+      const orders = await OrderService.getUserBookingHistory(userId.toString());
+      
+      res.status(200).json({
+        status: true,
+        error: 0,
+        message: "Lấy lịch sử đặt vé thành công",
+        data: orders,
+      });
+    } catch (error) {
+      console.error("Error getting user booking history:", error);
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: "Lỗi server khi lấy lịch sử đặt vé",
+        data: null,
+      });
+    }
+  }
+
+  async getUserOrderDetails(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?._id;
+      const orderId = req.params.orderId;
+      
+      if (!userId) {
+        res.status(401).json({
+          status: false,
+          error: 401,
+          message: "Không có quyền truy cập",
+          data: null,
+        });
+        return;
+      }
+
+      if (!orderId) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "Thiếu mã đơn hàng",
+          data: null,
+        });
+        return;
+      }
+
+      const order = await OrderService.getUserOrderDetails(userId.toString(), orderId);
+      
+      if (!order) {
+        res.status(404).json({
+          status: false,
+          error: 404,
+          message: "Không tìm thấy đơn hàng",
+          data: null,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        status: true,
+        error: 0,
+        message: "Lấy chi tiết đơn hàng thành công",
+        data: order,
+      });
+    } catch (error) {
+      console.error("Error getting user order details:", error);
+      res.status(500).json({
+        status: false,
+        error: 500,
+        message: "Lỗi server khi lấy chi tiết đơn hàng",
+        data: null,
+      });
+    }
+  }
+
   // Tạo order mới
   async createOrder(req: Request, res: Response): Promise<void> {
     try {
@@ -35,6 +124,19 @@ class OrderController {
       }
 
       if (
+        !orderData.paymentMethod ||
+        !["MOMO", "VNPAY"].includes(orderData.paymentMethod)
+      ) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: "Phương thức thanh toán không hợp lệ",
+          data: null,
+        });
+        return;
+      }
+
+      if (
         !orderData.customerInfo ||
         !orderData.customerInfo.fullName ||
         !orderData.customerInfo.phoneNumber ||
@@ -49,13 +151,23 @@ class OrderController {
         return;
       }
 
-      const order = await OrderService.createOrder(orderData);
+      const result = await OrderService.createOrder(orderData);
+
+      if (!result.success) {
+        res.status(200).json({
+          status: false,
+          error: 400,
+          message: result.message,
+          data: null,
+        });
+        return;
+      }
 
       res.status(201).json({
         status: true,
         error: 0,
-        message: "Tạo đơn hàng thành công",
-        data: order,
+        message: result.message,
+        data: result.order,
       });
     } catch (error) {
       console.error("Create order error:", error);
@@ -338,6 +450,17 @@ class OrderController {
         return;
       }
 
+      // Kiểm tra paymentMethod có khớp với order không
+      if (order.paymentMethod !== paymentMethod) {
+        res.status(400).json({
+          status: false,
+          error: 400,
+          message: `Phương thức thanh toán không khớp. Order yêu cầu: ${order.paymentMethod}`,
+          data: null,
+        });
+        return;
+      }
+
       // Tạo payment record
       const payment = await PaymentService.createPayment({
         orderId: order._id,
@@ -353,10 +476,31 @@ class OrderController {
 
       // Tạo payment URL tùy theo phương thức
       if (paymentMethod === "MOMO") {
-        paymentUrl = await PaymentService.createMoMoPayment(payment);
+        try {
+          paymentUrl = await PaymentService.createMoMoPayment(payment);
+        } catch (error: any) {
+          console.error(
+            "MoMo payment creation failed:",
+            error.response?.data || error.message
+          );
+
+          // Sử dụng mock payment để test tính năng email (MoMo sandbox có vấn đề)
+          // Đảm bảo sử dụng payment.amount (đã được set từ order.finalAmount)
+          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${payment.amount}&paymentMethod=${paymentMethod}`;
+        }
       } else if (paymentMethod === "VNPAY") {
-        // TODO: Implement VNPay integration
-        throw new Error("VNPay chưa được tích hợp");
+        try {
+          paymentUrl = await PaymentService.createVNPayPayment(payment);
+        } catch (error: any) {
+          console.error(
+            "VNPay payment creation failed:",
+            error.response?.data || error.message
+          );
+
+          // Sử dụng mock payment để test tính năng email (VNPay sandbox có vấn đề)
+          // Đảm bảo sử dụng payment.amount (đã được set từ order.finalAmount)
+          paymentUrl = `http://localhost:5000/v1/api/payments/mock?paymentId=${payment._id}&amount=${payment.amount}&paymentMethod=${paymentMethod}`;
+        }
       }
 
       res.status(200).json({

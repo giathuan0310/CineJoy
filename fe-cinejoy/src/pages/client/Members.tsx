@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import MemberCard from '@/components/card/memberCard';
 import VoucherTab from '@/components/voucher';
+import CNJPointsTab from '@/components/cnjPoints';
 import useAppStore from '@/store/app.store';
 import { updateUserApi, uploadAvatarApi } from '@/services/api';
 import { useAlertContextApp } from '@/context/alert.context';
@@ -26,8 +27,13 @@ const MembersPage = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [activeTabKey, setActiveTabKey] = useState<string>('1');
-  const { user, setUser, isDarkMode } = useAppStore();
+  const { user, setUser, isDarkMode, setIsModalOpen } = useAppStore();
   const { messageApi } = useAlertContextApp();
+
+  // Reset login modal state khi vào trang members
+  useEffect(() => {
+    setIsModalOpen(false);
+  }, [setIsModalOpen]);
   
   useEffect(() => {
     if (user) {
@@ -155,7 +161,7 @@ const MembersPage = () => {
                 : 'linear-gradient(180deg, #e0f7fa 0%, #b2ebf2 100%)'
             }}
           >
-            <h2 className="text-2xl font-bold text-center mb-6" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Thông tin cá nhân</h2>
+            <h2 className="text-2xl font-bold text-left mb-6" style={{ color: isDarkMode ? '#fff' : '#a05a1c' }}>Thông tin cá nhân</h2>
             <div className="flex flex-col items-center mb-6">
               <img
                 src={previewImage || user.avatar}
@@ -260,26 +266,18 @@ const MembersPage = () => {
               <Form.Item
                 label={<span style={{ color: isDarkMode ? '#fff' : undefined }}>Ngày sinh</span>}
                 name="dateOfBirth"
-                rules={[
-                  { required: true, message: "Vui lòng chọn ngày sinh!" },
-                  ({ validator(_, value) {
-                      if (value && value.isAfter(dayjs())) {
-                        return Promise.reject(new Error('Ngày sinh không được lớn hơn ngày hiện tại!'));
-                      }
-                      return Promise.resolve();
-                    }
-                  }),
-                ]}
                 style={{ marginBottom: 0 }}
               >
                 <DatePicker
                   format="DD-MM-YYYY"
                   size="large"
+                  disabled
+                  className={isDarkMode ? 'disabled-datepicker-dark' : 'disabled-datepicker-light'}
                   style={isDarkMode
-                    ? { width: '100%', backgroundColor: '#23272f', color: '#fff', borderColor: '#666', opacity: 1 }
-                    : { width: '100%' }
+                    ? { width: '100%', backgroundColor: '#2d323b', color: '#e0e0e0', borderColor: '#666', opacity: 1 }
+                    : { width: '100%', backgroundColor: '#f3f4f6', color: '#6b7280', borderColor: '#e5e7eb', opacity: 1 }
                   }
-                  allowClear
+                  allowClear={false}
                   popupStyle={isDarkMode ? { background: '#23272f', color: '#fff' } : undefined}
                 />
               </Form.Item>
@@ -337,6 +335,8 @@ const MembersPage = () => {
           <MemberCard user={user} />
         ) : activeTabKey === '3' ? (
           <VoucherTab />
+        ) : activeTabKey === '4' ? (
+          <CNJPointsTab />
         ) : (
           <div className={clsx("text-center py-10 text-xl font-semibold uppercase", isDarkMode ? "text-white" : "text-black")}>Đang phát triển tính năng</div>
         )}

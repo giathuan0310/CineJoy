@@ -18,7 +18,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       res.status(200).json({ ...result, data: rest });
       return;
     }
-
+    
     res.status(200).json(result);
     return;
 
@@ -79,7 +79,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 export const refreshToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const refreshToken = req.cookies.refreshToken;
-
+    
     if (!refreshToken) {
       res.status(401).json({
         status: false,

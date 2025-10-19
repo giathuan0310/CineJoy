@@ -80,6 +80,7 @@ const ModalLogin = (props: IProps) => {
         });
         if (res.data) {
             localStorage.setItem("accessToken", res.data.accessToken);
+            sessionStorage.setItem("current_user_id", res.data.user._id);
             setUser(res.data.user);
             setIsAuthenticated(true);
             setIsDarkMode(res.data.user.settings.darkMode);
@@ -105,6 +106,7 @@ const ModalLogin = (props: IProps) => {
                 centered
                 width={450}
                 getContainer={false}
+                zIndex={10000}
             >
                 <div className="text-center font-semibold text-xl text-[#0f1b4c] mt-4 mb-6 select-none">Đăng nhập</div>
 

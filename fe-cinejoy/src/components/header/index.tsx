@@ -13,7 +13,6 @@ import Logo from "assets/CineJoyLogo.png";
 const Header = () => {
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
   const [searchValue, setSearchValue] = useState<string>("");
   const [searchResults, setSearchResults] = useState<IMovie[]>([]);
@@ -27,6 +26,7 @@ const Header = () => {
     setUser,
     setIsAuthenticated,
     isModalOpen,
+    setIsModalOpen,
     isDarkMode,
     setIsDarkMode,
   } = useAppStore();
@@ -108,6 +108,17 @@ const Header = () => {
     }
   };
   const handleSelectMovie = (id: string) => {
+    // Validate ID trước khi navigate
+    if (!id || id.trim() === '') {
+      console.error("Invalid movie ID:", id);
+      messageApi?.open({
+        type: "error",
+        content: "ID phim không hợp lệ!",
+      });
+      return;
+    }
+
+    console.log("Navigating to movie with ID:", id);
     setShowSearch(false);
     setShowDropdown(false);
     setSearchValue("");
@@ -116,12 +127,12 @@ const Header = () => {
 
   const handleOpenLoginModal = (value: boolean) => {
     setModalOpen(value);
-    setLoginModalOpen(true);
+    setIsModalOpen(true);
   };
 
   const handleCloseLoginModal = (value: boolean) => {
     setModalOpen(value);
-    setLoginModalOpen(false);
+    setIsModalOpen(false);
   };
 
   const handleLogout = async () => {
@@ -136,6 +147,8 @@ const Header = () => {
           type: "success",
           content: "Đăng xuất thành công!",
         });
+        // Quay về trang chủ sau khi đăng xuất thành công
+        navigate("/");
       }
     } catch (error) {
       console.error("Lỗi khi đăng xuất:", error);
@@ -171,9 +184,9 @@ const Header = () => {
       onClick: () => navigate("/members"),
     },
     {
-      key: "/history",
+      key: "booking-history",
       label: <div className="text-center">Lịch sử đặt vé</div>,
-      //   onClick: () => navigate("/history"),
+      onClick: () => navigate("/booking-history"),
     },
     {
       key: "logout",
@@ -189,6 +202,7 @@ const Header = () => {
         </Link>
       ),
       key: "admin",
+      onClick: () => navigate("/admin"),
     });
   }
 
@@ -202,7 +216,7 @@ const Header = () => {
     <>
       <header
         className={`sticky top-0 ${
-          loginModalOpen || modalOpen || isModalOpen ? "z-1000" : "z-2000"
+          modalOpen || isModalOpen ? "z-500" : "z-2000"
         } ${
           isDarkMode ? "bg-[#23272f]" : "bg-[#eee]"
         } shadow-sm border-b border-[#ccc]`}
@@ -212,7 +226,7 @@ const Header = () => {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center">
               <img
-                className="w-[90px] object-cover inline-block"
+                className="w-[65px] object-cover inline-block"
                 src={Logo}
                 alt="Logo"
               />
@@ -227,10 +241,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Trang chủ
@@ -241,10 +255,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Phim
@@ -255,10 +269,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Tin tức
@@ -269,10 +283,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Thành viên
@@ -283,10 +297,10 @@ const Header = () => {
                 isActive
                   ? `${
                       isDarkMode ? "text-red-700" : "text-[#9d3b0a]"
-                    } font-medium hover:text-red-900 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-900 transition-colors uppercase text-[15.5px]`
                   : `${
                       isDarkMode ? "text-white" : "text-gray-800"
-                    } font-medium hover:text-red-600 transition-colors uppercase text-[18px]`
+                    } font-medium hover:text-red-600 transition-colors uppercase text-[15.5px]`
               }
             >
               Liên hệ
@@ -314,9 +328,9 @@ const Header = () => {
                 onClick={handleDarkMode}
               >
                 {isDarkMode ? (
-                  <MdDarkMode color="white" size={35} />
+                  <MdDarkMode color="white" size={32} />
                 ) : (
-                  <MdDarkMode size={35} />
+                  <MdDarkMode size={32} />
                 )}
               </div>
               <Dropdown
@@ -328,10 +342,10 @@ const Header = () => {
                   <img
                     src={user?.avatar}
                     alt="User Avatar"
-                    className="w-9 h-9 mr-3 rounded-full object-cover"
+                    className="w-7.5 h-7.5 mr-3 rounded-full object-cover"
                   />
                   <span
-                    className={`text-md font-medium ${
+                    className={`text-[15.5px] font-medium ${
                       isDarkMode ? "text-white" : ""
                     }`}
                   >
@@ -361,15 +375,15 @@ const Header = () => {
                   onClick={handleDarkMode}
                 >
                   {isDarkMode ? (
-                    <MdDarkMode color="white" size={35} />
+                    <MdDarkMode color="white" size={32} />
                   ) : (
-                    <MdDarkMode size={35} />
+                    <MdDarkMode size={32} />
                   )}
                 </div>
                 <button
                   className={`${
                     isDarkMode ? "bg-blue-700" : "bg-[#061b4b]"
-                  } text-white px-4 py-3.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
+                  } text-white px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity font-medium cursor-pointer`}
                   onClick={() => handleOpenLoginModal(false)}
                 >
                   Đăng nhập
@@ -381,7 +395,7 @@ const Header = () => {
       </header>
 
       <ModalLogin
-        isOpen={loginModalOpen}
+        isOpen={isModalOpen && !user}
         onOpen={handleOpenLoginModal}
         onClose={handleCloseLoginModal}
       />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getTheaters } from "@/apiservice/apiTheater";
 import useAppStore from "@/store/app.store";
 import dayjs from "dayjs";
@@ -10,6 +10,7 @@ import { getMovieById } from "@/apiservice/apiMovies";
 import { getShowTimesByTheater } from "@/apiservice/apiShowTime";
 import { getRegions } from "@/apiservice/apiRegion";
 import { useNavigate } from "react-router-dom";
+import { useReleaseReservedSeats } from "@/hooks/useReleaseReservedSeats";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -17,6 +18,8 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 interface IFlattenedShowtime {
+  _id: string;
+  parentId: string; // Add parent document ID
   date: string;
   start: string;
   end: string;
@@ -77,7 +80,7 @@ const getDateRange = (start: string, end: string) => {
 };
 
 const formatVNTime = (iso: string) => {
-  return dayjs(iso).tz("Asia/Ho_Chi_Minh").format("hh:mm A");
+  return dayjs(iso).tz("Asia/Ho_Chi_Minh").format("HH:mm");
 };
 
 const ScheduleList: React.FC = () => {
@@ -85,9 +88,11 @@ const ScheduleList: React.FC = () => {
   const sevenDaysLater = dayjs().add(6, "day").format("YYYY-MM-DD");
 
   const navigate = useNavigate();
+  const { releaseUserReservedSeats } = useReleaseReservedSeats();
   const [selectedCinemaId, setSelectedCinemaId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const [selectedCity, setSelectedCity] = useState<string>("");
+  const previousCityRef = useRef<string>("");
   const [theater, setTheater] = useState<ITheater[]>([]);
   const [regions, setRegions] = useState<IRegion[]>();
   const [dates, setDates] = useState<{ label: string; value: string }[]>(
@@ -109,21 +114,46 @@ const ScheduleList: React.FC = () => {
           const movie = st.movieId as IMovie;
           const theaterData = st.theaterId as ITheater;
 
+
           return st.showTimes.map((innerSt) => ({
             ...innerSt,
+            parentId: st._id, // Add parent document ID
             movieId: movie._id,
             movieTitle: movie.title,
             ageRating: movie.ageRating,
             genre: movie.genre,
             theaterId: theaterData._id,
             theaterName: theaterData.name,
+            room: typeof innerSt.room === 'string' ? innerSt.room : (innerSt.room as { name?: string; _id?: string })?.name || (innerSt.room as { name?: string; _id?: string })?._id || 'Unknown Room',
           }));
         })
         .flat();
 
-      const showTimesOfSelectedDate = allShowTimes.filter(
+      // Lọc theo ngày chọn
+      let showTimesOfSelectedDate = allShowTimes.filter(
         (st) => dayjs(st.date).format("YYYY-MM-DD") === selectedDate
       );
+
+      // Nếu là hôm nay: ẩn các suất bắt đầu trước thời điểm hiện tại 5 phút
+      const isToday = selectedDate === dayjs().format("YYYY-MM-DD");
+      if (isToday) {
+        const now = dayjs();
+        showTimesOfSelectedDate = showTimesOfSelectedDate.filter((st) => {
+          const start = dayjs(st.start);
+          const end = dayjs(st.end);
+          
+          // Xử lý trường hợp ca đêm qua ngày hôm sau
+          if (start.hour() >= 22 && end.hour() < 6) {
+            // Ca đêm: kiểm tra xem đã qua end time chưa
+            const endTimeToday = end.format("YYYY-MM-DD HH:mm");
+            const nowFormatted = now.format("YYYY-MM-DD HH:mm");
+            return dayjs(endTimeToday).add(5, "minute").isAfter(now);
+          } else {
+            // Ca bình thường: kiểm tra start time
+            return start.add(5, "minute").isAfter(now);
+          }
+        });
+      }
 
       const newGroupedShowtimes = showTimesOfSelectedDate.reduce(
         (acc, showtime) => {
@@ -148,7 +178,7 @@ const ScheduleList: React.FC = () => {
     }
   }, [showtimes, selectedDate, movieDetails]);
 
-  const { isDarkMode } = useAppStore();
+  const { isDarkMode, user, setIsModalOpen } = useAppStore();
 
   useEffect(() => {
     const fetchRegions = async () => {
@@ -242,25 +272,36 @@ const ScheduleList: React.FC = () => {
   useEffect(() => {
     if (theater.length > 0) {
       const citiesWithCinemas = [
-        ...new Set(theater.map((c) => c.location.city)),
+        ...new Set(theater.map((c) => (c.location?.city || "").trim())),
       ];
-      if (!citiesWithCinemas.includes(selectedCity)) {
-        setSelectedCity(citiesWithCinemas[0]);
+      if (!citiesWithCinemas.map((n)=>n.toLowerCase()).includes(selectedCity.trim().toLowerCase())) {
+        setSelectedCity(citiesWithCinemas[0] || "");
       }
     }
   }, [theater]);
 
   const filteredCinemas = theater.filter(
-    (c) => c.location.city === selectedCity
+    (c) => (c.location?.city || "").trim().toLowerCase() === selectedCity.trim().toLowerCase()
   );
 
   // Khi đổi thành phố, chọn lại rạp đầu tiên hoặc reset nếu không có rạp
   useEffect(() => {
-    if (filteredCinemas.length > 0) {
-      setSelectedCinemaId(filteredCinemas[0]._id);
-    } else {
-      setSelectedCinemaId("");
+    // Chỉ auto-select khi thành phố thực sự thay đổi (không phải lần render đầu tiên hoặc re-render)
+    const cityChanged = previousCityRef.current !== "" && previousCityRef.current !== selectedCity;
+    
+    if (cityChanged) {
+      const filtered = theater.filter(
+        (c) => (c.location?.city || "").trim().toLowerCase() === selectedCity.trim().toLowerCase()
+      );
+      if (filtered.length > 0) {
+        setSelectedCinemaId(filtered[0]._id);
+      } else {
+        setSelectedCinemaId("");
+      }
     }
+    
+    // Cập nhật ref cho lần kiểm tra tiếp theo
+    previousCityRef.current = selectedCity;
   }, [selectedCity, theater]);
 
   return (
@@ -292,7 +333,7 @@ const ScheduleList: React.FC = () => {
                 : "bg-white text-gray-800 border-gray-200"
             } w-[250px] text-sm border rounded p-2 cursor-pointer`}
             value={selectedCity}
-            onChange={(e) => setSelectedCity(e.target.value)}
+            onChange={(e) => setSelectedCity(e.target.value.trim())}
           >
             {regions?.map((region) => (
               <option key={region._id} value={region.name.trim()}>
@@ -310,42 +351,44 @@ const ScheduleList: React.FC = () => {
                   Không có rạp nào ở khu vực này
                 </div>
               ) : (
-                filteredCinemas.map((cinema) => (
+                filteredCinemas.map((cinema) => {
+                  const isSelected = selectedCinemaId === cinema._id;
+                  return (
                   <button
                     key={cinema._id}
-                    className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer ${
-                      selectedCinemaId !== cinema._id
-                        ? `${
-                            isDarkMode
-                              ? "hover:bg-gray-700 hover:border-blue-400"
-                              : "hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"
-                          } ${
-                            isDarkMode
-                              ? "bg-[#3a3c4a] border-gray-600 text-gray-200"
-                              : "bg-white border-gray-200"
-                          }`
-                        : `${
-                            isDarkMode
-                              ? "bg-blue-900 border-blue-400"
-                              : "bg-[#e4e6ee] border-[#0f1b4c]"
-                          } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`
+                    className={`flex items-center gap-2 px-3 py-2 rounded border w-full text-left cursor-pointer transition-all duration-200 ${
+                      isSelected
+                        ? isDarkMode
+                          ? "bg-blue-600 border-blue-500 text-white shadow-lg"
+                          : "bg-blue-600 border-blue-700 text-white shadow-lg"
+                        : isDarkMode
+                        ? "bg-[#3a3c4a] border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-blue-400"
+                        : "bg-white border-gray-200 hover:bg-[#f5f5f5] hover:border-[#0f1b4c]"
                     }`}
-                    onClick={() => setSelectedCinemaId(cinema._id)}
+                    onClick={() => {
+                      console.log('Clicked cinema:', cinema._id, cinema.name);
+                      setSelectedCinemaId(cinema._id);
+                    }}
                   >
                     <img
-                      src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
-                      alt="CGV"
+                      src="https://res.cloudinary.com/dd1vwmybp/image/upload/v1757904774/cinejoy/bynlzrloegzerc5ucbxw.png"
+                      alt="CNJ"
                       className="w-9 h-9"
                     />
                     <span
                       className={`${
-                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                        isSelected
+                          ? "text-white font-semibold"
+                          : isDarkMode
+                          ? "text-gray-200"
+                          : "text-gray-800"
                       }`}
                     >
                       {cinema.name}
                     </span>
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -359,7 +402,7 @@ const ScheduleList: React.FC = () => {
             >
               <img
                 className="w-10 h-10"
-                src="https://res.cloudinary.com/ddia5yfia/image/upload/v1742918428/xhnsfypp7fdgxwgpedkg_lxikuw.jpg"
+                src="https://res.cloudinary.com/dd1vwmybp/image/upload/v1757904774/cinejoy/bynlzrloegzerc5ucbxw.png"
                 alt="logo"
               />
               <div className="select-none">
@@ -553,16 +596,39 @@ const ScheduleList: React.FC = () => {
                                   ? "bg-[#3a3c4a] border-gray-600 text-gray-200 hover:bg-blue-700"
                                   : "bg-gray-50 border border-gray-300 text-gray-800 hover:bg-[#0f1b4c]"
                               } rounded px-2 py-0.5 text-sm cursor-pointer hover:text-white transition-all duration-250 ease-in-out`}
-                              onClick={() => {
+                              onClick={async () => {
+                                // Kiểm tra user đã đăng nhập chưa
+                                if (!user || !user._id) {
+                                  setIsModalOpen(true);
+                                  return;
+                                }
+                                
+                                // Giải phóng ghế tạm giữ trước khi chọn suất chiếu mới
+                                await releaseUserReservedSeats();
+                                
                                 navigate(`/selectSeat`, {
                                   state: {
                                     movie: {
+                                      ...movie,
                                       title: movie?.title,
                                       poster: movie?.image,
                                       format: "2D, Phụ đề Tiếng Việt", // hoặc lấy từ movie nếu có
                                       genre: movie?.genre?.join(", "),
                                       duration: movie?.duration,
+                                      minAge:
+                                        movie?.ageRating === "T18+"
+                                          ? 18
+                                          : movie?.ageRating === "T16+"
+                                          ? 16
+                                          : movie?.ageRating === "T15+"
+                                          ? 15
+                                          : movie?.ageRating === "T12+"
+                                          ? 12
+                                          : 13,
+                                      theaterId: selectedCinemaId, // Thêm theaterId
                                     },
+                                    showtimeId: showtime.parentId,
+                                    theaterId: selectedCinemaId, // Thêm theaterId ở level state
                                     cinema: filteredCinemas.find(
                                       (c) => c._id === selectedCinemaId
                                     )?.name,
@@ -574,8 +640,8 @@ const ScheduleList: React.FC = () => {
                                 });
                               }}
                             >
-                              {dayjs(showtime.start).format("HH:mm")} -{" "}
-                              {dayjs(showtime.end).format("HH:mm")}
+                              {formatVNTime(showtime.start)} -{" "}
+                              {formatVNTime(showtime.end)}
                             </span>
                           ))}
                         </div>

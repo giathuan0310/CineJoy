@@ -1,10 +1,12 @@
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FaCheckCircle } from 'react-icons/fa';
 import MoviesListCarousel from '@/components/moviesListCarousel';
 import ScheduleList from '@/components/scheduleList';
 import CommentCard from '@/components/card/commentCard';
 import NewsCard from '@/components/card/newCard';
 import useAppStore from '@/store/app.store';
+import { getVisibleBlogs } from '@/apiservice/apiBlog';
 
 interface UserComment {
     name: string;
@@ -29,7 +31,11 @@ interface NewsCardProps {
 
 const HomePage = () => {
     const { isDarkMode } = useAppStore();
+    const navigate = useNavigate();
     const scheduleRef = useRef<HTMLDivElement>(null);
+    const [blogs, setBlogs] = useState<IBlog[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [showAllNews, setShowAllNews] = useState(false);
     
     const scrollToSchedule = () => {
         if (scheduleRef.current) {
@@ -43,6 +49,24 @@ const HomePage = () => {
             });
         }
     };
+
+    // Load blogs data
+    useEffect(() => {
+        const loadBlogs = async () => {
+            setLoading(true);
+            try {
+                const data = await getVisibleBlogs();
+                // API đã sắp xếp theo ngày đăng mới nhất
+                setBlogs(data);
+            } catch (error) {
+                console.error('Error loading blogs:', error);
+                setBlogs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadBlogs();
+    }, []);
     
     const cards: CommentCardProps[] = [
         {
@@ -145,38 +169,18 @@ const HomePage = () => {
         },
     ];
 
-    const newsList: NewsCardProps[] = [
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/xem-phim-hay--ngat-ngay-cung-banh-phong-de-rec-rec_m20xlz.jpg",
-            title: "Bánh Phồng Dễ REC REC - Thử Ngay!",
-            description: "Thưởng thức Bánh Phồng Dễ REC REC với giá chỉ từ 25K khi mua cùng Combo!",
-        },
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/ben-nhau-gan-ket---tet-trung-qua-to_qwluti.jpg",
-            title: "Bên Nhau Gắn Kết - Tết Trúng Quà To",
-            description: "Mua combo bắp nước có sản phẩm Pepsi và nhận cơ hội tham gia Vòng Quay May Mắn!",
-        },
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/ben-nhau-gan-ket---tet-vui-tron-vi_xkdwj4.jpg",
-            title: "Bên Nhau Gắn Kết - Tết Vui Trọn Vị",
-            description: "Tận hưởng combo đồ ăn đặc biệt trong mùa Tết tại VTI Cinema!",
-        },
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140334/happy-day---ve-chi-tu-45k_pqvewt.jpg",
-            title: "Thứ Ba Vui Vẻ - Vé Chỉ 50K",
-            description: "Mua vé vào thứ Ba với giá 50K, áp dụng cho mọi suất chiếu!",
-        },
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739140984/ngay-tri-an-cua-galaxy-cinema---ngay-thu-hai-dau-tien-moi-thang_ul8h6x.jpg",
-            title: "Ngày Tri Ân VTI Cinema - Vé 2D chỉ từ 45K!",
-            description: "Mua vé 2D giá chỉ 45K vào Thứ Hai đầu tiên của mỗi tháng, kèm ưu đãi bắp nước!",
-        },
-        {
-            image: "https://res.cloudinary.com/ddia5yfia/image/upload/v1739141351/tieu-chi-phan-loai-phim-theo-lua-tuoi-cap-nhat-moi-tu-cuc-dien-anh_vigjab.jpg",
-            title: "Phân Loại Phim Theo Độ Tuổi",
-            description: "Cập nhật quy định phân loại phim theo độ tuổi mới nhất từ VTI Cinema.",
-        },
-    ];
+    // Handle news card click
+    const handleNewsClick = (blogCode: string) => {
+        navigate(`/news/${blogCode}`);
+    };
+
+    // Handle "Xem thêm" / "Ẩn bớt" button click
+    const handleToggleNews = () => {
+        setShowAllNews(!showAllNews);
+    };
+
+    // Get displayed blogs based on showAllNews state
+    const displayedBlogs = showAllNews ? blogs : blogs.slice(0, 6);
 
     return (
         <>
@@ -245,8 +249,8 @@ const HomePage = () => {
                 </div>
             </div>
 
-            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="nowShowing" />
-            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="upcoming" />
+            <MoviesListCarousel title='PHIM ĐANG CHIẾU' starRating status="Phim đang chiếu" />
+            <MoviesListCarousel title='PHIM SẮP CHIẾU' bg titleColor="#0f1b4c" status="Phim sắp chiếu" />
             <div ref={scheduleRef}>
                 <ScheduleList />
             </div>
@@ -272,17 +276,38 @@ const HomePage = () => {
                     TIN TỨC - KHUYẾN MÃI
                 </h1>
 
-                <div className="grid md:grid-cols-3 gap-6 max-w-7xl mx-auto">
-                    {newsList.map((news, index) => (
-                        <NewsCard key={index} {...news} />
-                    ))}
-                </div>
+                {loading ? (
+                    <div className="text-center py-20">
+                        <div className={`${isDarkMode ? "text-white" : "text-black"}`}>Đang tải tin tức...</div>
+                    </div>
+                ) : (
+                    <div className="grid md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+                        {displayedBlogs.map((blog) => (
+                            <div 
+                                key={blog._id} 
+                                className="cursor-pointer hover:scale-[1.02] transition-all duration-200"
+                                onClick={() => handleNewsClick(blog.blogCode)}
+                            >
+                                <NewsCard 
+                                    image={blog.posterImage}
+                                    title={blog.title}
+                                    description={blog.description}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
 
-                <div className="text-center mt-10">
-                    <button className={`${isDarkMode ? "bg-blue-700 hover:bg-blue-800 text-white" : "bg-[#0f1b4c] hover:bg-blue-700 text-white"} px-6 py-2 rounded-full transition cursor-pointer`}>
-                        Xem thêm ↓
-                    </button>
-                </div>
+                {blogs.length > 6 && (
+                    <div className="text-center mt-10">
+                        <button 
+                            onClick={handleToggleNews}
+                            className={`${isDarkMode ? "bg-blue-700 hover:bg-blue-800 text-white" : "bg-[#0f1b4c] hover:bg-blue-700 text-white"} px-6 py-2 rounded-full transition cursor-pointer`}
+                        >
+                            {showAllNews ? 'Ẩn bớt ↑' : 'Xem thêm ↓'}
+                        </button>
+                    </div>
+                )}
             </div>
         </>
     );

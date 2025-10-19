@@ -7,7 +7,14 @@ export interface IOrder extends Document {
   movieId: string;
   theaterId: string;
   showtimeId: string;
-  seats: string[];
+  showDate: string; // Format: "2025-09-07"
+  showTime: string; // Format: "08:00"
+  room: string; // "Room 1"
+  seats: Array<{
+    seatId: string; // "A1", "B2", etc.
+    type: string; // "standard", "vip", "couple"
+    price: number;
+  }>;
   foodCombos: Array<{
     comboId: string;
     quantity: number;
@@ -15,13 +22,34 @@ export interface IOrder extends Document {
   }>;
   voucherId?: string;
   voucherDiscount: number;
+  amountDiscount: number;
+  amountDiscountInfo?: {
+    description: string;
+    minOrderValue: number;
+    discountValue: number;
+    exclusionGroup?: string;
+  };
+  itemPromotions?: Array<{
+    description: string;
+    rewardItem: string;
+    rewardQuantity: number;
+    rewardType: string;
+  }>;
+  percentPromotions?: Array<{
+    description: string;
+    comboName: string;
+    comboId: string;
+    discountPercent: number;
+    discountAmount: number;
+  }>;
   ticketPrice: number;
   comboPrice: number;
   totalAmount: number;
   finalAmount: number;
-  paymentMethod: "MOMO" | "VNPAY";
+  paymentMethod: "MOMO" | "VNPAY"; // Required
   paymentStatus: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
   orderStatus: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  pointsProcessed?: boolean; // Đánh dấu order đã được xử lý điểm chưa
   customerInfo: {
     fullName: string;
     phoneNumber: string;
@@ -53,7 +81,7 @@ const OrderSchema: Schema = new Schema(
     },
     movieId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Movies",
+      ref: "Movie",
       required: true,
     },
     theaterId: {
@@ -66,10 +94,33 @@ const OrderSchema: Schema = new Schema(
       ref: "Showtime",
       required: true,
     },
+    showDate: {
+      type: String,
+      required: true, // Format: "2025-09-07"
+    },
+    showTime: {
+      type: String,
+      required: true, // Format: "08:00"
+    },
+    room: {
+      type: String,
+      required: true, // "Room 1", "Room 2", etc.
+    },
     seats: [
       {
-        type: String,
-        required: true,
+        seatId: {
+          type: String,
+          required: true, // "A1", "B2", etc.
+        },
+        type: {
+          type: String,
+          required: true, // "standard", "vip", "couple"
+        },
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
     foodCombos: [
@@ -93,7 +144,7 @@ const OrderSchema: Schema = new Schema(
     ],
     voucherId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Voucher",
+      ref: "UserVoucher", // Thực chất lưu userVoucherId, không phải voucherId
       required: false,
     },
     voucherDiscount: {
@@ -101,6 +152,73 @@ const OrderSchema: Schema = new Schema(
       default: 0,
       min: 0,
     },
+    amountDiscount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    amountDiscountInfo: {
+      description: {
+        type: String,
+        required: false,
+      },
+      minOrderValue: {
+        type: Number,
+        required: false,
+      },
+      discountValue: {
+        type: Number,
+        required: false,
+      },
+      exclusionGroup: {
+        type: String,
+        required: false,
+      },
+    },
+    itemPromotions: [
+      {
+        description: {
+          type: String,
+          required: true,
+        },
+        rewardItem: {
+          type: String,
+          required: true,
+        },
+        rewardQuantity: {
+          type: Number,
+          required: true,
+        },
+        rewardType: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
+    percentPromotions: [
+      {
+        description: {
+          type: String,
+          required: true,
+        },
+        comboName: {
+          type: String,
+          required: true,
+        },
+        comboId: {
+          type: String,
+          required: true,
+        },
+        discountPercent: {
+          type: Number,
+          required: true,
+        },
+        discountAmount: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
     ticketPrice: {
       type: Number,
       required: true,
@@ -124,7 +242,7 @@ const OrderSchema: Schema = new Schema(
     paymentMethod: {
       type: String,
       enum: ["MOMO", "VNPAY"],
-      required: true,
+      required: true, // Required when creating order
     },
     paymentStatus: {
       type: String,
@@ -136,6 +254,11 @@ const OrderSchema: Schema = new Schema(
       type: String,
       enum: ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"],
       default: "PENDING",
+      index: true,
+    },
+    pointsProcessed: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     customerInfo: {
@@ -183,9 +306,9 @@ const OrderSchema: Schema = new Schema(
 // Indexes for better performance
 OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ paymentStatus: 1, orderStatus: 1 });
-OrderSchema.index({ expiresAt: 1 });
+// expiresAt index is already defined above with TTL
 
-// Generate unique order code before saving
+// Generate unique order code before saving (backup in case not provided)
 OrderSchema.pre("save", async function (next) {
   if (this.isNew && !this.orderCode) {
     const timestamp = Date.now().toString(36);

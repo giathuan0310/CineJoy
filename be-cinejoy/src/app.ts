@@ -17,10 +17,18 @@ import UserRouter from "./routes/UserRouter";
 import UploadRouter from "./routes/UploadRouter";
 import OrderRouter from "./routes/OrderRouter";
 import PaymentRouter from "./routes/PaymentRouter";
+import RoomRouter from "./routes/RoomRouter";
+import SeatRouter from "./routes/SeatRouter";
+import ShowSessionRouter from "./routes/ShowSessionRouter";
+import PriceListRouter from "./routes/PriceListRouter";
+import PointsRouter from "./routes/PointsRouter";
+import momoConfig from "./configs/momoConfig";
+import SchedulerService from "./services/SchedulerService";
+
 dotenv.config();
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 app.use(
   cors({
@@ -44,9 +52,6 @@ app.use(
   })
 );
 
-// Connect to MongoDB
-connectDB();
-
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
@@ -59,16 +64,37 @@ app.use("/v1/api/upload", UploadRouter);
 app.use("/v1/user-vouchers", UserVoucherRouter);
 app.use("/v1/api/orders", OrderRouter);
 app.use("/v1/api/payments", PaymentRouter);
+app.use("/v1/api/points", PointsRouter);
 app.use("/movies", moviesRouter);
 app.use("/theaters", theaterRouter);
-app.use("/showtimes", ShowtimeRouter);
+app.use("/v1/api/showtimes", ShowtimeRouter);
+app.use("/showtimes", ShowtimeRouter); // Backward compatibility
 app.use("/foodcombos", FoodComboRouter);
 app.use("/blogs", BlogRouter);
-app.use("/vouchers", VoucherRouter);
+app.use("/v1/api/vouchers", VoucherRouter);
 app.use("/regions", RegionRouter);
+app.use("/rooms", RoomRouter);
+app.use("/seats", SeatRouter);
+app.use("/show-sessions", ShowSessionRouter);
+app.use("/price-lists", PriceListRouter);
 app.use("/chatbot", chatbotRouter);
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+
+  // Initialize database connection
+  connectDB();
+
+  // Check MoMo configuration on startup
+  if (momoConfig.isConfigured()) {
+    // MoMo is configured
+  } else {
+    // MoMo configuration incomplete - Payment features may not work
+  }
+
+  // Khởi động scheduler service để cleanup expired reservations và cập nhật trạng thái phim
+  const schedulerService = new SchedulerService();
+  schedulerService.startAllSchedulers();
+
 });

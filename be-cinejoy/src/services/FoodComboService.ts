@@ -1,24 +1,76 @@
-import { FoodCombo, IFoodCombo } from "../models/FoodCombo";
+import { FoodCombo, IFoodCombo, IComboItem } from "../models/FoodCombo";
+import mongoose from "mongoose";
 
 export default class FoodComboService {
+    // Lấy tất cả sản phẩm và combo
     getFoodCombos(): Promise<IFoodCombo[]> {
-        return FoodCombo.find();
+        return FoodCombo.find().populate('items.productId').sort({ _id: -1 });
+    }
+
+    // Lấy sản phẩm đơn lẻ
+    getSingleProducts(): Promise<IFoodCombo[]> {
+        return FoodCombo.find({ type: "single" }).sort({ _id: -1 });
+    }
+
+    // Lấy combo
+    getCombos(): Promise<IFoodCombo[]> {
+        return FoodCombo.find({ type: "combo" }).populate('items.productId').sort({ _id: -1 });
+    }
+
+    // Lấy theo category
+    getProductsByCategory(category: string): Promise<IFoodCombo[]> {
+        return FoodCombo.find({ type: "single", category }).sort({ _id: -1 });
     }
 
     getFoodComboById(id: string): Promise<IFoodCombo | null> {
-        return FoodCombo.findById(id);
+        return FoodCombo.findById(id).populate('items.productId');
     }
 
-    addFoodCombo(data: IFoodCombo): Promise<IFoodCombo> {
-        const combo = new FoodCombo(data);
-        return combo.save();
+    // Thêm sản phẩm đơn lẻ
+    async addSingleProduct(data: {
+        code: string;
+        name: string;
+        description: string;
+    }): Promise<IFoodCombo> {
+        const product = new FoodCombo({
+            ...data,
+            type: "single"
+        });
+        const savedProduct = await product.save();
+        
+        
+        return savedProduct;
     }
 
-    updateFoodCombo(id: string, data: Partial<IFoodCombo>): Promise<IFoodCombo | null> {
-        return FoodCombo.findByIdAndUpdate(id, data, { new: true });
+    // Thêm combo
+    async addCombo(data: {
+        code: string;
+        name: string;
+        description: string;
+        items: IComboItem[];
+    }): Promise<IFoodCombo> {
+        const combo = new FoodCombo({
+            ...data,
+            type: "combo"
+        });
+        const savedCombo = await combo.save();
+        
+        
+        return savedCombo;
     }
 
-    deleteFoodCombo(id: string): Promise<IFoodCombo | null> {
-        return FoodCombo.findByIdAndDelete(id);
+    async updateFoodCombo(id: string, data: Partial<IFoodCombo>): Promise<IFoodCombo | null> {
+        const updatedCombo = await FoodCombo.findByIdAndUpdate(id, data, { new: true }).populate('items.productId');
+        
+        
+        return updatedCombo;
     }
+
+    async deleteFoodCombo(id: string): Promise<IFoodCombo | null> {
+        const deletedCombo = await FoodCombo.findByIdAndDelete(id);
+        
+        
+        return deletedCombo;
+    }
+
 }

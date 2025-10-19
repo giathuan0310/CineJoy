@@ -1,15 +1,23 @@
 import Order, { IOrder } from "../models/Order";
-import Payment from "../models/Payment";
-import { FoodCombo } from "../models/FoodCombo";
-import { Voucher } from "../models/Voucher";
+import { UserVoucher } from "../models/UserVoucher";
+import ShowtimeService from "./ShowtimeService";
 import mongoose from "mongoose";
+
+const showtimeService = new ShowtimeService();
 
 export interface CreateOrderData {
   userId: string;
   movieId: string;
   theaterId: string;
   showtimeId: string;
-  seats: string[];
+  showDate: string;
+  showTime: string;
+  room: string;
+  seats: Array<{
+    seatId: string;
+    type: string;
+    price: number;
+  }>;
   foodCombos: Array<{
     comboId: string;
     quantity: number;
@@ -21,96 +29,432 @@ export interface CreateOrderData {
     phoneNumber: string;
     email: string;
   };
-  seatPrice: number;
 }
 
 export interface UpdateOrderData {
   paymentStatus?: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED";
   orderStatus?: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+  paymentMethod?: "MOMO" | "VNPAY";
   paymentInfo?: {
     transactionId?: string;
     paymentDate?: Date;
     paymentGatewayResponse?: any;
   };
+  expiresAt?: Date;
 }
 
 class OrderService {
+  // Lấy lịch sử đặt vé của user
+  async getUserBookingHistory(userId: string): Promise<IOrder[]> {
+    try {
+      const orders = await Order.find({
+        userId: new mongoose.Types.ObjectId(userId),
+        orderStatus: "CONFIRMED"
+      })
+      .populate({
+        path: "movieId",
+        select: "title poster duration genre ageRating posterImage"
+      })
+      .populate({
+        path: "theaterId",
+        select: "name"
+      })
+      .populate({
+        path: "showtimeId",
+        select: "showTimes"
+      })
+      .sort({ createdAt: -1 }) // Sắp xếp theo thời gian tạo mới nhất
+      .lean();
+
+      return orders;
+    } catch (error) {
+      console.error("Error getting user booking history:", error);
+      throw error;
+    }
+  }
+
+  // Get user order details by orderId
+  async getUserOrderDetails(userId: string, orderId: string): Promise<IOrder | null> {
+    try {
+      const order = await Order.findOne({
+        _id: new mongoose.Types.ObjectId(orderId),
+        userId: new mongoose.Types.ObjectId(userId)
+      })
+      .populate({
+        path: "movieId",
+        select: "title poster duration genre ageRating posterImage"
+      })
+      .populate({
+        path: "theaterId",
+        select: "name"
+      })
+      .populate({
+        path: "showtimeId",
+        select: "showTimes"
+      })
+      .populate({
+        path: "foodCombos.comboId",
+        select: "name"
+      })
+      .lean();
+
+      return order;
+    } catch (error) {
+      console.error("Error getting user order details:", error);
+      throw error;
+    }
+  }
+
   // Tạo order mới
-  async createOrder(orderData: CreateOrderData): Promise<IOrder> {
+  async createOrder(orderData: CreateOrderData): Promise<{
+    success: boolean;
+    order?: IOrder;
+    message?: string;
+  }> {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // Tính toán giá combo
-      let comboPrice = 0;
-      const combosWithPrice = [];
+      // Tính giá combo từ payload (giá đã được frontend gán theo bảng giá hiện hành)
+      const combosWithPrice = orderData.foodCombos.map(combo => ({
+        comboId: combo.comboId,
+        quantity: combo.quantity,
+        // Nếu frontend chưa gửi price, mặc định 0
+        // @ts-ignore - interface cũ chưa có price trên orderData.foodCombos
+        price: (combo as any).price || 0,
+      }));
+      const comboPrice = combosWithPrice.reduce((sum, c) => sum + (c.price || 0) * (c.quantity || 0), 0);
 
-      for (const combo of orderData.foodCombos) {
-        const foodCombo = await FoodCombo.findById(combo.comboId).session(
-          session
-        );
-        if (!foodCombo) {
-          throw new Error(`Combo không tồn tại: ${combo.comboId}`);
-        }
-
-        if (foodCombo.quantity < combo.quantity) {
-          throw new Error(`Combo ${foodCombo.name} không đủ số lượng`);
-        }
-
-        const comboTotal = foodCombo.price * combo.quantity;
-        comboPrice += comboTotal;
-
-        combosWithPrice.push({
-          comboId: combo.comboId,
-          quantity: combo.quantity,
-          price: foodCombo.price,
-        });
-
-        // Cập nhật số lượng combo
-        await FoodCombo.findByIdAndUpdate(
-          combo.comboId,
-          { $inc: { quantity: -combo.quantity } },
-          { session }
-        );
-      }
-
-      // Tính toán giá vé
-      const ticketPrice = orderData.seats.length * orderData.seatPrice;
+      // Tính toán giá vé từ seats array
+      const ticketPrice = orderData.seats.reduce(
+        (total, seat) => total + seat.price,
+        0
+      );
       const totalAmount = ticketPrice + comboPrice;
 
       // Tính toán voucher discount
       let voucherDiscount = 0;
-      if (orderData.voucherId) {
-        const voucher = await Voucher.findById(orderData.voucherId).session(
-          session
-        );
-        if (voucher && voucher.quantity > 0) {
+      if (orderData.voucherId) { // orderData.voucherId thực chất là userVoucherId (ObjectId của UserVoucher)
+        try {
+          // Tìm UserVoucher trực tiếp bằng _id. KHÔNG populate voucherId ở đây
+          // vì userVoucher.voucherId lưu detail._id, không phải _id của Voucher header.
+        const userVoucher = await UserVoucher.findOne({
+            _id: orderData.voucherId,
+          userId: orderData.userId,
+          status: "unused",
+          }).session(session);
+
+          if (userVoucher) {
+            console.log(`🔍 Voucher Debug:`);
+            console.log(`  UserVoucher ID: ${orderData.voucherId}`);
+            console.log(`  Voucher Code: ${userVoucher.code}`);
+            console.log(`  UserVoucher.voucherId (raw detail._id): ${userVoucher.voucherId}`);
+
+            if (!userVoucher.voucherId) {
+              console.log(`  Error: userVoucher.voucherId is null or undefined in UserVoucher document.`);
+              // Điều này chỉ ra một document UserVoucher bị lỗi.
+              throw new Error("UserVoucher document is missing voucherId.");
+            }
+
+            // Tìm Voucher document chính (header) chứa detail._id này
+            const { Voucher } = await import("../models/Voucher");
+            const voucherDoc = await Voucher.findOne({
+              "lines.detail._id": userVoucher.voucherId // Sử dụng raw detail._id từ userVoucher
+            }).session(session);
+
+            let voucherDetail: any = null;
+            let voucherLine: any = null; // Để lưu trữ đối tượng line cho validityPeriod
+
+            if (voucherDoc) {
+              // Tìm line chứa detail._id này
+              const line = voucherDoc.lines?.find((l: any) => 
+                l?.detail?._id?.toString() === userVoucher.voucherId.toString()
+              );
+
+              if (line && line.detail) {
+                voucherDetail = line.detail; // Đây là đối tượng detail thực tế chúng ta cần
+                voucherLine = line; // Lưu trữ line để lấy validityPeriod
+                console.log(`  Found voucher detail in main Voucher document.`);
+              } else {
+                console.log(`  Could not find matching line detail in main Voucher document for ID: ${userVoucher.voucherId}`);
+              }
+            } else {
+              console.log(`  Main Voucher document not found for detail ID: ${userVoucher.voucherId}`);
+            }
+
+            if (voucherDetail && voucherLine) { // Bây giờ 'voucherDetail' là đối tượng detail, và 'voucherLine' là line
           const now = new Date();
-          if (
-            now >= voucher.validityPeriod.startDate &&
-            now <= voucher.validityPeriod.endDate
+
+              const validityPeriod = voucherLine.validityPeriod; // Lấy validityPeriod từ đối tượng line
+
+              console.log(`  Discount Percent: ${voucherDetail.discountPercent}%`);
+              console.log(`  Total Amount: ${totalAmount}`);
+              console.log(`  Validity Period: ${validityPeriod?.startDate} - ${validityPeriod?.endDate}`);
+              console.log(`  Current Time: ${now}`);
+
+              if (
+                voucherDetail.quantity > 0 &&
+                validityPeriod && now >= new Date(validityPeriod.startDate) && now <= new Date(validityPeriod.endDate)
           ) {
             voucherDiscount = Math.round(
-              (totalAmount * voucher.discountPercent) / 100
-            );
+                  (totalAmount * voucherDetail.discountPercent) / 100
+                );
+                // Áp dụng giới hạn giảm giá tối đa
+                if (voucherDetail.maxDiscountValue && voucherDiscount > voucherDetail.maxDiscountValue) {
+                  voucherDiscount = voucherDetail.maxDiscountValue;
+                }
+                console.log(`  Calculated Voucher Discount: ${voucherDiscount}`);
+              } else {
+                console.log(`  Voucher is not valid (quantity, dates).`);
+              }
+            } else {
+              console.log(`  Final voucher detail object or line is null, cannot calculate discount.`);
+            }
+          } else {
+            console.log(`  UserVoucher not found for ID: ${orderData.voucherId}`);
           }
+        } catch (error) {
+          console.error(`❌ Error processing voucher:`, error);
+          // Tiếp tục với voucherDiscount = 0 nếu có lỗi
         }
       }
 
-      const finalAmount = totalAmount - voucherDiscount;
+      // Tính toán amount discount (khuyến mãi tiền dựa trên tổng đơn hàng)
+      let amountDiscount = 0;
+      let amountDiscountInfo = null;
+      
+      try {
+        // Tìm các voucher có promotionType = "amount" và status = "hoạt động"
+        const { Voucher } = await import("../models/Voucher");
+        const activeAmountVouchers = await Voucher.find({
+          "lines.promotionType": "amount",
+          "lines.status": "hoạt động",
+          status: "hoạt động"
+        }).session(session);
 
-      // Tạo order với thời gian hết hạn 10 phút
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        console.log(`🔍 Amount Discount Debug:`);
+        console.log(`  Found ${activeAmountVouchers.length} active amount vouchers`);
+
+        // Tìm amount discount phù hợp nhất (cao nhất nhưng không vượt quá totalAmount)
+        for (const voucher of activeAmountVouchers) {
+          for (const line of voucher.lines || []) {
+            if (line.promotionType === "amount" && line.status === "hoạt động" && line.detail) {
+              const detail = line.detail as any; // Type assertion để access amount fields
+              const minOrderValue = detail.minOrderValue || 0;
+              const discountValue = detail.discountValue || 0;
+              const now = new Date();
+
+              console.log(`  Checking amount line: minOrder=${minOrderValue}, discount=${discountValue}`);
+
+              // Kiểm tra điều kiện thời gian và giá trị đơn hàng
+              if (
+                totalAmount >= minOrderValue &&
+                discountValue > amountDiscount &&
+                line.validityPeriod &&
+                now >= new Date(line.validityPeriod.startDate) &&
+                now <= new Date(line.validityPeriod.endDate)
+              ) {
+                amountDiscount = discountValue;
+                amountDiscountInfo = {
+                  description: detail.description || `Giảm ${discountValue.toLocaleString('vi-VN')}₫ cho hóa đơn từ ${minOrderValue.toLocaleString('vi-VN')}₫`,
+                  minOrderValue,
+                  discountValue,
+                  exclusionGroup: line.rule?.exclusionGroup || null
+                };
+                console.log(`  ✅ Applied amount discount: ${discountValue}₫ (${amountDiscountInfo.description})`);
+              }
+            }
+          }
+        }
+
+        // Cho phép áp dụng cả voucher và amount discount (không loại trừ)
+        // Nếu cần logic exclusion group trong tương lai, có thể thêm điều kiện cụ thể
+        console.log(`  ✅ Amount discount applied: ${amountDiscount}₫`);
+
+      } catch (error) {
+        console.error(`❌ Error processing amount discount:`, error);
+        // Tiếp tục với amountDiscount = 0 nếu có lỗi
+      }
+
+      // Tính toán item promotions (khuyến mãi hàng)
+      let itemPromotions = [];
+      
+      try {
+        // Import VoucherService để sử dụng applyItemPromotions
+        const VoucherServiceModule = await import("./VoucherService");
+        const VoucherService = VoucherServiceModule.default;
+        const voucherService = new VoucherService();
+        
+        // Chuyển đổi foodCombos thành format cần thiết cho API
+        const selectedCombos = combosWithPrice.map(combo => ({
+          comboId: combo.comboId,
+          quantity: combo.quantity,
+          name: 'Combo' // Tên sẽ được lấy từ database trong VoucherService
+        }));
+        
+        if (selectedCombos.length > 0) {
+          console.log(`🔍 Item Promotions Debug:`);
+          console.log(`  Selected combos:`, selectedCombos);
+          
+          const promotionResult = await voucherService.applyItemPromotions(selectedCombos, []);
+          
+          if (promotionResult.status && promotionResult.data && promotionResult.data.applicablePromotions.length > 0) {
+            itemPromotions = promotionResult.data.applicablePromotions.map((promotion: any) => ({
+              description: promotion.detail?.description || `Tặng ${promotion.rewardQuantity} ${promotion.rewardItem}`,
+              rewardItem: promotion.rewardItem,
+              rewardQuantity: promotion.rewardQuantity,
+              rewardType: promotion.rewardType
+            }));
+            
+            console.log(`  ✅ Applied ${itemPromotions.length} item promotions:`, itemPromotions);
+          } else {
+            console.log(`  ℹ️ No applicable item promotions found`);
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error processing item promotions:`, error);
+        // Tiếp tục với itemPromotions = [] nếu có lỗi
+      }
+
+      // Tính toán percent promotions (khuyến mãi chiết khấu)
+      let percentPromotions = [];
+      let percentDiscountAmount = 0;
+      
+      try {
+        // Import VoucherService để sử dụng applyPercentPromotions
+        const VoucherServiceModule = await import("./VoucherService");
+        const VoucherService = VoucherServiceModule.default;
+        const voucherService = new VoucherService();
+        
+        // Chuyển đổi foodCombos thành format cần thiết cho API (có thêm price)
+        const selectedCombosWithPrice = combosWithPrice.map(combo => ({
+          comboId: combo.comboId,
+          quantity: combo.quantity,
+          name: 'Combo', // Tên sẽ được lấy từ database trong VoucherService
+          price: combo.price
+        }));
+        
+        if (selectedCombosWithPrice.length > 0) {
+          console.log(`🔍 Percent Promotions Debug:`);
+          console.log(`  Selected combos with price:`, selectedCombosWithPrice);
+          
+          const percentResult = await voucherService.applyPercentPromotions(selectedCombosWithPrice, []);
+          
+          if (percentResult.status && percentResult.data && percentResult.data.applicablePromotions.length > 0) {
+            percentPromotions = percentResult.data.applicablePromotions.map((promotion: any) => ({
+              description: promotion.detail?.description || `Giảm ${promotion.discountPercent}% ${promotion.comboName}`,
+              comboName: promotion.comboName,
+              comboId: promotion.comboId,
+              discountPercent: promotion.discountPercent,
+              discountAmount: promotion.discountAmount
+            }));
+            
+            percentDiscountAmount = percentResult.data.totalDiscountAmount || 0;
+            
+            console.log(`  ✅ Applied ${percentPromotions.length} percent promotions:`, percentPromotions);
+            console.log(`  ✅ Total percent discount amount: ${percentDiscountAmount}₫`);
+          } else {
+            console.log(`  ℹ️ No applicable percent promotions found`);
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error processing percent promotions:`, error);
+        // Tiếp tục với percentPromotions = [] nếu có lỗi
+      }
+
+      const finalAmount = totalAmount - voucherDiscount - amountDiscount - percentDiscountAmount;
+      
+      console.log(`🔍 Order Amount Debug:`);
+      console.log(`  Total Amount: ${totalAmount}`);
+      console.log(`  Voucher Discount: ${voucherDiscount}`);
+      console.log(`  Amount Discount: ${amountDiscount}`);
+      console.log(`  Percent Discount: ${percentDiscountAmount}`);
+      console.log(`  Item Promotions: ${itemPromotions.length} promotions`);
+      console.log(`  Percent Promotions: ${percentPromotions.length} promotions`);
+      console.log(`  Final Amount: ${finalAmount}`);
+
+      // Generate unique order code
+      let orderCode: string;
+      let isUnique = false;
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      while (!isUnique && attempts < maxAttempts) {
+        const timestamp = Date.now().toString(36);
+        const random = Math.random().toString(36).substring(2, 7);
+        orderCode = `CJ${timestamp}${random}`.toUpperCase();
+
+        // Check if orderCode already exists
+        const existingOrder = await Order.findOne({ orderCode }).session(
+          session
+        );
+        if (!existingOrder) {
+          isUnique = true;
+        } else {
+          attempts++;
+          // Small delay to ensure different timestamp
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+      }
+
+      if (!isUnique) {
+        await session.abortTransaction();
+        return {
+          success: false,
+          message: "Không thể tạo mã đơn hàng unique sau nhiều lần thử",
+        };
+      }
+
+      // Tạo order với thời gian hết hạn 1 giờ cho order chưa thanh toán
+      // Chỉ set TTL cho order PENDING, CONFIRMED sẽ không bị xóa tự động
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // **KIỂM TRA GHẾ TRƯỚC KHI TẠO ORDER**
+      const seatIds = orderData.seats.map((seat) => seat.seatId);
+
+      // Sử dụng thời gian trực tiếp từ frontend (Vietnam time)
+      const showTime = orderData.showTime;
+
+
+      // Tạm giữ ghế trong showtime với trạng thái "reserved" (8 phút)
+      try {
+        await showtimeService.setSeatsStatus(
+          orderData.showtimeId,
+          orderData.showDate,
+          showTime,
+          orderData.room,
+          seatIds,
+          "reserved",
+          undefined, // onlyIfReservedByUserId
+          orderData.userId // reservedByUserId
+        );
+        console.log(`🔒 Reserved seats ${seatIds.join(', ')} for user ${orderData.userId} for 8 minutes`);
+      } catch (seatError: any) {
+        // Nếu ghế không available, return error response
+        await session.abortTransaction();
+        return {
+          success: false,
+          message: `Không thể tạm giữ ghế: ${seatError.message}`,
+        };
+      }
 
       const newOrder = new Order({
+        orderCode: orderCode!,
         userId: orderData.userId,
         movieId: orderData.movieId,
         theaterId: orderData.theaterId,
         showtimeId: orderData.showtimeId,
+        showDate: orderData.showDate,
+        showTime: orderData.showTime,
+        room: orderData.room,
         seats: orderData.seats,
         foodCombos: combosWithPrice,
         voucherId: orderData.voucherId,
         voucherDiscount,
+        amountDiscount,
+        amountDiscountInfo,
+        itemPromotions,
+        percentPromotions,
         ticketPrice,
         comboPrice,
         totalAmount,
@@ -121,12 +465,29 @@ class OrderService {
       });
 
       const savedOrder = await newOrder.save({ session });
+
+      console.log(
+        "Order created and seats reserved successfully:",
+        savedOrder.orderCode
+      );
+
+      // Note: Voucher sẽ được mark as used khi thanh toán thành công, không phải khi tạo order
+
       await session.commitTransaction();
 
-      return savedOrder;
+      return {
+        success: true,
+        order: savedOrder,
+        message: "Tạo đơn hàng thành công",
+      };
     } catch (error) {
       await session.abortTransaction();
-      throw error;
+      return {
+        success: false,
+        message: `Lỗi tạo đơn hàng: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      };
     } finally {
       session.endSession();
     }
@@ -146,11 +507,11 @@ class OrderService {
 
     const [orders, totalOrders] = await Promise.all([
       Order.find()
-        .populate("userId", "fullName email phoneNumber")
+        .populate("userId", "fullName email phoneNumber gender")
         .populate("movieId", "title poster duration")
-        .populate("theaterId", "name location")
+        .populate("theaterId", "theaterCode name location")
         .populate("showtimeId", "startTime date")
-        .populate("foodCombos.comboId", "name price")
+        .populate("foodCombos.comboId", "name description")
         .populate("voucherId", "code discountPercent")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -169,8 +530,8 @@ class OrderService {
   // Lấy order theo ID
   async getOrderById(orderId: string): Promise<IOrder | null> {
     return await Order.findById(orderId)
-      .populate("userId", "fullName email phoneNumber")
-      .populate("movieId", "title poster duration")
+      .populate("userId", "fullName email phoneNumber gender")
+      .populate("movieId", "title poster duration posterImage")
       .populate("theaterId", "name location")
       .populate("showtimeId", "startTime date")
       .populate("foodCombos.comboId", "name price")
@@ -180,8 +541,8 @@ class OrderService {
   // Lấy order theo orderCode
   async getOrderByCode(orderCode: string): Promise<IOrder | null> {
     return await Order.findOne({ orderCode })
-      .populate("userId", "fullName email phoneNumber")
-      .populate("movieId", "title poster duration")
+      .populate("userId", "fullName email phoneNumber gender")
+      .populate("movieId", "title poster duration posterImage")
       .populate("theaterId", "name location")
       .populate("showtimeId", "startTime date")
       .populate("foodCombos.comboId", "name price")
@@ -203,10 +564,11 @@ class OrderService {
 
     const [orders, totalOrders] = await Promise.all([
       Order.find({ userId })
-        .populate("movieId", "title poster duration")
-        .populate("theaterId", "name location")
+        .populate("userId", "fullName email phoneNumber gender")
+        .populate("movieId", "title poster duration posterImage")
+        .populate("theaterId", "theaterCode name location")
         .populate("showtimeId", "startTime date")
-        .populate("foodCombos.comboId", "name price")
+        .populate("foodCombos.comboId", "name description")
         .populate("voucherId", "code discountPercent")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -227,26 +589,129 @@ class OrderService {
     orderId: string,
     updateData: UpdateOrderData
   ): Promise<IOrder | null> {
-    return await Order.findByIdAndUpdate(
-      orderId,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    )
-      .populate("userId", "fullName email phoneNumber")
-      .populate("movieId", "title poster duration")
-      .populate("theaterId", "name location")
-      .populate("showtimeId", "startTime date")
-      .populate("foodCombos.comboId", "name price")
-      .populate("voucherId", "code discountPercent");
-  }
-
-  // Hủy order
-  async cancelOrder(orderId: string, reason?: string): Promise<IOrder | null> {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      const order = await Order.findById(orderId).session(session);
+      // Lấy thông tin order hiện tại
+      const currentOrder = await Order.findById(orderId).session(session);
+      if (!currentOrder) {
+        throw new Error("Order không tồn tại");
+      }
+
+      // Nếu order được thanh toán thành công hoặc được confirm, extend expiresAt để không bị tự động xóa
+      if (updateData.paymentStatus === "PAID" || updateData.orderStatus === "CONFIRMED") {
+        updateData.expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+        if (updateData.paymentStatus === "PAID") {
+        updateData.orderStatus = "CONFIRMED";
+        }
+        console.log(`✅ Order ${orderId} confirmed and expiresAt extended to 1 year from now`);
+
+        // Mark voucher as used khi thanh toán thành công (fallback cho trường hợp updateOrder được gọi)
+        if (currentOrder.voucherId && currentOrder.voucherDiscount > 0) {
+          try {
+            const { UserVoucher } = await import("../models/UserVoucher");
+            const updateResult = await UserVoucher.findByIdAndUpdate(
+              currentOrder.voucherId,
+              {
+                $set: {
+                  status: "used",
+                  usedAt: new Date(),
+                },
+              }
+            );
+            
+            if (updateResult) {
+              console.log(`✅ Voucher ${updateResult.code} marked as used after successful payment (via updateOrder)`);
+            } else {
+              console.log(`❌ Failed to mark voucher as used: voucher not found`);
+            }
+          } catch (error) {
+            console.error(`❌ Error marking voucher as used:`, error);
+          }
+        }
+
+        // Đảm bảo ghế được book trong showtime khi thanh toán thành công
+        try {
+          const seatIds = currentOrder.seats.map((seat) => seat.seatId);
+
+          // Sử dụng thời gian trực tiếp từ order (Vietnam time)
+          const showTime = currentOrder.showTime;
+
+          console.log("Attempting to confirm seats for paid order:", {
+            orderId: currentOrder._id,
+            orderCode: currentOrder.orderCode,
+            showtimeId: currentOrder.showtimeId.toString(),
+            showDate: currentOrder.showDate,
+            showTime: currentOrder.showTime,
+            room: currentOrder.room,
+            seatIds: seatIds,
+          });
+
+          // Chuyển ghế từ "reserved" sang "selected" khi thanh toán thành công
+          await showtimeService.setSeatsStatus(
+            currentOrder.showtimeId.toString(),
+            currentOrder.showDate,
+            showTime,
+            currentOrder.room,
+            seatIds,
+            "selected",
+            currentOrder.userId.toString(), // Chỉ user này mới có thể confirm ghế của họ
+            currentOrder.userId.toString()
+          );
+          console.log(`✅ Confirmed seats ${seatIds.join(', ')} for user ${currentOrder.userId} after successful payment`);
+          console.log(
+            "Seats confirmed for paid order:",
+            currentOrder.orderCode
+          );
+        } catch (seatError) {
+          console.error("Error confirming seats for paid order:", seatError);
+          // Log error nhưng không fail transaction vì payment đã thành công
+        }
+      }
+
+      const updatedOrder = await Order.findByIdAndUpdate(
+        orderId,
+        { $set: updateData },
+        { new: true, runValidators: true, session }
+      )
+        .populate("userId", "fullName email phoneNumber")
+        .populate("movieId", "title poster duration")
+        .populate("theaterId", "theaterCode name location")
+        .populate("showtimeId", "startTime date")
+        .populate("foodCombos.comboId", "name description")
+        .populate("voucherId", "code discountPercent");
+
+      await session.commitTransaction();
+      
+      // Sau khi commit (thanh toán thành công), cập nhật trạng thái ghế ở collection seats về 'selected'
+      try {
+        if (updateData.paymentStatus === "PAID") {
+          const Seat = (await import("../models/Seat")).default;
+          if (currentOrder?.seats?.length) {
+            await Seat.updateMany(
+              { seatId: { $in: currentOrder.seats.map((s) => s.seatId) }, room: (currentOrder as any).roomId || undefined },
+              { $set: { status: "selected" } }
+            );
+          }
+        }
+      } catch (e) {
+        // Không làm fail request nếu cập nhật ghế gặp lỗi; chỉ log
+        console.error("Failed to update seat status after payment:", e);
+      }
+      return updatedOrder;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  // Hủy order
+  async cancelOrder(orderId: string, reason?: string): Promise<IOrder | null> {
+    try {
+      const order = await Order.findById(orderId);
       if (!order) {
         throw new Error("Order không tồn tại");
       }
@@ -259,13 +724,25 @@ class OrderService {
         throw new Error("Không thể hủy order đã thanh toán");
       }
 
-      // Hoàn lại số lượng combo
-      for (const combo of order.foodCombos) {
-        await FoodCombo.findByIdAndUpdate(
-          combo.comboId,
-          { $inc: { quantity: combo.quantity } },
-          { session }
+      // Bỏ logic hoàn trả FoodCombo vì đã xóa các trường quantity, price
+
+      // Release ghế trong showtime khi hủy order
+      try {
+        const seatIds = order.seats.map((seat) => seat.seatId);
+        
+        // Cập nhật trạng thái ghế về available (dùng setSeatsStatus để so khớp theo tên phòng/seatId)
+        await showtimeService.setSeatsStatus(
+          order.showtimeId.toString(),
+          order.showDate,
+          order.showTime,
+          order.room,
+          seatIds,
+          'available'
         );
+        console.log("Seats released for cancelled order:", order.orderCode);
+      } catch (seatError) {
+        console.error("Error releasing seats for cancelled order:", seatError);
+        // Log error nhưng vẫn tiếp tục cancel order
       }
 
       // Cập nhật trạng thái order
@@ -277,16 +754,11 @@ class OrderService {
             paymentStatus: "CANCELLED",
           },
         },
-        { new: true, session }
+        { new: true }
       );
-
-      await session.commitTransaction();
       return updatedOrder;
     } catch (error) {
-      await session.abortTransaction();
       throw error;
-    } finally {
-      session.endSession();
     }
   }
 

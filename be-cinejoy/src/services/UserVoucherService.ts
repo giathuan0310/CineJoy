@@ -1,6 +1,12 @@
 import { UserVoucher } from "../models/UserVoucher";
-import { IVoucher } from "../models/Voucher";
+import { IVoucher, Voucher } from "../models/Voucher";
 import { Types } from "mongoose";
+
+type VoucherWithLegacy = IVoucher & {
+  discountPercent?: number;
+  validityPeriod?: { startDate?: Date; endDate?: Date };
+  maxDiscountValue?: number;
+};
 
 export default class UserVoucherService {
   // Lấy tất cả voucher của user
@@ -79,22 +85,64 @@ export default class UserVoucherService {
       }
 
       // Tìm voucher chưa sử dụng
-      const userVoucher = await UserVoucher.findOne({
+      let userVoucher = await UserVoucher.findOne({
         code: code,
         status: "unused",
         ...(userId && { userId }), // Nếu có userId thì check luôn
       }).populate("voucherId");
 
-      if (!userVoucher || !userVoucher.voucherId) {
-        return {
-          status: false,
-          error: 1,
-          message: "Mã voucher không hợp lệ hoặc đã được sử dụng",
-          data: null,
-        };
-      }
+      let voucher = userVoucher?.voucherId as unknown as VoucherWithLegacy | null;
 
-      const voucher = userVoucher.voucherId as unknown as IVoucher;
+      // Nếu populate thất bại (trường hợp voucherId lưu là detail._id), tra ngược theo detailId
+      if (!userVoucher || !voucher) {
+        const rawUv = await UserVoucher.findOne({
+          code: code,
+          status: "unused",
+          ...(userId && { userId }),
+        }).lean();
+
+        const detailId = (rawUv as any)?.voucherId;
+        if (!rawUv || !detailId) {
+          return {
+            status: false,
+            error: 1,
+            message: "Mã voucher không hợp lệ hoặc đã được sử dụng",
+            data: null,
+          };
+        }
+
+        const voucherDoc: any = await Voucher.findOne({
+          "lines.detail._id": detailId,
+        }).lean();
+
+        if (!voucherDoc) {
+          return {
+            status: false,
+            error: 1,
+            message: "Mã voucher không hợp lệ hoặc đã được sử dụng",
+            data: null,
+          };
+        }
+
+        const line = (voucherDoc.lines || []).find(
+          (l: any) => l?.detail?._id?.toString?.() === detailId.toString()
+        );
+
+        voucher = {
+          ...(voucherDoc as VoucherWithLegacy),
+          discountPercent:
+            (line?.detail?.discountPercent as number | undefined) ??
+            (voucherDoc.discountPercent as number | undefined),
+          validityPeriod: {
+            startDate: line?.validityPeriod?.startDate || voucherDoc.startDate,
+            endDate: line?.validityPeriod?.endDate || voucherDoc.endDate,
+          },
+          maxDiscountValue: line?.detail?.maxDiscountValue,
+        } as VoucherWithLegacy;
+
+        // Chuẩn hóa userVoucher cho phần trả về (dùng rawUv)
+        userVoucher = (rawUv as any) as any;
+      }
 
       // Kiểm tra ngày hết hạn
       if (
@@ -102,7 +150,7 @@ export default class UserVoucherService {
         new Date() > voucher.validityPeriod.endDate
       ) {
         // Đánh dấu voucher expired
-        await UserVoucher.findByIdAndUpdate(userVoucher._id, {
+        await UserVoucher.findByIdAndUpdate((userVoucher as any)._id, {
           status: "expired",
         });
         return {
@@ -127,13 +175,16 @@ export default class UserVoucherService {
       }
 
       // Voucher hợp lệ
+      // Đảm bảo userVoucher không null bằng cách fallback rawUv (đã có ở trên)
+      const ensuredUserVoucher: any = userVoucher ?? (await UserVoucher.findOne({ code, ...(userId && { userId }) }).lean());
+
       return {
         status: true,
         error: 0,
         message: "Mã voucher hợp lệ",
         data: {
           voucher: voucher,
-          userVoucher: userVoucher,
+          userVoucher: ensuredUserVoucher,
           discount: voucher.discountPercent,
         },
       };
@@ -171,10 +222,14 @@ export default class UserVoucherService {
         };
       }
 
-      // Tính số tiền giảm giá
-      const discountAmount = Math.round(
-        (orderTotal * validation.data.discount!) / 100
-      );
+      // Tính số tiền giảm giá (áp dụng trần nếu có)
+      const percent = validation.data.discount!;
+      let discountAmount = Math.round((orderTotal * percent) / 100);
+      const cap = (validation.data.voucher as VoucherWithLegacy)
+        ?.maxDiscountValue;
+      if (typeof cap === "number") {
+        discountAmount = Math.min(discountAmount, cap);
+      }
       const finalTotal = Math.max(0, orderTotal - discountAmount);
 
       return {
@@ -329,7 +384,7 @@ export default class UserVoucherService {
       const now = new Date();
 
       for (const userVoucher of expiredVouchers) {
-        const voucher = userVoucher.voucherId as unknown as IVoucher;
+        const voucher = userVoucher.voucherId as unknown as VoucherWithLegacy;
         if (
           voucher.validityPeriod?.endDate &&
           now > voucher.validityPeriod.endDate

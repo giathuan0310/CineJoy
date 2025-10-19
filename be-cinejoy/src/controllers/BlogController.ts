@@ -26,11 +26,30 @@ export default class BlogController {
         }
     }
 
+    async getBlogByCode(req: Request, res: Response): Promise<void> {
+        const { blogCode } = req.params;
+        try {
+            const blog = await blogService.getBlogByCode(blogCode);
+            if (!blog) {
+                res.status(404).json({ message: "Blog not found" });
+                return;
+            }
+            res.status(200).json(blog);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching blog", error });
+        }
+    }
+
     async addBlog(req: Request, res: Response): Promise<void> {
         try {
-            const newBlog = await blogService.addBlog(req.body);
+            const body = req.body as any;
+            const newBlog = await blogService.addBlog(body);
             res.status(201).json(newBlog);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.name === 'ValidationError') {
+                res.status(400).json({ message: "Validation error", errors: error.errors });
+                return;
+            }
             res.status(500).json({ message: "Error adding blog", error });
         }
     }
@@ -38,13 +57,18 @@ export default class BlogController {
     async updateBlog(req: Request, res: Response): Promise<void> {
         const { id } = req.params;
         try {
-            const updatedBlog = await blogService.updateBlog(id, req.body);
+            const body = req.body as any;
+            const updatedBlog = await blogService.updateBlog(id, body);
             if (!updatedBlog) {
                 res.status(404).json({ message: "Blog not found" });
                 return;
             }
             res.status(200).json(updatedBlog);
-        } catch (error) {
+        } catch (error: any) {
+            if (error.name === 'ValidationError') {
+                res.status(400).json({ message: "Validation error", errors: error.errors });
+                return;
+            }
             res.status(500).json({ message: "Error updating blog", error });
         }
     }
@@ -60,6 +84,51 @@ export default class BlogController {
             res.status(200).json({ message: "Blog deleted successfully" });
         } catch (error) {
             res.status(500).json({ message: "Error deleting blog", error });
+        }
+    }
+
+    // Lấy blog theo trạng thái
+    async getBlogsByStatus(req: Request, res: Response): Promise<void> {
+        const { status } = req.params;
+        try {
+            if (status !== 'Hiển thị' && status !== 'Ẩn') {
+                res.status(400).json({ message: "Invalid status. Must be 'Hiển thị' or 'Ẩn'" });
+                return;
+            }
+            const blogs = await blogService.getBlogsByStatus(status as 'Hiển thị' | 'Ẩn');
+            res.status(200).json(blogs);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching blogs by status", error });
+        }
+    }
+
+    // Lấy blog hiển thị (cho client)
+    async getVisibleBlogs(req: Request, res: Response): Promise<void> {
+        try {
+            const blogs = await blogService.getVisibleBlogs();
+            res.status(200).json(blogs);
+        } catch (error) {
+            res.status(500).json({ message: "Error fetching visible blogs", error });
+        }
+    }
+
+    // Cập nhật trạng thái blog
+    async updateBlogStatus(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        const { status } = req.body;
+        try {
+            if (!status || (status !== 'Hiển thị' && status !== 'Ẩn')) {
+                res.status(400).json({ message: "Invalid status. Must be 'Hiển thị' or 'Ẩn'" });
+                return;
+            }
+            const updatedBlog = await blogService.updateBlogStatus(id, status);
+            if (!updatedBlog) {
+                res.status(404).json({ message: "Blog not found" });
+                return;
+            }
+            res.status(200).json(updatedBlog);
+        } catch (error) {
+            res.status(500).json({ message: "Error updating blog status", error });
         }
     }
 }

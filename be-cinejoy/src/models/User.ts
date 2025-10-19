@@ -5,7 +5,7 @@ export enum Gender {
     Nam = "Nam",
     Nu = "Nữ",
     Khac = "Khác",
-}  
+}
 
 export enum Role {
     Admin = "ADMIN",
@@ -20,7 +20,7 @@ export interface IUser extends Document {
     gender: Gender;
     avatar: string;
     dateOfBirth: Date;
-    role: Role,
+    role: Role;
     isActive: boolean;
     point: number;
     otp?: string;
@@ -58,7 +58,7 @@ const UserSchema = new Schema<IUser>(
         settings: {
             darkMode: { type: Boolean, default: false },
         },
-    },  
+    },
     {
         timestamps: true,
     }
@@ -69,9 +69,11 @@ UserSchema.pre<IUser>("save", async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
-});  
-  
-UserSchema.methods.comparePassword = async function (candidate: string): Promise<boolean> {
+});
+
+UserSchema.methods.comparePassword = async function (
+    candidate: string
+): Promise<boolean> {
     return await bcrypt.compare(candidate, (this as IUser).password);
 };
 

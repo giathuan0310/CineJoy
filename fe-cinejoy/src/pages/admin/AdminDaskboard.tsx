@@ -34,7 +34,7 @@ const Dashboard: React.FC = () => {
     const [showShowtimeForm, setShowShowtimeForm] = useState<boolean>(false);
     const [editingShowtime, setEditingShowtime] = useState<IShowtime | null>(null);
     const { user } = useAppStore();
-    
+
     const itemsPerPage = 5;
 
     useEffect(() => {
@@ -893,7 +893,6 @@ const Dashboard: React.FC = () => {
                                             <th className="p-3 text-left">Số suất chiếu</th>
                                             <th className="p-3 text-left">Chi tiết suất chiếu</th>
                                             <th className="p-3 text-left">Hành Động</th>
-
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -901,22 +900,30 @@ const Dashboard: React.FC = () => {
                                             <tr key={showtime._id} className="border-b hover:bg-gray-100">
                                                 <td className="p-3">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                                                 <td className="p-3">
-                                                    {showtime.movieId.title}
+                                                    {showtime.movieId?.title || 'N/A'}
                                                 </td>
                                                 <td className="p-3">
-                                                    {showtime.theaterId.name}
+                                                    {showtime.theaterId?.name || 'N/A'}
                                                 </td>
-                                                <td className="p-3">{new Date(showtime.showDate.start).toLocaleDateString("vi-VN")}</td>
-                                                <td className="p-3">{new Date(showtime.showDate.end).toLocaleDateString("vi-VN")}</td>
-                                                <td className="p-3">{showtime.showTimes.length}</td>
+                                                <td className="p-3">
+                                                    {showtime.showDate?.start
+                                                        ? new Date(showtime.showDate.start).toLocaleDateString("vi-VN")
+                                                        : 'N/A'}
+                                                </td>
+                                                <td className="p-3">
+                                                    {showtime.showDate?.end
+                                                        ? new Date(showtime.showDate.end).toLocaleDateString("vi-VN")
+                                                        : 'N/A'}
+                                                </td>
+                                                <td className="p-3">{showtime.showTimes?.length || 0}</td>
                                                 <td className="p-3">
                                                     <motion.button
                                                         onClick={() => handleShowtimeDetail(showtime)}
                                                         className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                                        disabled={!showtime.showTimes?.length}
                                                     >
                                                         Xem chi tiết
                                                     </motion.button>
-
                                                 </td>
                                                 <td className="p-3">
                                                     <motion.button
@@ -936,8 +943,6 @@ const Dashboard: React.FC = () => {
                                                         Xóa
                                                     </motion.button>
                                                 </td>
-
-
                                             </tr>
                                         ))}
                                     </tbody>
@@ -964,69 +969,76 @@ const Dashboard: React.FC = () => {
 
             {/* Showtime Detail Modal */}
             {showTimeForm && selectedShowtime && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold">
-                                Chi tiết suất chiếu - {selectedShowtime.movieId.title}
-                            </h3>
-                            <button
-                                onClick={() => {
-                                    setShowTimeForm(false);
-                                    setSelectedShowtime(null);
-                                }}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="font-semibold">Rạp chiếu:</p>
-                                    <p>{selectedShowtime.theaterId.name}</p>
-                                </div>
-                                <div>
-                                    <p className="font-semibold">Thời gian chiếu:</p>
-                                    <p>
-                                        {new Date(selectedShowtime.showDate.start).toLocaleDateString("vi-VN")} -
-                                        {new Date(selectedShowtime.showDate.end).toLocaleDateString("vi-VN")}
-                                    </p>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold mb-2">Danh sách suất chiếu:</h4>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full">
-                                        <thead className="bg-gray-100">
-                                            <tr>
-                                                <th className="p-2 text-left">Ngày</th>
-                                                <th className="p-2 text-left">Giờ bắt đầu</th>
-                                                <th className="p-2 text-left">Giờ kết thúc</th>
-                                                <th className="p-2 text-left">Phòng chiếu</th>
-                                                <th className="p-2 text-left">Số ghế trống</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedShowtime.showTimes.map((time, index) => (
-                                                <tr key={index} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2">{new Date(time.date).toLocaleDateString("vi-VN")}</td>
-                                                    <td className="p-2">{new Date(time.start).toLocaleTimeString("vi-VN")}</td>
-                                                    <td className="p-2">{new Date(time.end).toLocaleTimeString("vi-VN")}</td>
-                                                    <td className="p-2">{time.room}</td>
-                                                    <td className="p-2">
-                                                        {time.seats.filter(seat => seat.status === 'available').length} / {time.seats.length}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">
+                    Chi tiết suất chiếu - {selectedShowtime.movieId?.title || 'N/A'}
+                </h3>
+                <button
+                    onClick={() => {
+                        setShowTimeForm(false);
+                        setSelectedShowtime(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                >
+                    ✕
+                </button>
+            </div>
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="font-semibold">Rạp chiếu:</p>
+                        <p>{selectedShowtime.theaterId?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Thời gian chiếu:</p>
+                        <p>
+                            {selectedShowtime.showDate?.start && selectedShowtime.showDate?.end
+                                ? `${new Date(selectedShowtime.showDate.start).toLocaleDateString("vi-VN")} - ${new Date(selectedShowtime.showDate.end).toLocaleDateString("vi-VN")}`
+                                : 'N/A'}
+                        </p>
                     </div>
                 </div>
-            )}
+                <div>
+                    <h4 className="font-semibold mb-2">Danh sách suất chiếu:</h4>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="p-2 text-left">Ngày</th>
+                                    <th className="p-2 text-left">Giờ bắt đầu</th>
+                                    <th className="p-2 text-left">Giờ kết thúc</th>
+                                    <th className="p-2 text-left">Phòng chiếu</th>
+                                    <th className="p-2 text-left">Số ghế trống</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {selectedShowtime.showTimes?.map((time, index) => (
+                                    <tr key={index} className="border-b hover:bg-gray-50">
+                                        <td className="p-2">{time.date ? new Date(time.date).toLocaleDateString("vi-VN") : 'N/A'}</td>
+                                        <td className="p-2">{time.start ? new Date(time.start).toLocaleTimeString("vi-VN") : 'N/A'}</td>
+                                        <td className="p-2">{time.end ? new Date(time.end).toLocaleTimeString("vi-VN") : 'N/A'}</td>
+                                        <td className="p-2">{time.room || 'N/A'}</td>
+                                        <td className="p-2">
+                                            {time.seats?.filter(seat => seat.status === 'available').length || 0} / {time.seats?.length || 0}
+                                        </td>
+                                    </tr>
+                                )) || (
+                                    <tr>
+                                        <td colSpan={5} className="p-2 text-center text-gray-500">
+                                            Không có suất chiếu nào
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
 
             {/* Showtime Form Modal */}
             {showShowtimeForm && (
